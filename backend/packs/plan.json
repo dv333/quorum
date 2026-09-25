@@ -1,0 +1,8 @@
+{
+  "name": "Plan a project",
+  "emoji": "🗺️",
+  "description": "Turn a goal into phases, first steps and risks.",
+  "prompt": "Help me plan ",
+  "focus": "a realistic, concrete plan",
+  "guidance": "Produce a concrete plan: phases, the first three steps, the biggest risks and what to cut if time runs short. Challenge unrealistic timelines and missing prerequisites. Prefer the simplest plan that reaches the goal."
+}

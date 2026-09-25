@@ -199,6 +199,7 @@ or pick **Firecrawl cloud** in *Settings → Web search* and paste an API key.
 | To… | Do this |
 |---|---|
 | Ask | Type your conundrum and press Enter |
+| Pick a kind of debate | A topic pack under the question box (Review code, Stress-test a decision…) |
 | Skip the chair's questions | **Skip, just start** |
 | Change the council, chair or priorities | **Customize** under the question box |
 | Look something up | `@Beagle what's the current 30-year mortgage rate?` |
@@ -207,8 +208,45 @@ or pick **Firecrawl cloud** in *Settings → Web search* and paste an API key.
 | Steer a running debate | Type a message; the next agent sees it |
 | Get the answer early | **Answer now** |
 | Read it simpler or deeper | **Simple / Standard / Expert** on the answer |
+| Save or share the answer | **Export** on the answer: Markdown (with or without the debate), or print / save as PDF |
 | New conundrum | ⌘N / Ctrl+N |
 | Hide the sidebar | ⌃⌘S |
+
+### Topic packs
+
+A topic pack sets up a kind of debate: a question starter, what to focus on, and guidance every agent and the
+chair follows. Quorum ships with seven (Compare options, Plan a project, Check a claim, Explain something, Review code,
+Stress-test a decision, Brainstorm ideas). To add your own, drop a JSON file in `data/packs/`:
+
+```json
+{
+  "name": "Pre-mortem",
+  "emoji": "🪦",
+  "description": "Imagine the project failed and work out why.",
+  "prompt": "It's a year from now and this failed: ",
+  "focus": "likely failure modes and early warning signs",
+  "guidance": "Assume the plan failed. Each agent names a different, specific cause, then the council ranks them by likelihood and says what to watch for."
+}
+```
+
+The file name is the pack's id (`pre-mortem.json`). See [docs/PACKS.md](docs/PACKS.md) for every field.
+
+### From the terminal
+
+The `quorum` command asks the council from your terminal, scripts or CI, using the Quorum you already have running:
+
+```bash
+uv run quorum ask "Should we use Postgres or SQLite for a single-server app?"
+git diff | uv run quorum ask --pack code-review --no-questions
+uv run quorum ask "Rust or Go for a CLI?" --json > answer.json
+uv run quorum show <id> --debate > debate.md
+uv run quorum packs
+```
+
+Progress goes to stderr and the answer to stdout, as Markdown (or JSON with `--json`). The chair's clarifying
+questions are asked in the terminal; `--no-questions` skips them (and they're skipped when input is piped). Every
+conundrum also appears in the app, so you can open it there. To use `quorum` from anywhere:
+`uv tool install --editable .`. Point it at another port with `QUORUM_URL`.
 
 ## Configuration
 

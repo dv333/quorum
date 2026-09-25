@@ -24,7 +24,7 @@ export function Markdown({ children, className = '' }) {
   )
 }
 
-async function copyText(text) {
+export async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text)
   } catch {

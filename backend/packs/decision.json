@@ -1,0 +1,8 @@
+{
+  "name": "Stress-test a decision",
+  "emoji": "🧪",
+  "description": "Argue against a decision to find its weak spots before you commit.",
+  "prompt": "I've decided to ",
+  "focus": "hidden assumptions, downside risk, what would change the decision",
+  "guidance": "Treat this as a pre-mortem. At least one agent should argue against the decision in every round. Surface hidden assumptions, the worst realistic outcome and how to limit it, and the evidence that would change the decision. Only agree once the strongest objection has been answered."
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Brainstorm ideas",
+  "emoji": "✨",
+  "description": "Many distinct ideas first, then critique, merge and rank.",
+  "prompt": "Give me ideas for ",
+  "focus": "originality and feasibility",
+  "guidance": "In round 1, each agent proposes ideas nobody before them has proposed. In later rounds, critique, merge near-duplicates and rank them. Favor ideas that are both original and feasible, and drop generic ones."
+}

@@ -43,6 +43,9 @@ Browser (React) ── /api (REST + Server-Sent Events) ──► FastAPI backen
 | `firecrawl.py` | Web search with page excerpts, self-hosted or cloud |
 | `monitor.py` | Background CPU / memory / GPU sampler for the live charts |
 | `setup.py` | First-launch helpers: what's installed, starter model pack, starting local web search |
+| `packs.py` | Topic packs: loading and validating built-in (`backend/packs/`) and user (`data/packs/`) packs |
+| `export.py` | Markdown export: the answer at a reading level, its sources and optionally the whole debate |
+| `cli.py` | The `quorum` command; talks to the running backend over HTTP using only the standard library |
 | `db.py` | SQLite schema, lightweight migrations and helpers |
 | `config.py` | Settings (all overridable through environment variables or `.env`) |
 

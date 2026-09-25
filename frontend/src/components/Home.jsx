@@ -6,12 +6,7 @@ import Customize from './Customize'
 import { useAutoGrow } from './DebateView'
 import { Orb } from './Message'
 
-const SUGGESTIONS = [
-  ['Compare two options', 'Which is better for '],
-  ['Plan a project', 'Help me plan '],
-  ['Check a claim', 'Is it true that '],
-  ['Explain something', 'Explain simply how '],
-]
+const PACKS_SHOWN = 4 // the rest sit behind "More"
 
 function defaultsFrom(config, auto, research) {
   return {
@@ -34,6 +29,9 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [packs, setPacks] = useState([])
+  const [packId, setPackId] = useState(null)
+  const [allPacks, setAllPacks] = useState(false)
   const ref = useRef(null)
   useAutoGrow(ref, question)
 
@@ -41,6 +39,22 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
     api.autoCouncil(config.num_ctx).then(setAuto, (e) => setError(e.message))
     api.inventory(config.num_ctx).then((inv) => setModels(inv.models.filter((m) => m.chat)), () => {})
   }, [config.num_ctx])
+  useEffect(() => { api.packs().then(setPacks, () => {}) }, [])
+
+  const pack = packs.find((p) => p.id === packId)
+  const choosePack = (p) => {
+    const starters = packs.map((x) => x.prompt).filter(Boolean)
+    const untouched = !question.trim() || starters.includes(question)
+    if (p.id === packId) {
+      setPackId(null)
+      if (untouched) setQuestion('')
+    } else {
+      setPackId(p.id)
+      if (untouched) setQuestion(p.prompt || '')
+    }
+    ref.current?.focus()
+  }
+  const shownPacks = allPacks ? packs : packs.filter((p, i) => i < PACKS_SHOWN || p.id === packId)
 
   const research = auto?.research
   const setup = custom || (auto ? defaultsFrom(config, auto, research) : null)
@@ -53,7 +67,7 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
     setError(null)
     requestNotifications() // ask once, during a click, so the chair can reach you later
     try {
-      let body = { question: q }
+      let body = { question: q, pack: packId }
       if (custom) {
         const seatRef = (h) => { const s = custom.seats[handles.indexOf(h)]; return s && { endpoint_id: s.endpoint_id, model: s.model } }
         body = {
@@ -66,6 +80,7 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
           num_ctx: custom.numCtx,
           criteria: custom.criteria,
           custom_rubric: custom.rubric,
+          pack: packId,
         }
       }
       const snap = await api.createDebate(body)
@@ -134,11 +149,18 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
             </div>
           )}
           {error && <p className="error">{error}</p>}
-          <div className="suggestions">
-            {SUGGESTIONS.map(([label, prefix]) => (
-              <button key={label} className="chip" onClick={() => { setQuestion(prefix); ref.current?.focus() }}>{label}</button>
+          <div className="suggestions" role="group" aria-label="Topic packs">
+            {shownPacks.map((p) => (
+              <button key={p.id} className={`chip ${p.id === packId ? 'on' : ''}`} aria-pressed={p.id === packId}
+                title={p.description} onClick={() => choosePack(p)}>
+                {p.emoji && <span className="chip-emoji" aria-hidden="true">{p.emoji}</span>}{p.name}
+              </button>
             ))}
+            {packs.length > PACKS_SHOWN && (
+              <button className="chip ghost" onClick={() => setAllPacks(!allPacks)}>{allPacks ? 'Less' : 'More'}</button>
+            )}
           </div>
+          {pack && <div className="pack-note">{pack.description}</div>}
         </div>
       </div>
       {editing && (

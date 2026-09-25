@@ -27,6 +27,10 @@ PORT = _env_int("LLC_PORT", 8002)
 # SQLite database file
 DB_PATH = os.getenv("LLC_DB_PATH", "data/council.db")
 
+# Topic packs: the ones that ship with Quorum, and your own (JSON files; the same id overrides a built-in one)
+BUILTIN_PACKS_DIR = os.path.join(os.path.dirname(__file__), "packs")
+USER_PACKS_DIR = os.getenv("QUORUM_PACKS_DIR", "data/packs")
+
 # Endpoints auto-registered on first start: (name, base_url, kind)
 DEFAULT_ENDPOINTS = [
     ("Ollama", os.getenv("OLLAMA_URL", "http://localhost:11434"), "ollama"),

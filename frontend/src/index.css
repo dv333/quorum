@@ -618,3 +618,33 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   .ob-welcome h1 { font-size: 30px; }
   .ob-points span { min-width: 54px; font-size: 18px; }
 }
+
+/* Topic packs on the home screen */
+.chip-emoji { margin-right: 6px; }
+.chip.ghost { background: transparent; border-style: dashed; }
+.pack-note { margin-top: 12px; font: 13px var(--font); color: var(--text-2); text-align: center; max-width: 520px; animation: fade 0.2s ease; }
+
+/* Export menu on the answer */
+.export { position: relative; display: inline-flex; align-items: center; }
+.copy-btn.on { opacity: 1; background: var(--fill); color: var(--text); }
+.export-note { font: 12px var(--font); color: var(--agree); margin-left: 4px; }
+.export .menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 220px; padding: 6px;
+  background: var(--card); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-lg, 0 12px 32px rgba(0,0,0,.14));
+  display: flex; flex-direction: column; animation: fade 0.12s ease; }
+.export .menu button, .export .menu a { all: unset; cursor: pointer; padding: 8px 10px; border-radius: 8px; font: 14px var(--font); color: var(--text); }
+.export .menu button:hover, .export .menu a:hover, .export .menu button:focus-visible, .export .menu a:focus-visible { background: var(--fill); }
+.export .menu hr { border: 0; border-top: 1px solid var(--hairline); margin: 4px 6px; }
+
+/* Print or save one answer as PDF (AnswerCard copies the card into #print-root) */
+.print-only, #print-root { display: none; }
+@media print {
+  html:has(body.print-answer), body.print-answer { height: auto !important; overflow: visible !important; background: #fff !important; }
+  body.print-answer > *:not(#print-root) { display: none !important; }
+  body.print-answer #print-root { display: block; }
+  #print-root .answer { box-shadow: none; border: 0; background: #fff; color: #000; animation: none; margin: 0; max-width: none;
+    -webkit-backdrop-filter: none; backdrop-filter: none; }
+  #print-root .print-only { display: block; }
+  #print-root .print-q { font: 600 15px var(--font); padding: 0 26px 10px; color: #333; }
+  #print-root .copy-btn, #print-root .export, #print-root .seg, #print-root .diagram-hint { display: none; }
+  #print-root .stats, #print-root .bars, #print-root .diagram { break-inside: avoid; }
+}

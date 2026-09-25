@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 (2026-09-25)
+
+- Topic packs: pick a kind of debate (Review code, Stress-test a decision, Brainstorm ideas and more) or add your own
+  as JSON in `data/packs/`; the pack's guidance reaches every agent and the chair
+- `quorum` command: ask from the terminal, scripts or CI (`git diff | quorum ask --pack code-review`), with JSON output
+- Export: copy or download an answer as Markdown (optionally with the whole debate), or print / save it as PDF
+- The frontend's backend address can be changed with `QUORUM_URL`
+
 ## 0.1.1 (2026-09-25)
 
 - `start.sh` / `start.ps1` check prerequisites and offer to install missing ones (Homebrew on macOS, winget on

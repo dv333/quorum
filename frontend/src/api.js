@@ -25,6 +25,7 @@ export const api = {
   catalog: (numCtx) => request(`/catalog?num_ctx=${numCtx}`),
   autoCouncil: (numCtx = 8192) => request(`/auto-council?num_ctx=${numCtx}`),
   plan: (models, numCtx) => request('/plan', { method: 'POST', body: { models, num_ctx: numCtx } }),
+  packs: () => request('/packs'),
 
   listDebates: () => request('/debates'),
   getDebate: (id) => request(`/debates/${id}`),
@@ -71,6 +72,17 @@ export const api = {
       for (const line of lines) if (line.trim()) onEvent(JSON.parse(line))
     }
   },
+}
+
+// Markdown export of a conundrum: the answer at a reading level, optionally with the whole debate
+export function exportUrl(id, { level = 'standard', debate = false, download = false } = {}) {
+  return `/api/debates/${id}/export?level=${level}&debate=${debate}&download=${download}`
+}
+
+export async function exportMarkdown(id, opts) {
+  const res = await fetch(exportUrl(id, opts))
+  if (!res.ok) throw new Error(`Export failed (${res.status})`)
+  return res.text()
 }
 
 export function formatGB(bytes) {

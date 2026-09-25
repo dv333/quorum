@@ -1,0 +1,8 @@
+{
+  "name": "Review code",
+  "emoji": "🧑‍💻",
+  "description": "Senior-style review: bugs, risks, edge cases and simpler designs.",
+  "prompt": "Review this code for bugs, risks and simpler alternatives:\n\n",
+  "focus": "correctness, security, simplicity",
+  "guidance": "Act as senior code reviewers. Look for correctness bugs, security issues, unhandled edge cases, performance traps and a simpler design. Quote the lines you mean. Separate must-fix problems from nice-to-haves, and don't invent problems that aren't there."
+}

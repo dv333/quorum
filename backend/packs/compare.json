@@ -1,0 +1,8 @@
+{
+  "name": "Compare options",
+  "emoji": "⚖️",
+  "description": "Weigh two or more options against your situation and pick one.",
+  "prompt": "Which is better for ",
+  "focus": "fit to my situation, trade-offs, a clear recommendation",
+  "guidance": "Judge each option against the user's actual situation, not in general. Name the two or three factors that decide it, say which option wins on each, and say when the answer would flip. End with one clear recommendation."
+}

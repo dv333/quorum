@@ -1,0 +1,8 @@
+{
+  "name": "Check a claim",
+  "emoji": "🔎",
+  "description": "Find out what's established, disputed or unknown, with sources.",
+  "prompt": "Is it true that ",
+  "focus": "evidence, sources, honest confidence",
+  "guidance": "Separate what is well established, what is disputed and what is unknown. Don't rely on memory for facts that can be checked: ask the researcher. Quote the strongest evidence on each side and state your confidence plainly."
+}

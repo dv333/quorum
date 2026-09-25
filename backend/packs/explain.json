@@ -1,0 +1,8 @@
+{
+  "name": "Explain something",
+  "emoji": "💡",
+  "description": "Build real understanding, from intuition to mechanism.",
+  "prompt": "Explain simply how ",
+  "focus": "clarity and correctness",
+  "guidance": "Aim for understanding, not coverage: start with an intuition or analogy, then the actual mechanism, then one common misconception. Check each other's explanations for errors and oversimplifications."
+}

@@ -258,7 +258,8 @@ function TopicBlock({ topic, state, seatsById, current, answerRef, onIntake }) {
     <div ref={current ? answerRef : null} style={{ display: 'contents' }}>
       <AnswerCard debateId={debate.id} msg={chairMsg} verdict={verdict} seats={state.seats}
         chairHandle={debate.chair_handle || null} metrics={metrics[topic]}
-        finalStances={latestStances(messages, topic, state.seats)} factChecked={factChecked} />
+        finalStances={latestStances(messages, topic, state.seats)} factChecked={factChecked}
+        question={question?.content} />
     </div>
   )
   return (
@@ -348,7 +349,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
       <div className="topbar">
         <div className="q-title">
           <h2 title={question}>{displayTitle(debate.title, question)}</h2>
-          <div className="sub">{sub}</div>
+          <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</div>
         </div>
         {INTAKE.includes(status) && (
           <div className="actions">

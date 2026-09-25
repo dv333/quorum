@@ -28,8 +28,13 @@ RESEARCH_HELP = f"""
   {RESEARCHER_NAME} will post a sourced brief before the next agent speaks. Ask at most one question per message, and don't re-ask what a brief already answered. Cite briefs as [{RESEARCHER_NAME}]."""
 
 
+def guidance_line(guidance: str) -> str:
+    """A topic pack's guidance for how the council should approach the conundrum."""
+    return f"\n- How to approach this conundrum: {guidance.strip()}" if guidance and guidance.strip() else ""
+
+
 def agent_system_prompt(
-    handle: str, others: List[str], criteria: List[str], custom_rubric: str, research: bool = False
+    handle: str, others: List[str], criteria: List[str], custom_rubric: str, research: bool = False, guidance: str = ""
 ) -> str:
     return f"""Today is {today()}. You are {handle}, one member of a council of AI agents working together to give the user the best possible answer, by debating in a group chat.
 The other agents are: {", ".join(others)}. The user may also post messages; treat them as guidance from the person you all serve.
@@ -40,7 +45,7 @@ How to debate:
 - Don't repeat points that were already made. Add something new: evidence, a counter-example, a refinement, or a concrete recommendation.
 - Check the numbers against the user's situation. If something doesn't add up (for example, a purchase their income can't support), say so plainly and adjust the advice.
 - Keep it under {WORD_CAP} words. Use markdown only when it helps (short lists, code).
-- The user cares most about: {criteria_text(criteria, custom_rubric)}.
+- The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 - If the user addresses you by name (for example @{handle}), answer them directly first.
 - Speak only as yourself. Never write messages for other agents, the user or {RESEARCHER_NAME}.{RESEARCH_HELP if research else ""}
 
@@ -112,6 +117,7 @@ def turn_messages(
     round_no: int,
     max_rounds: int,
     research: bool = False,
+    guidance: str = "",
 ) -> List[Dict[str, str]]:
     user = [history_block(prior_topics), f"THE QUESTION:\n{question}\n"]
     if summary:
@@ -126,7 +132,7 @@ def turn_messages(
         f"Reply with your message only, ending with the STANCE and POSITION lines."
     )
     return [
-        {"role": "system", "content": agent_system_prompt(handle, others, criteria, custom_rubric, research)},
+        {"role": "system", "content": agent_system_prompt(handle, others, criteria, custom_rubric, research, guidance)},
         {"role": "user", "content": "".join(user)},
     ]
 
@@ -161,6 +167,7 @@ def verdict_messages(
     reason: str,
     criteria: List[str],
     custom_rubric: str,
+    guidance: str = "",
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -191,7 +198,7 @@ Final positions:
 {pos}
 {check}
 {why}
-The user cares most about: {criteria_text(criteria, custom_rubric)}.
+The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
 Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer. Correct anything the fact-check or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory.
 

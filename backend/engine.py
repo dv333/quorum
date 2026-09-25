@@ -138,6 +138,7 @@ class DebateEngine:
         if d is None:
             raise KeyError(self.id)
         d["criteria"] = db.loads(d.pop("criteria_json"), [])
+        d["pack"] = db.loads(d.pop("pack_json", None), None)
         d["autopilot"] = bool(d["autopilot"])
         d["research_enabled"] = bool(d["research_enabled"])
         return d
@@ -1092,6 +1093,7 @@ class DebateEngine:
                 round_no=round_no,
                 max_rounds=d["max_rounds"],
                 research=d["research_enabled"],
+                guidance=(d["pack"] or {}).get("guidance", ""),
             )
 
         messages = build(msgs)
@@ -1202,6 +1204,7 @@ class DebateEngine:
                 reason=reason,
                 criteria=d["criteria"],
                 custom_rubric=d["custom_rubric"],
+                guidance=(d["pack"] or {}).get("guidance", ""),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:

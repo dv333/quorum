@@ -1,12 +1,12 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 // Models write "~$12k" for approximations; only ~~double~~ tildes should strike through
 const GFM = [[remarkGfm, { singleTilde: false }]]
-import { api } from '../api'
+import { api, exportMarkdown, exportUrl } from '../api'
 import { RESEARCHER, agentFor, formatDuration, formatTime, formatTokens, modelShort } from '../agents'
-import { CopyButton, Markdown, Orb } from './Message'
+import { CopyButton, Markdown, Orb, copyText } from './Message'
 import Mermaid from './Mermaid'
 
 const LEVELS = [['simple', 'Simple'], ['standard', 'Standard'], ['expert', 'Expert']]
@@ -122,13 +122,64 @@ function FragmentRow({ actor, chair, models, width, detail, title }) {
   )
 }
 
-export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked }) {
+// Export: Markdown to the clipboard or a file (with or without the debate), or print / save as PDF
+function ExportMenu({ debateId, level, onPrint }) {
+  const [open, setOpen] = useState(false)
+  const [note, setNote] = useState(null)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    const close = (e) => { if (e.type === 'keydown' ? e.key === 'Escape' : !ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) }
+  }, [open])
+  const flash = (text) => { setNote(text); setOpen(false); setTimeout(() => setNote(null), 1600) }
+  const copy = async () => {
+    try { await copyText(await exportMarkdown(debateId, { level })); flash('Copied') } catch (e) { flash(e.message) }
+  }
+  return (
+    <div className="export" ref={ref}>
+      <button className={`copy-btn ${open ? 'on' : ''}`} aria-label="Export" title={note || 'Export'} aria-haspopup="menu"
+        aria-expanded={open} onClick={() => setOpen(!open)}>
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M10 12.5V2.5m0 0L6.5 6M10 2.5 13.5 6" strokeLinecap="round" strokeLinejoin="round" /><path d="M5 9.5H4.5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2H15" strokeLinecap="round" /></svg>
+      </button>
+      {note && <span className="export-note">{note}</span>}
+      {open && (
+        <div className="menu" role="menu">
+          <button role="menuitem" onClick={copy}>Copy as Markdown</button>
+          <a role="menuitem" href={exportUrl(debateId, { level, download: true })} onClick={() => setOpen(false)}>Download Markdown</a>
+          <a role="menuitem" href={exportUrl(debateId, { level, debate: true, download: true })} onClick={() => setOpen(false)}>Download with the debate</a>
+          <hr />
+          <button role="menuitem" onClick={() => { setOpen(false); onPrint() }}>Print or save as PDF</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question }) {
   const [level, setLevel] = useState('standard')
   const [versions, setVersions] = useState({})
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
   const [diagramFailed, setDiagramFailed] = useState(false)
+  const cardRef = useRef(null)
   const onDiagramFail = useCallback(() => setDiagramFailed(true), [])
+
+  // Print just this answer: a copy goes into a plain top-level container (the app itself scrolls inside a
+  // fixed-height window, which would cut the printout at one page), and print CSS hides everything else.
+  const print = () => {
+    if (!cardRef.current) return
+    const holder = document.createElement('div')
+    holder.id = 'print-root'
+    holder.appendChild(cardRef.current.cloneNode(true))
+    document.body.appendChild(holder)
+    document.body.classList.add('print-answer')
+    const done = () => { holder.remove(); document.body.classList.remove('print-answer'); window.removeEventListener('afterprint', done) }
+    window.addEventListener('afterprint', done)
+    setTimeout(() => window.print(), 50)
+  }
 
   const streaming = msg?.status === 'streaming'
   const chooseLevel = async (lv) => {
@@ -166,10 +217,12 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
   }
 
   return (
-    <div className={`answer ${busy ? 'rewriting' : ''}`}>
+    <div className={`answer ${busy ? 'rewriting' : ''}`} ref={cardRef}>
+      {question && <div className="print-only print-q">{question}</div>}
       <div className="a-head">
         <div className="t">{verdict ? headline(verdict, finalStances, seats.length, factChecked, chairName) : <span>{chairName} is writing the answer…</span>}</div>
         {verdict && <CopyButton text={text} label="Copy answer" />}
+        {verdict && msg?.status === 'done' && <ExportMenu debateId={debateId} level={versions[level] || level === 'standard' ? level : 'standard'} onPrint={print} />}
         {verdict && verdict.reason !== 'direct' && (
           <div className="seg" role="group" aria-label="Reading level">
             {LEVELS.map(([k, label]) => (

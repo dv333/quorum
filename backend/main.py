@@ -8,10 +8,10 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import db, firecrawl, inventory, monitor, setup
+from . import db, export, firecrawl, inventory, monitor, packs, setup
 from .config import (
     APP_NAME,
     DEFAULT_AUTOPILOT,
@@ -78,6 +78,7 @@ class CreateDebate(BaseModel):
     num_ctx: int = Field(DEFAULT_NUM_CTX, ge=2048, le=262144)
     research_enabled: Optional[bool] = None  # None: on when Firecrawl is available
     researcher: Optional[ModelRef] = None  # None: picked with the chair
+    pack: Optional[str] = None  # topic pack id (see /api/packs)
 
 
 class UpdateDebate(BaseModel):
@@ -298,6 +299,12 @@ async def create_debate(body: CreateDebate):
         if not inventory.endpoint(ref.endpoint_id):
             raise HTTPException(400, f"Unknown endpoint {ref.endpoint_id}")
 
+    pack = None
+    if body.pack:
+        pack = packs.get(body.pack)
+        if not pack:
+            raise HTTPException(400, f"Unknown topic pack: {body.pack}")
+
     research = body.research_enabled
     if research is None:
         research = bool((await firecrawl.status())["ready"])
@@ -307,7 +314,7 @@ async def create_debate(body: CreateDebate):
     db.execute(
         "INSERT INTO debates (id, title, created_at, chair_endpoint_id, chair_model, max_rounds, autopilot, "
         "criteria_json, custom_rubric, num_ctx, research_enabled, researcher_endpoint_id, researcher_model, "
-        "chair_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "chair_mode, pack_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             debate_id,
             (body.title or "").strip(),
@@ -317,12 +324,14 @@ async def create_debate(body: CreateDebate):
             body.max_rounds,
             int(body.autopilot),
             json.dumps(body.criteria),
-            body.custom_rubric,
+            # A pack's focus stands in when you didn't write your own rubric
+            body.custom_rubric or (pack or {}).get("focus", ""),
             body.num_ctx,
             int(research),
             researcher.endpoint_id if researcher else None,
             researcher.model if researcher else None,
             "manual" if body.chair else "auto",
+            json.dumps(pack) if pack else None,
         ],
     )
     for i, seat in enumerate(seats):
@@ -334,6 +343,24 @@ async def create_debate(body: CreateDebate):
 
     await get_engine(debate_id).post_user_message(body.question)
     return get_engine(debate_id).snapshot()
+
+
+@app.get("/api/packs")
+async def list_packs():
+    return packs.load_all()
+
+
+@app.get("/api/debates/{debate_id}/export")
+async def export_debate(debate_id: str, level: str = "standard", debate: bool = False, download: bool = False):
+    """The conundrum as Markdown: the answer at a reading level, its sources and, with debate=true, the debate."""
+    _require_debate(debate_id)
+    snap = get_engine(debate_id).snapshot()
+    try:
+        text = export.to_markdown(snap, level=level, include_debate=debate)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    headers = {"Content-Disposition": f'attachment; filename="{export.filename(snap)}"'} if download else {}
+    return PlainTextResponse(text, media_type="text/markdown; charset=utf-8", headers=headers)
 
 
 @app.get("/api/debates/{debate_id}")
