@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api } from '../api'
+import { api, formatGB } from '../api'
 import { requestNotifications } from '../attention'
 import { RESEARCHER, modelShort } from '../agents'
 import Customize from './Customize'
@@ -35,11 +35,33 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
   const ref = useRef(null)
   useAutoGrow(ref, question)
 
+  const [refresh, setRefresh] = useState(0)
+  const [pull, setPull] = useState(null) // { model, pct, error }
   useEffect(() => {
-    api.autoCouncil(config.num_ctx).then(setAuto, (e) => setError(e.message))
     api.inventory(config.num_ctx).then((inv) => setModels(inv.models.filter((m) => m.chat)), () => {})
-  }, [config.num_ctx])
+  }, [config.num_ctx, refresh])
+  // The council follows the topic pack: a pack can build it around specialists (for example coding models)
+  useEffect(() => {
+    let live = true
+    api.autoCouncil(config.num_ctx, packId).then((a) => { if (live) setAuto(a) }, (e) => setError(e.message))
+    return () => { live = false }
+  }, [config.num_ctx, packId, refresh])
   useEffect(() => { api.packs().then(setPacks, () => {}) }, [])
+
+  // Adding a suggested model only ever happens on the user's click
+  const addModel = async (s) => {
+    setPull({ model: s.model, pct: 0 })
+    try {
+      await api.pullModel(s.endpoint_id, s.model, (ev) => {
+        if (ev.error) throw new Error(ev.error)
+        if (ev.total) setPull({ model: s.model, pct: Math.round((100 * (ev.completed || 0)) / ev.total) })
+      })
+      setPull(null)
+      setRefresh((n) => n + 1)
+    } catch (e) {
+      setPull({ model: s.model, error: e.message })
+    }
+  }
 
   const pack = packs.find((p) => p.id === packId)
   const choosePack = (p) => {
@@ -58,6 +80,8 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
 
   const research = auto?.research
   const setup = custom || (auto ? defaultsFrom(config, auto, research) : null)
+  const packCouncil = !custom && auto?.pack?.id === packId ? auto.pack : null
+  const suggestion = packCouncil?.suggestions?.find((s) => s.fit !== 'too_big' && s.disk_ok && s.endpoint_id)
   const handles = config.handles
 
   const start = async () => {
@@ -143,7 +167,9 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
           </div>
           {setup && (
             <div className="hint">
-              {custom ? 'Your council' : `Every model you have joins (${seatsShown.length} agents)`} · {chairText} ·{' '}
+              {custom ? 'Your council'
+                : packCouncil?.specialists?.length ? `Built for ${pack?.name}: ${packCouncil.specialists.length} specialist${packCouncil.specialists.length === 1 ? '' : 's'} and the strongest generalists (${seatsShown.length} agents)`
+                : `Every model you have joins (${seatsShown.length} agents)`} · {chairText} ·{' '}
               <button className="linkish" onClick={() => setEditing(setup)}>Customize</button>
               {custom && <> · <button className="linkish" onClick={() => setCustom(null)}>Reset</button></>}
             </div>
@@ -161,6 +187,20 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
             )}
           </div>
           {pack && <div className="pack-note">{pack.description}</div>}
+          {pack && suggestion && (
+            <div className="pack-suggest">
+              {pull?.model === suggestion.model && !pull.error ? (
+                <>Adding {suggestion.model}… {pull.pct}% <span className="progress-line"><i style={{ width: `${pull.pct}%` }} /></span></>
+              ) : (
+                <>
+                  None of your models specialize in this yet. <b>{suggestion.model}</b> ({formatGB(suggestion.size_bytes)}
+                  {suggestion.strengths ? `, ${suggestion.strengths.toLowerCase()}` : ''}) would join as a specialist.{' '}
+                  <button className="linkish" onClick={() => addModel(suggestion)} disabled={!!pull && !pull.error}>Add it</button>
+                  {pull?.error && <span className="error"> · {pull.error}</span>}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {editing && (

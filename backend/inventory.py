@@ -3,8 +3,9 @@
 import asyncio
 import json
 import os
+import shutil
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import db
 from .config import AUTO_COUNCIL_MAX, AUTO_COUNCIL_MIN, DEFAULT_NUM_CTX, HANDLES
@@ -180,6 +181,87 @@ def pick_council(
     return seats
 
 
+def _suits(model: str, prefer: List[str]) -> bool:
+    name = model.lower()
+    return any(p in name for p in prefer)
+
+
+def pick_council_for_pack(
+    models: List[Dict[str, Any]], usable_bytes: int, prefs: Optional[Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """The council for a topic pack that prefers certain models (for example coding models for code review).
+
+    When suitable models are installed, the council is those specialists plus the strongest generalists, capped at
+    the pack's seat count: smaller, focused and faster. With no suitable model installed, or no preferences, it's the
+    usual council. Returns (seats, the specialists that got a seat).
+    """
+    if not prefs or not prefs.get("prefer"):
+        return pick_council(models, usable_bytes), []
+    candidates = pick_council(models, usable_bytes, max_size=len(models), min_size=0)
+    specialists = [m for m in candidates if _suits(m["model"], prefs["prefer"])]
+    if not specialists:
+        return pick_council(models, usable_bytes), []
+    size = prefs.get("seats", 4)
+    chosen = specialists[:size]
+    chosen += [m for m in candidates if m not in chosen][: max(0, size - len(chosen))]
+    chosen.sort(key=lambda m: m["est_bytes"] or 0, reverse=True)  # the largest member still picks the chair
+    seats = list(chosen)
+    i = 0
+    while len(seats) < AUTO_COUNCIL_MIN:
+        seats.append(chosen[i % len(chosen)])
+        i += 1
+    return seats, [m["model"] for m in specialists[:size]]
+
+
+def models_dir() -> str:
+    return os.getenv("OLLAMA_MODELS") or os.path.expanduser("~/.ollama/models")
+
+
+def free_disk_bytes() -> Optional[int]:
+    """Free space where Ollama keeps its models (or the nearest existing parent folder)."""
+    path = models_dir()
+    while path and not os.path.exists(path) and os.path.dirname(path) != path:
+        path = os.path.dirname(path)
+    try:
+        return shutil.disk_usage(path or os.path.expanduser("~")).free
+    except OSError:
+        return None
+
+
+def pack_suggestions(
+    prefs: Optional[Dict[str, Any]], installed: List[Dict[str, Any]], num_ctx: int = DEFAULT_NUM_CTX
+) -> List[Dict[str, Any]]:
+    """Models worth adding for a pack when none of its preferred models are installed. Never downloads anything:
+    the user decides. Each suggestion says whether it fits in memory and on disk."""
+    if not prefs or not prefs.get("suggest"):
+        return []
+    have = {m["model"].removesuffix(":latest") for m in installed}
+    known = {c["model"]: c for c in catalog(num_ctx)}
+    free = free_disk_bytes()
+    ollama = next((e for e in endpoints(enabled_only=True) if e.kind == "ollama" and e.is_local), None)
+    out = []
+    for name in prefs["suggest"]:
+        if name in have:
+            continue
+        c = known.get(name)
+        if not c:
+            continue
+        disk_ok = free is None or free > c["size_bytes"] * 1.2
+        out.append(
+            {
+                "model": name,
+                "strengths": c.get("strengths", ""),
+                "size_bytes": c["size_bytes"],
+                "est_bytes": c["est_bytes"],
+                "fit": c["fit"],
+                "free_disk_bytes": free,
+                "disk_ok": disk_ok,
+                "endpoint_id": ollama.id if ollama else None,
+            }
+        )
+    return out
+
+
 def pick_researcher(seats: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Beagle gets a mid-sized member: capable enough to summarize sources, quick enough for many lookups."""
     if not seats:
@@ -188,10 +270,12 @@ def pick_researcher(seats: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return distinct[len(distinct) // 2]
 
 
-async def auto_council(num_ctx: int = DEFAULT_NUM_CTX) -> Dict[str, Any]:
-    """The council a new question gets by default, plus who will pick the chair (the largest model)."""
+async def auto_council(num_ctx: int = DEFAULT_NUM_CTX, pack: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The council a new question gets by default, plus who will pick the chair (the largest model).
+    A topic pack with model preferences gets a council built around suitable models (see pick_council_for_pack)."""
     inv = await inventory(num_ctx)
-    seats = pick_council(inv["models"], inv["system"]["usable_bytes"])
+    prefs = (pack or {}).get("models")
+    seats, specialists = pick_council_for_pack(inv["models"], inv["system"]["usable_bytes"], prefs)
     members = [
         {
             "handle": HANDLES[i],
@@ -215,4 +299,17 @@ async def auto_council(num_ctx: int = DEFAULT_NUM_CTX) -> Dict[str, Any]:
         if beagle
         else None
     )
-    return {"seats": members, "picker": members[0]["handle"] if members else None, "researcher": researcher, "plan": p}
+    result = {
+        "seats": members,
+        "picker": members[0]["handle"] if members else None,
+        "researcher": researcher,
+        "plan": p,
+    }
+    if pack:
+        local = [m for m in inv["models"] if m.get("local") and m.get("chat", True)]
+        result["pack"] = {
+            "id": pack["id"],
+            "specialists": specialists,
+            "suggestions": [] if specialists else pack_suggestions(prefs, local, num_ctx),
+        }
+    return result

@@ -17,6 +17,10 @@
     {"model": "gemma3:27b", "size_gb": 17.0, "family": "Gemma", "strengths": "High quality generalist"},
     {"model": "qwen3:30b", "size_gb": 19.0, "family": "Qwen", "strengths": "Fast mixture-of-experts, great chair"},
     {"model": "qwen3:32b", "size_gb": 20.0, "family": "Qwen", "strengths": "Dense, strong reasoning"},
-    {"model": "gpt-oss:120b", "size_gb": 65.0, "family": "gpt-oss", "strengths": "Frontier-class open weights, needs 80 GB+"}
+    {"model": "gpt-oss:120b", "size_gb": 65.0, "family": "gpt-oss", "strengths": "Frontier-class open weights, needs 80 GB+"},
+    {"model": "qwen2.5-coder:7b", "size_gb": 4.7, "family": "Qwen", "strengths": "Small, fast coding model", "tags": ["code"]},
+    {"model": "qwen2.5-coder:14b", "size_gb": 9.0, "family": "Qwen", "strengths": "Strong code review and generation", "tags": ["code"]},
+    {"model": "devstral:24b", "size_gb": 14.0, "family": "Mistral", "strengths": "Agentic coding, reads whole codebases", "tags": ["code"]},
+    {"model": "qwen3-coder:30b", "size_gb": 19.0, "family": "Qwen", "strengths": "Fast mixture-of-experts coder", "tags": ["code"]}
   ]
 }

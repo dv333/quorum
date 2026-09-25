@@ -19,6 +19,7 @@ MacBook Pro with eight local models, answering *Should I rent or buy a home in C
 - [First launch](#first-launch)
 - [Light and dark](#light-and-dark)
 - [From the terminal](#from-the-terminal)
+- [Health report](#health-report)
 - [Privacy](#privacy)
 
 ## Ask
@@ -52,6 +53,17 @@ what it does, and gives every agent and the chair guidance for how to approach t
 | ✨ Brainstorm ideas | Many distinct ideas first, then critique, merge and rank |
 
 Add your own by dropping a JSON file into `data/packs/`. See [PACKS.md](PACKS.md).
+
+### A council built for the pack
+
+Some packs want particular models. **Review code** prefers coding models: when you have some installed, the council
+becomes those specialists plus the strongest generalists, four seats in all, which is smaller, more focused and
+faster. Without a pack, every model you have joins as usual.
+
+If none of your models suit the pack, Quorum suggests one to add, checked against your memory and free disk space.
+Nothing is downloaded until you click **Add it**, and Quorum never removes models.
+
+<img src="images/specialists.png" alt="Review code chosen, with a coding model suggested because none is installed">
 
 ## Customize the council
 
@@ -227,6 +239,41 @@ While `quorum ask` runs, each finished turn is printed as one line on stderr (fo
 Progress goes to stderr and the answer to stdout (Markdown, or JSON with `--json`), so it pipes cleanly. The chair's
 questions are asked in the terminal; `--no-questions` skips them. `uv tool install --editable .` puts `quorum` on
 your PATH.
+
+## Health report
+
+`quorum doctor` measures your own recent conundrums, with no model calls: how debates end, how long answers take,
+how often agents agree or dissent, which models skip the stance format or fail, and how fast each model is. Then it
+lists plain-language findings. For example, on the machine these screenshots come from:
+
+```text
+$ uv run quorum doctor
+Last 18 conundrums: 19 answers (consensus 9, direct 1, max_rounds 9), 1 unfinished
+Time to first answer: median 10.9 min, longest 43.6 min
+Agent turns: 341 · agree 49.6% · refine 46.6% · disagree 3.8% · round-1 agree 28.9% · missing stance 1.5% · failed 0
+Research: 101 briefs, 258 searches, 0 failed · chair answer errors: 0 · drafts: 4
+
+Models (slowest first):
+  qwen3.8:latest: 9 calls, 163.1s per call, 8.4 tok/s · 9 turns, missing stance 0.0%
+  deepseek-r1:8b: 69 calls, 37.7s per call, 27.2 tok/s · 49 turns, missing stance 6.1%
+  qwen3.6:latest: 71 calls, 36.7s per call, 35.4 tok/s · 32 turns, missing stance 0.0%
+  qwen3:14b: 77 calls, 31.9s per call, 13.0 tok/s · 27 turns, missing stance 3.7%
+  gpt-oss:20b: 116 calls, 27.6s per call, 39.1 tok/s · 51 turns, missing stance 2.0%
+  gemma3:12b: 60 calls, 23.5s per call, 12.9 tok/s · 52 turns, missing stance 0.0%
+  phi4:14b: 132 calls, 22.3s per call, 12.0 tok/s · 54 turns, missing stance 0.0%
+  llama3.1:8b: 27 calls, 21.8s per call, 14.3 tok/s · 27 turns, missing stance 0.0%
+  gemma3:4b: 84 calls, 5.6s per call, 30.0 tok/s · 40 turns, missing stance 0.0%
+
+Findings:
+  - Agents rarely disagree: 3.8% of turns are DISAGREE. Debates may be rubber-stamping the first answer.
+  - 28.9% of round-1 turns already AGREE, before most agents have heard the others.
+  - A typical answer takes 10.9 minutes (longest 43.6).
+  - qwen3.8:latest averages 163.1s per call, 5.9× the council's typical 28s, so it slows every round. Consider leaving it out of the council.
+  - 1 conundrum(s) were left unfinished (paused or interrupted).
+```
+
+`quorum doctor --ask` hands the report to the council and prints its diagnosis: the likely cause of each problem and
+the fix, in priority order. The same numbers are available as JSON at `/api/diagnostics`.
 
 ## Privacy
 

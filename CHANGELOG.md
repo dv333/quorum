@@ -10,6 +10,11 @@
   highlighted, what changed and whose argument changed it, and earlier drafts one click away
 - Why?: select any part of the answer to see which agents argued for it, who pushed back, and the sources behind it
 - Round recaps (stances, who dissents, fold a round away) and a plain-words live status line by the message box
+- Councils built for the pack: a pack can prefer certain models (Review code prefers coding models); the council
+  becomes those specialists plus the strongest generalists, and Quorum suggests a model to add, checked against
+  memory and free disk, when none is installed. Nothing is downloaded without a click; nothing is ever removed
+- `quorum doctor`: a health report measured from your recent conundrums (outcomes, time to answer, stance and failure
+  rates, speed per model) with plain-language findings; `--ask` gets the council's diagnosis. Also at `/api/diagnostics`
 - A features guide with screenshots: [docs/FEATURES.md](docs/FEATURES.md)
 - The frontend's backend address can be changed with `QUORUM_URL`
 

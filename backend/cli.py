@@ -6,6 +6,7 @@
     quorum show <id> --debate > debate.md
     quorum packs
     quorum list
+    quorum doctor [--ask]
 
 Uses only the Python standard library.
 """
@@ -251,6 +252,36 @@ def cmd_show(args: argparse.Namespace) -> int:
     return 0
 
 
+DOCTOR_QUESTION = """Here is Quorum's health report, measured from my last {n} conundrums on this machine (Quorum is the app you are running in: a council of local models that debate a question in rounds, then a chair writes the answer).
+
+{report}
+
+Diagnose it like an engineer: which problems matter most for answer quality and speed, the likely cause of each, and the concrete fix (a setting, a model change, or a code change), in priority order. Only use the numbers above; say what else we'd need to measure where they aren't enough."""
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    report = get(f"/diagnostics?last={args.last}&text=true", raw=True)
+    if args.json:
+        print(json.dumps(get(f"/diagnostics?last={args.last}"), indent=2, ensure_ascii=False))
+        return 0
+    print(report)
+    if not args.ask:
+        return 0
+    print("\nAsking the council for an improvement plan…", file=sys.stderr)
+    snap = post("/debates", {"question": DOCTOR_QUESTION.format(n=args.last, report=report), "research_enabled": False})
+    debate_id = snap["debate"]["id"]
+    progress = Progress(args.quiet)
+    progress.say(f"Conundrum {debate_id} · watch it live at {APP_URL}/#q/{debate_id}")
+    try:
+        wait_for_answer(debate_id, interactive=False, progress=progress)
+    except KeyboardInterrupt:
+        post(f"/debates/{debate_id}/stop")
+        print(f"\nPaused. Pick it up in the app: {APP_URL}/#q/{debate_id}", file=sys.stderr)
+        return 130
+    print("\n" + _result(debate_id, "standard", False, False))
+    return 0
+
+
 def cmd_packs(args: argparse.Namespace) -> int:
     packs = get("/packs")
     if args.json:
@@ -300,6 +331,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     packs = sub.add_parser("packs", help="list topic packs")
     packs.add_argument("--json", action="store_true")
     packs.set_defaults(func=cmd_packs)
+
+    doctor = sub.add_parser("doctor", help="health report from your recent conundrums")
+    doctor.add_argument("--last", type=int, default=20, help="how many recent conundrums to measure (default 20)")
+    doctor.add_argument("--ask", action="store_true", help="then ask the council for an improvement plan")
+    doctor.add_argument("--json", action="store_true")
+    doctor.add_argument("-q", "--quiet", action="store_true", help="no progress lines on stderr")
+    doctor.set_defaults(func=cmd_doctor)
 
     ls = sub.add_parser("list", help="list recent conundrums")
     ls.add_argument("-n", type=int, default=15, help="how many (default 15)")

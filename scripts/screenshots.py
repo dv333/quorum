@@ -71,6 +71,13 @@ async def main(args):
         await take("home-light", f"{BASE}/", prepare=type_question)
         await take("home-dark", f"{BASE}/", dark=True, prepare=type_question)
         await take("packs", f"{BASE}/", prepare=choose_pack)
+
+        async def choose_code_review(page):
+            await page.click("button.chip:has-text('More')")
+            await page.click("button.chip:has-text('Review code')")
+            await page.wait_for_timeout(1500)  # the council and any suggestion follow the pack
+
+        await take("specialists", f"{BASE}/", prepare=choose_code_review)
         await take("welcome", f"{BASE}/#welcome")
 
         async def open_customize(page):

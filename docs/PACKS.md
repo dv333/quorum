@@ -19,6 +19,26 @@ The file name is the pack's id: lowercase letters, digits and dashes, up to 40 c
 | `emoji` | no | 8 | Shown on the chip |
 | `prompt` | no | 300 | A question starter placed in the question box (keep a trailing space) |
 | `focus` | no | 200 | What the user cares most about, when they haven't set their own priorities in Customize |
+| `models` | no | | Which models suit the pack (see below) |
+
+## Models for a pack
+
+A pack can build its council around suitable models:
+
+```json
+"models": {
+  "prefer": ["coder", "devstral"],
+  "suggest": ["qwen3-coder:30b", "qwen2.5-coder:14b"],
+  "seats": 4
+}
+```
+
+- `prefer`: parts of model names (up to 12). Installed models whose name contains one of them are the pack's
+  specialists. When at least one is installed, the council is the specialists plus the strongest other models, up to
+  `seats` (2 to 8, default 4). Without specialists, the council is every installed model as usual.
+- `suggest`: Ollama models (up to 5) to offer when no specialist is installed. Each must be in `backend/catalog.json`
+  so Quorum can check its size against your memory and free disk before offering it. Nothing is downloaded without a
+  click, and models are never removed.
 
 A pack that doesn't match this format is skipped, and the backend log says why.
 

@@ -23,7 +23,7 @@ export const api = {
   config: () => request('/config'),
   inventory: (numCtx, refresh = false) => request(`/inventory?num_ctx=${numCtx}${refresh ? '&refresh=true' : ''}`),
   catalog: (numCtx) => request(`/catalog?num_ctx=${numCtx}`),
-  autoCouncil: (numCtx = 8192) => request(`/auto-council?num_ctx=${numCtx}`),
+  autoCouncil: (numCtx = 8192, pack = null) => request(`/auto-council?num_ctx=${numCtx}${pack ? `&pack=${encodeURIComponent(pack)}` : ''}`),
   plan: (models, numCtx) => request('/plan', { method: 'POST', body: { models, num_ctx: numCtx } }),
   packs: () => request('/packs'),
 

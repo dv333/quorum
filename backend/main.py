@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import db, export, firecrawl, inventory, monitor, packs, setup
+from . import db, diagnostics, export, firecrawl, inventory, monitor, packs, setup
 from .config import (
     APP_NAME,
     DEFAULT_AUTOPILOT,
@@ -167,8 +167,11 @@ async def config():
 
 
 @app.get("/api/auto-council")
-async def get_auto_council(num_ctx: int = DEFAULT_NUM_CTX):
-    council = await inventory.auto_council(num_ctx)
+async def get_auto_council(num_ctx: int = DEFAULT_NUM_CTX, pack: Optional[str] = None):
+    chosen = packs.get(pack) if pack else None
+    if pack and not chosen:
+        raise HTTPException(404, f"Unknown topic pack: {pack}")
+    council = await inventory.auto_council(num_ctx, pack=chosen)
     council["research"] = await firecrawl.status()
     return council
 
@@ -287,10 +290,15 @@ async def list_debates():
 
 @app.post("/api/debates")
 async def create_debate(body: CreateDebate):
+    pack = None
+    if body.pack:
+        pack = packs.get(body.pack)
+        if not pack:
+            raise HTTPException(400, f"Unknown topic pack: {body.pack}")
     seats = body.seats
     researcher = body.researcher
     if seats is None:
-        auto = await inventory.auto_council(body.num_ctx)
+        auto = await inventory.auto_council(body.num_ctx, pack=pack)
         seats = [SeatIn(endpoint_id=m["endpoint_id"], model=m["model"], thinking=True) for m in auto["seats"]]
         if researcher is None and auto["researcher"]:
             researcher = ModelRef(endpoint_id=auto["researcher"]["endpoint_id"], model=auto["researcher"]["model"])
@@ -302,12 +310,6 @@ async def create_debate(body: CreateDebate):
     for ref in refs:
         if not inventory.endpoint(ref.endpoint_id):
             raise HTTPException(400, f"Unknown endpoint {ref.endpoint_id}")
-
-    pack = None
-    if body.pack:
-        pack = packs.get(body.pack)
-        if not pack:
-            raise HTTPException(400, f"Unknown topic pack: {body.pack}")
 
     research = body.research_enabled
     if research is None:
@@ -347,6 +349,13 @@ async def create_debate(body: CreateDebate):
 
     await get_engine(debate_id).post_user_message(body.question)
     return get_engine(debate_id).snapshot()
+
+
+@app.get("/api/diagnostics")
+async def get_diagnostics(last: int = 20, text: bool = False):
+    """Health report from your recent conundrums: outcomes, speed per model, stance and failure rates, findings."""
+    r = diagnostics.report(last)
+    return PlainTextResponse(diagnostics.as_text(r)) if text else r
 
 
 @app.get("/api/packs")

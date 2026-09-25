@@ -51,7 +51,8 @@ A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
 - **Current facts, with sources.** Beagle searches the web through [Firecrawl](https://github.com/firecrawl/firecrawl),
   posts cited briefs, and fact-checks the claims the final answer depends on.
 - **Topic packs.** Pick a kind of debate (Review code, Stress-test a decision, Brainstorm ideas and more) or write
-  your own in a few lines of JSON.
+  your own in a few lines of JSON. Packs can build the council around suitable models, like coding models for code
+  review, and suggest one to add when you have none.
 - **Watch the answer improve.** After every round the chair updates a draft answer pinned at the top, with the
   changed words highlighted. Round recaps show who agrees and who dissents.
 - **Answers for everyone.** The bottom line comes first. Switch between Simple, Standard and Expert; the Expert view
@@ -251,6 +252,8 @@ git diff | uv run quorum ask --pack code-review --no-questions
 uv run quorum ask "Rust or Go for a CLI?" --json > answer.json
 uv run quorum show <id> --debate > debate.md
 uv run quorum packs
+uv run quorum doctor             # health report from your recent conundrums
+uv run quorum doctor --ask       # ...and the council's diagnosis
 ```
 
 Progress goes to stderr and the answer to stdout, as Markdown (or JSON with `--json`). The chair's clarifying

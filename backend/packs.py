@@ -49,7 +49,29 @@ def validate(pack_id: str, raw: Any) -> Dict[str, Any]:
             raise PackError(f'"{field}" is longer than {limit} characters')
         # The question starter keeps its trailing space so the cursor lands after it
         pack[field] = value if field == "prompt" else value.strip()
+    if raw.get("models") is not None:
+        pack["models"] = _validate_models(raw["models"])
     return pack
+
+
+def _validate_models(raw: Any) -> Dict[str, Any]:
+    """Which installed models suit this pack ("prefer": name fragments), what to suggest when none are installed
+    ("suggest": Ollama model names), and how many seats the council gets when specialists are found ("seats")."""
+    if not isinstance(raw, dict):
+        raise PackError('"models" must be an object with "prefer", "suggest" and "seats"')
+    out: Dict[str, Any] = {}
+    for key, most in (("prefer", 12), ("suggest", 5)):
+        items = raw.get(key, [])
+        if not isinstance(items, list) or not all(isinstance(x, str) and 0 < len(x.strip()) <= 60 for x in items):
+            raise PackError(f'"models.{key}" must be a list of model names')
+        if len(items) > most:
+            raise PackError(f'"models.{key}" can list at most {most} models')
+        out[key] = [x.strip().lower() for x in items]
+    seats = raw.get("seats", 4)
+    if not isinstance(seats, int) or not 2 <= seats <= 8:
+        raise PackError('"models.seats" must be a whole number from 2 to 8')
+    out["seats"] = seats
+    return out
 
 
 def _load_dir(path: str, builtin: bool) -> Dict[str, Dict[str, Any]]:

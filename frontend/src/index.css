@@ -713,3 +713,8 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .consensus-pill .cp-dots .dot { width: 6px; height: 6px; }
 .consensus-pill em { font-style: normal; color: var(--disagree); }
 @media (max-width: 720px) { .consensus-pill { margin: 4px 0 8px; } }
+
+/* A suggested specialist for the chosen topic pack (downloaded only on click) */
+.pack-suggest { margin-top: 8px; font: 13px/1.5 var(--font); color: var(--text-2); text-align: center; max-width: 560px; animation: fade 0.2s ease; }
+.pack-suggest .progress-line { display: inline-block; vertical-align: middle; margin-left: 8px; }
+.pack-suggest b { color: var(--text); font-weight: 600; }

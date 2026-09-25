@@ -13,7 +13,8 @@ Browser (React) ── /api (REST + Server-Sent Events) ──► FastAPI backen
 
 ## How a conundrum flows
 
-1. **Intake.** Every installed local model gets a seat (up to eight), and Beagle is assigned a mid-sized model. The
+1. **Intake.** Every installed local model gets a seat (up to eight), and Beagle is assigned a mid-sized model. A
+   topic pack that prefers certain models instead gets those specialists plus the strongest generalists. The
    largest member picks the chair and a short title. The chair then sizes up the conundrum: trivial messages
    (greetings, simple facts) it answers directly with no debate; otherwise it sets the number of rounds (1–10), and if
    the answer depends on something only the user knows, it asks up to three questions (one at a time, with suggested
@@ -46,6 +47,7 @@ Browser (React) ── /api (REST + Server-Sent Events) ──► FastAPI backen
 | `monitor.py` | Background CPU / memory / GPU sampler for the live charts |
 | `setup.py` | First-launch helpers: what's installed, starter model pack, starting local web search |
 | `packs.py` | Topic packs: loading and validating built-in (`backend/packs/`) and user (`data/packs/`) packs |
+| `diagnostics.py` | Health report measured from the database (no model calls), with findings; `quorum doctor` |
 | `export.py` | Markdown export: the answer at a reading level, its sources and optionally the whole debate |
 | `cli.py` | The `quorum` command; talks to the running backend over HTTP using only the standard library |
 | `db.py` | SQLite schema, lightweight migrations and helpers |
