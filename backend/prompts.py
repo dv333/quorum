@@ -1,5 +1,6 @@
 """Prompt builders for debate turns, rolling summaries, peer votes and the chair's verdict."""
 
+import re
 from datetime import date
 from typing import Any, Dict, List, Optional
 
@@ -38,10 +39,16 @@ def role_line(role: Optional[Dict[str, str]]) -> str:
     if not role or not role.get("role"):
         return ""
     focus = f" {role['focus']}" if role.get("focus") else ""
-    return (
+    line = (
         f"\nYour role in this debate: {role['role']}.{focus} Argue from this perspective, but stay honest: "
         "if the evidence goes against your role's usual view, say so."
     )
+    if re.search(r"skeptic|sceptic|critic|devil|contrarian|red team", role["role"], re.I):
+        line += (
+            " Only AGREE once your strongest objection has been answered with evidence (a source or a checked fact), "
+            "not just with more argument or because others agree."
+        )
+    return line
 
 
 def agent_system_prompt(
@@ -142,7 +149,14 @@ def turn_messages(
     user = [history_block(prior_topics), f"THE QUESTION:\n{question}\n"]
     if summary:
         user.append(f"\nSUMMARY OF ROUNDS 1-{summary_upto} (written by the chair):\n{summary}\n")
-    if transcript:
+    if round_no == 1:
+        if transcript:
+            user.append(f"\nBEFORE THE DEBATE:\n{transcript}\n")
+        user.append(
+            "\nThis is round 1. You haven't seen the other agents' views, and that's deliberate: think independently. "
+            "Give your own initial recommendation, then the strongest objection to it.\n"
+        )
+    elif transcript:
         user.append(f"\nDISCUSSION SO FAR:\n{transcript}\n")
     else:
         user.append("\nNobody has spoken yet. Give your initial answer.\n")
@@ -174,7 +188,7 @@ def summary_messages(question: str, previous_summary: Optional[str], transcript:
 {prev}New rounds to fold into the summary:
 {transcript}
 
-Write an updated summary in at most 200 words. For each agent (by handle), note their current position and key arguments; note any user guidance; list points of agreement and open disagreements. No preamble.""",
+Write an updated summary in at most 230 words. For each agent (by handle), note their current position and key arguments; note any user guidance; list points of agreement. Then, under "Open:", carry forward every unresolved disagreement, every claim that is still unverified or disputed, and any source evidence against the emerging answer, with its caveats; never drop these just because most agents agree. No preamble.""",
         },
     ]
 
@@ -273,6 +287,7 @@ def verdict_messages(
     criteria: List[str],
     custom_rubric: str,
     guidance: str = "",
+    claims: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -281,11 +296,12 @@ def verdict_messages(
         "manual": "The user ended the debate.",
     }.get(reason, "")
     summ = f"\nSummary of earlier rounds:\n{summary}\n" if summary else ""
-    check = (
-        f"\nWeb fact-check of key claims (trust this over the agents where they conflict):\n{fact_check}\n"
-        if fact_check
-        else ""
-    )
+    if claims:
+        check = f"\nEvidence ledger (checked against sources; it overrides the agents):\n{ledger_text(claims)}\n\n{EVIDENCE_RULES}\n"
+    elif fact_check:
+        check = f"\nWeb fact-check of key claims (trust this over the agents where they conflict):\n{fact_check}\n"
+    else:
+        check = ""
     return [
         {
             "role": "system",
@@ -305,7 +321,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer. Correct anything the fact-check or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it.
 
 {ANSWER_FORMAT}""",
         },
@@ -493,26 +509,139 @@ def research_plan_messages(request: str, question: str, max_queries: int) -> Lis
 
 {need}
 
-Write 1 to {max_queries} short web search queries (like you'd type into a search engine) that will find current, authoritative sources for this. Prefer one query unless the request clearly has several parts. Don't put years in queries unless the request is about a specific year; if you must, use the current year.""",
+Write 1 to {max_queries} short web search queries (like you'd type into a search engine) that will find current, authoritative sources for this. Prefer queries that surface primary sources: official documentation, the maker's own pages, standards or filings, rather than comparison sites and blogs. Prefer one query unless the request clearly has several parts. Don't put years in queries unless the request is about a specific year; if you must, use the current year.""",
         },
     ]
 
 
-def factcheck_plan_messages(question: str, positions: List[Dict[str, str]], max_queries: int) -> List[Dict[str, str]]:
-    pos = "\n\n".join(f"{p['handle']}: {p['position']}\n{p['body'][:800]}" for p in positions)
+def claims_messages(
+    question: str, positions: List[Dict[str, str]], summary: Optional[str], max_claims: int
+) -> List[Dict[str, str]]:
+    """The material factual claims the final answer is about to rely on, each with a search query to verify it."""
+    pos = "\n\n".join(f"{p['handle']}: {p['position']}\n{p['body'][:700]}" for p in positions)
+    summ = f"Summary of the debate so far:\n{summary}\n\n" if summary else ""
     return [
         {
             "role": "system",
-            "content": "You plan web searches. Output only search queries, one per line, with no numbering, quotes or commentary.",
+            "content": "You list the factual claims a debate's conclusion depends on, so each can be checked. Reply with a single JSON object and nothing else.",
         },
         {
             "role": "user",
             "content": f"""Today is {today()}. Question: {question}
 
-Final positions from the debate:
+{summ}Final positions:
 {pos}
 
-Pick up to {max_queries} specific factual claims the final answer will rely on that could be wrong or out of date (versions, numbers, dates, product capabilities, recent events). For each, write one web search query that would verify it (no years unless the claim is about a specific year). If nothing needs checking, output NONE.""",
+List up to {max_claims} factual claims the final answer will rely on, most decisive first. Focus on claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write one web search query likely to reach primary documentation (the vendor's docs, standards, filings).
+
+Reply like: {{"claims": [{{"claim": "...", "query": "..."}}]}}""",
+        },
+    ]
+
+
+def verify_claim_messages(claim: str, sources: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """Check one claim against the pages found for it; the quote must be copied from a source."""
+    blocks = "\n\n".join(
+        f"[{i + 1}] {src['title']} ({src['url']}){' [primary source]' if src.get('primary') else ''}\n{src['content']}"
+        for i, src in enumerate(sources)
+    )
+    return [
+        {
+            "role": "system",
+            "content": f"You are {RESEARCHER_NAME}, a careful fact-checker. You judge a claim only by what the sources literally say. Reply with a single JSON object and nothing else.",
+        },
+        {
+            "role": "user",
+            "content": f"""Claim: {claim}
+
+Sources:
+{blocks}
+
+Decide what the sources establish about the claim:
+- "supported": a source directly states it, in full.
+- "partly": a source supports part of it, or supports it only with a condition or limit (give that as the caveat). A page that mentions a capability is only partial support for a broader claim about a whole workflow, cost, speed or superiority.
+- "contradicted": a source directly says otherwise (give the correct fact as the caveat).
+- "unknown": the sources don't settle it.
+Prefer sources marked [primary source]. The quote must be copied word for word from one source (one or two sentences); use an empty quote for "unknown".
+
+Reply like: {{"status": "partly", "source": 1, "quote": "...", "caveat": "..."}}""",
+        },
+    ]
+
+
+def ledger_text(claims: List[Dict[str, Any]]) -> str:
+    """The claim ledger as the chair and the checker see it."""
+    label = {
+        "supported": "SUPPORTED",
+        "partly": "PARTLY SUPPORTED",
+        "contradicted": "CONTRADICTED",
+        "unknown": "UNVERIFIED",
+    }
+    lines = []
+    for i, c in enumerate(claims, 1):
+        line = f"{i}. [{label.get(c['status'], 'UNVERIFIED')}] {c['claim']}"
+        if c.get("caveat"):
+            line += f" | Caveat: {c['caveat']}"
+        if c.get("quote"):
+            line += f' | Source says: "{c["quote"]}" ({c.get("source_title") or c.get("source_url")})'
+        lines.append(line)
+    return "\n".join(lines)
+
+
+EVIDENCE_RULES = """Rules for factual claims (they override the debate):
+- Never state a CONTRADICTED claim; state the correct fact from the ledger instead.
+- A PARTLY SUPPORTED claim must carry its caveat.
+- An UNVERIFIED claim may appear only if it is clearly marked as unverified; it can't be a deciding reason.
+- Don't present a comparative advantage (cheaper, faster to implement, better integrated, no middleware) as established unless a SUPPORTED claim says exactly that.
+- If the evidence can't establish a winner, say so: name the finalists and what would decide between them. Agreement among agents is not evidence."""
+
+
+def answer_check_messages(answer: str, claims: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": "You audit an AI council's final answer against its evidence ledger. Reply with a single JSON object and nothing else.",
+        },
+        {
+            "role": "user",
+            "content": f"""Evidence ledger:
+{ledger_text(claims)}
+
+{EVIDENCE_RULES}
+
+Answer to audit:
+{answer}
+
+List every place where the answer breaks a rule: it states a contradicted claim, drops a caveat, presents an unverified claim as fact or as a deciding reason, or presents a comparative advantage the ledger doesn't support. Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
+
+Reply like: {{"problems": [{{"text": "...", "issue": "..."}}]}}""",
+        },
+    ]
+
+
+def answer_revise_messages(
+    answer: str, problems: List[Dict[str, str]], claims: List[Dict[str, Any]]
+) -> List[Dict[str, str]]:
+    issues = "\n".join(f'- "{p["text"]}": {p["issue"]}' for p in problems)
+    return [
+        {
+            "role": "system",
+            "content": "You are the chair of an AI council. You correct your final answer so it says only what the evidence supports.",
+        },
+        {
+            "role": "user",
+            "content": f"""Evidence ledger:
+{ledger_text(claims)}
+
+{EVIDENCE_RULES}
+
+Your answer:
+{answer}
+
+An audit found these problems:
+{issues}
+
+Rewrite the answer to fix every problem. Keep everything else, including the structure and headings. If fixing them means no option is clearly best, say so in the bottom line. Output only the corrected answer.""",
         },
     ]
 
@@ -521,15 +650,12 @@ def research_brief_messages(
     request: str, requested_by: Optional[str], sources: List[Dict[str, str]], kind: str
 ) -> List[Dict[str, str]]:
     blocks = "\n\n".join(
-        f"[{i + 1}] {src['title']} ({src['url']})\n{src['description']}\n{src['content']}"
+        f"[{i + 1}] {src['title']} ({src['url']}){' [primary source]' if src.get('primary') else ''}\n"
+        f"{src['description']}\n{src['content']}"
         for i, src in enumerate(sources)
     )
-    if kind == "factcheck":
-        task = """Fact-check the claims implied by the request below against the sources. For each claim write one line:
-- **Supported** / **Contradicted** / **Unclear**: the claim, then the correct fact with [n] citations.
-At most 5 lines. Don't add anything the sources don't support."""
-    else:
-        task = """Write a brief (at most 150 words) that answers the request using only the sources. Cite every fact with [n]. Lead with the direct answer, and when the request is about versions or releases, state the newest one explicitly. Mention dates when recency matters. If the sources don't answer it, say so plainly instead of guessing."""
+    task = """Write a brief (at most 170 words) that answers the request using only the sources. Cite every fact with [n], and for the facts that matter most, quote the exact words from the source in "double quotes". Lead with the direct answer, and when the request is about versions or releases, state the newest one explicitly. Mention dates when recency matters.
+Report exactly what each source establishes and no more: a page that mentions a capability is not proof of a whole workflow, lower cost, faster implementation or superiority over another product. Prefer sources marked [primary source]; say when a fact comes only from a comparison site or blog. If the sources don't answer it, or contradict each other, say so plainly instead of guessing."""
     who = f" (asked by {requested_by})" if requested_by else ""
     return [
         {

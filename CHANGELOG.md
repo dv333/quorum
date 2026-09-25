@@ -9,6 +9,18 @@
 - The living answer: after every round the chair updates a draft answer pinned at the top, with changed words
   highlighted, what changed and whose argument changed it, and earlier drafts one click away
 - Why?: select any part of the answer to see which agents argued for it, who pushed back, and the sources behind it
+- Evidence over agreement (after a CPQ debate presented "no middleware needed" as a verified reason, although the
+  vendor's documentation says otherwise):
+  - A claim ledger: the claims the answer relies on are each checked against sources, with a status (supported,
+    partly, contradicted, unverified) and an exact quote that must really appear in the page
+  - The ledger binds the answer (no contradicted claims, caveats kept, no decisions on unverified claims, "two
+    finalists remain" allowed), and the answer is audited and corrected against it
+  - Blind first round: independent recommendations and objections before agents see each other
+  - Summaries keep open disagreements and unverified claims; Skeptics need evidence, not consensus, to agree
+  - Research prefers official documentation, uses longer excerpts, quotes exact passages and doesn't stretch a
+    mention into a broader claim
+  - `scripts/replay.py` and `tests/regressions/`: replay known failures against real models; the CPQ case also runs
+    in CI with scripted models
 - Roles: before round 1 the chair gives every agent a role matched to its model: always a Skeptic, a Pragmatist and a
   User advocate, plus experts specific to the question. Roles appear next to agent names (messages, stage, @mentions,
   exports), a Roles row opens the debate, and each message keeps the role it was written under

@@ -229,7 +229,46 @@ function ExportMenu({ debateId, level, onPrint }) {
   )
 }
 
-export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question }) {
+// The claim ledger behind the answer: each material claim, what the sources say about it, and the exact quote
+const CLAIM_LABEL = { supported: 'Supported', partly: 'Partly supported', contradicted: 'Contradicted', unknown: 'Unverified' }
+
+function EvidenceSummary({ claims, evidence }) {
+  if (!claims.length) return null
+  const n = (s) => claims.filter((c) => c.status === s).length
+  const parts = ['supported', 'partly', 'contradicted', 'unknown'].filter((s) => n(s)).map((s) => (
+    <span key={s} className={`ev-count ev-${s}`}>{n(s)} {CLAIM_LABEL[s].toLowerCase()}</span>
+  ))
+  return (
+    <div className="ev-summary">
+      Evidence: {parts.reduce((acc, p, i) => (i ? [...acc, ' · ', p] : [p]), [])}
+      {evidence?.revised && <span className="ev-fixed"> · answer corrected to match the evidence</span>}
+    </div>
+  )
+}
+
+function Evidence({ claims }) {
+  if (!claims.length) return null
+  return (
+    <details className="evidence">
+      <summary>Evidence checked <span>· {claims.length} claim{claims.length === 1 ? '' : 's'} the answer relies on</span></summary>
+      <ul>
+        {claims.map((c) => (
+          <li key={c.id}>
+            <span className={`ev-chip ev-${c.status}`}>{CLAIM_LABEL[c.status] || 'Unverified'}</span>
+            <div>
+              <div className="ev-claim">{c.claim}</div>
+              {c.caveat && <div className="ev-caveat">{c.caveat}</div>}
+              {c.quote && <blockquote>“{c.quote}”</blockquote>}
+              {c.source_url && <a href={c.source_url} target="_blank" rel="noreferrer">{c.source_title || c.source_url}</a>}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question, claims = [] }) {
   const [level, setLevel] = useState('standard')
   const [versions, setVersions] = useState({})
   const [busy, setBusy] = useState(null)
@@ -347,6 +386,8 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
           {a.dissent && <div className="dissent"><b>Where they differed: </b><Markdown className="inline">{a.dissent}</Markdown></div>}
         </div>
       )}
+      {verdict && <EvidenceSummary claims={claims} evidence={msg?.meta?.evidence} />}
+      {verdict && <Evidence claims={claims} />}
       {canTrace && <div className="why-hint">Select any part of the answer to see who argued for it.</div>}
       {sel && !why && (
         <button className="why-btn" style={{ left: sel.x, top: sel.y }} onMouseDown={(e) => e.preventDefault()} onClick={traceSelection}>

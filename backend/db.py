@@ -128,6 +128,18 @@ CREATE TABLE IF NOT EXISTS provenance (
     content TEXT NOT NULL,
     PRIMARY KEY (verdict_id, passage)
 );
+CREATE TABLE IF NOT EXISTS claims (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    debate_id TEXT NOT NULL REFERENCES debates(id) ON DELETE CASCADE,
+    topic INTEGER NOT NULL,
+    claim TEXT NOT NULL,
+    status TEXT NOT NULL,
+    quote TEXT NOT NULL DEFAULT '',
+    caveat TEXT NOT NULL DEFAULT '',
+    source_url TEXT,
+    source_title TEXT,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

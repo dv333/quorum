@@ -1,6 +1,7 @@
 """Firecrawl client for the Researcher: web search with page content, self-hosted or cloud."""
 
 import re
+from urllib.parse import urlsplit
 from typing import Any, Dict, List
 
 import httpx
@@ -61,6 +62,20 @@ async def status() -> Dict[str, Any]:
             "ready": False,
             "error": f"Firecrawl isn't running at {s['url']}. Start it with scripts/firecrawl.sh up.",
         }
+
+
+_PRIMARY_HOST = re.compile(
+    r"^(docs|developer|developers|learn|support|help|documentation|dev|api)\.|\.gov(\.[a-z]{2})?$|"
+    r"(^|\.)(iso\.org|w3\.org|ietf\.org|sec\.gov|europa\.eu|who\.int|nih\.gov|python\.org)$"
+)
+_PRIMARY_PATH = re.compile(r"/(docs|documentation|help|manual|reference|readiness|api)(/|$)", re.I)
+
+
+def is_primary(url: str) -> bool:
+    """Official documentation, standards bodies and government sources, rather than comparison sites and blogs."""
+    parts = urlsplit(url)
+    host = parts.netloc.lower().removeprefix("www.")
+    return bool(_PRIMARY_HOST.search(host) or _PRIMARY_PATH.search(parts.path))
 
 
 def relevant_excerpt(markdown: str, query: str, limit: int = RESEARCH_PAGE_CHARS) -> str:

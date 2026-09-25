@@ -60,6 +60,27 @@ def _readable(answer: str) -> str:
     return answer.replace(m.group(0), f"**Bottom line: {lead}**", 1)
 
 
+CLAIM_LABEL = {
+    "supported": "Supported",
+    "partly": "Partly supported",
+    "contradicted": "Contradicted",
+    "unknown": "Unverified",
+}
+
+
+def _ledger(claims: List[Dict[str, Any]]) -> str:
+    lines = []
+    for c in claims:
+        line = f"- **{CLAIM_LABEL.get(c['status'], 'Unverified')}**: {c['claim']}"
+        if c.get("caveat"):
+            line += f" {c['caveat'].rstrip('.')}."
+        if c.get("quote"):
+            source = f"[{c.get('source_title') or c['source_url']}]({c['source_url']})" if c.get("source_url") else ""
+            line += f" “{c['quote']}” {source}".rstrip()
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _answer(verdict: Dict[str, Any], message: Dict[str, Any], level: str) -> Tuple[str, str]:
     """The answer at the requested reading level, or the standard one if that version was never written."""
     if level != "standard":
@@ -150,8 +171,12 @@ def to_markdown(snapshot: Dict[str, Any], *, level: str = "standard", include_de
             text, used = _answer(v, msg, level)
             parts.append(f"*Answer · {outcome}" + (f" · {used} version*" if used != "standard" else "*"))
             parts.append(text.strip())
+            ledger = [c for c in snapshot.get("claims", []) if c["topic"] == topic]
             check = [m for m in messages if m["topic"] == topic and m.get("research_kind") == "factcheck"]
-            if check and check[-1].get("sources"):
+            if ledger:
+                parts.append("**Evidence checked**")
+                parts.append(_ledger(ledger))
+            elif check and check[-1].get("sources"):
                 parts.append(f"**Sources ({RESEARCHER_NAME}'s fact-check)**")
                 parts.append(_sources(check[-1]["sources"]))
         if include_debate:

@@ -106,30 +106,6 @@ def parse_research_requests(text: str, limit: int = 1) -> List[str]:
     return out
 
 
-_VERDICT_LINE_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s*[*_]*(Supported|Contradicted|Unclear)\b", re.IGNORECASE)
-
-
-def clean_fact_check(text: str) -> str:
-    """Keep only the Supported/Contradicted/Unclear bullets (models sometimes leak drafts around them).
-
-    When a claim was revised, the last bullet for it wins. Falls back to the full text if none parse.
-    """
-    lines = [line.rstrip() for line in text.splitlines() if _VERDICT_LINE_RE.match(line)]
-    if not lines:
-        return text.strip()
-    # Drafts repeat the list; keep the final pass (the last run of bullets of the same length)
-    blocks, current = [], []
-    for line in text.splitlines():
-        if _VERDICT_LINE_RE.match(line):
-            current.append(line.rstrip())
-        elif current and line.strip():
-            blocks.append(current)
-            current = []
-    if current:
-        blocks.append(current)
-    return "\n".join(blocks[-1])
-
-
 _STR = r'"((?:[^"\\]|\\.)*)"'
 
 

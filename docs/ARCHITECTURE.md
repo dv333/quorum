@@ -23,13 +23,17 @@ Browser (React) ── /api (REST + Server-Sent Events) ──► FastAPI backen
    in councils of four or more, then question-specific experts); `settle_roles` fills anything the chair leaves out.
 3. **Opening brief.** Beagle (the researcher) plans searches, reads the most relevant parts of the top pages and posts a
    cited brief.
-4. **Rounds.** Agents speak round-robin under animal names (Otter, Panda, Koala, Penguin, Hedgehog). Every message ends
+4. **Rounds.** Round 1 is blind (agents don't see each other's first turns). Agents speak round-robin under animal names (Otter, Panda, Koala, Penguin, Hedgehog). Every message ends
    with a stance (`AGREE`, `REFINE`, `DISAGREE`) and a one-line position. Agents can ask `@Beagle: …` for facts; the
    brief lands before the next speaker. The user can interject at any time.
 5. **Consensus.** The debate ends when everyone agrees (from round 2), at the round limit, or when the user asks for the
    answer. After every round that isn't the last, the chair writes a short draft answer (the "living answer", stored
    in `drafts`). Long debates are compressed into a rolling summary written by the chair.
-6. **Answer.** Beagle fact-checks the claims the answer will rely on, then the chair writes a structured answer: bottom
+6. **Evidence.** The chair lists the material claims the answer will rely on; Beagle searches each (primary sources
+   first) and gives it a status with an exact quote, which must really be in the page (`quote_in_source`). The
+   ledger is stored in `claims` and becomes rules for the answer.
+7. **Answer.** The chair writes a structured answer bound by the ledger, then audits it against the ledger and
+   revises it once if it breaks a rule (the chair message's `meta.evidence` records this). The answer has a bottom
    line, key points, an optional Mermaid diagram (shown in the Expert view), where the agents differed, and details.
    Simple and Expert versions are rewritten on demand, and **Why?** traces a selected passage back to the agents and
    sources behind it (on demand, cached in `provenance`).

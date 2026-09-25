@@ -1,6 +1,5 @@
 from backend.parsing import (
     ThinkSplitter,
-    clean_fact_check,
     parse_json_loose,
     parse_research_requests,
     parse_stance,
@@ -77,19 +76,6 @@ def test_research_request_limit():
     text = "@Researcher: first question here\n@Researcher: second question here"
     assert parse_research_requests(text, limit=1) == ["first question here"]
     assert len(parse_research_requests(text, limit=2)) == 2
-
-
-def test_clean_fact_check_keeps_final_bullets_only():
-    leaked = """- **Supported**: A [1]
-- **Contradicted**: B is wrong [2]
-
-Wait, source 2 says otherwise. Revised lines:
-- **Supported**: A [1]
-- **Unclear**: B [2]
-
-This fits the "at most 5 lines" constraint."""
-    assert clean_fact_check(leaked) == "- **Supported**: A [1]\n- **Unclear**: B [2]"
-    assert clean_fact_check("No claims could be checked.") == "No claims could be checked."
 
 
 def test_beagle_mentions():

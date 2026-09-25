@@ -37,6 +37,11 @@ def report(last: int = 20) -> Dict[str, Any]:
     seats = {s["id"]: s for s in db.query(f"SELECT * FROM seats WHERE debate_id IN ({marks})", ids)}
     usage = db.query(f"SELECT * FROM usage WHERE debate_id IN ({marks})", ids)
     drafts = db.query(f"SELECT debate_id, topic, round FROM drafts WHERE debate_id IN ({marks})", ids)
+    claims = db.query(f"SELECT status FROM claims WHERE debate_id IN ({marks})", ids)
+    corrected = sum(
+        '"revised": true' in (m.get("meta_json") or "")
+        for m in db.query(f"SELECT meta_json FROM messages WHERE author_kind = 'chair' AND debate_id IN ({marks})", ids)
+    )
     created = {d["id"]: d["created_at"] for d in debates}
 
     # --- outcomes and time
@@ -120,6 +125,11 @@ def report(last: int = 20) -> Dict[str, Any]:
         },
         "chair_answer_errors": chair_errors,
         "drafts": {"written": len(drafts), "rounds_that_could_have_one": rounds_between},
+        "evidence": {
+            "claims": len(claims),
+            **{s: sum(c["status"] == s for c in claims) for s in ("supported", "partly", "contradicted", "unknown")},
+            "answers_corrected": corrected,
+        },
     }
     out["findings"] = findings(out)
     return out
@@ -163,6 +173,12 @@ def findings(r: Dict[str, Any]) -> List[str]:
     research = r.get("research") or {}
     if research.get("failed"):
         out.append(f"{research['failed']} of {research['briefs']} research lookups failed.")
+    ev = r.get("evidence") or {}
+    if ev.get("claims", 0) >= 5 and (ev.get("contradicted", 0) + ev.get("unknown", 0)) / ev["claims"] >= 0.4:
+        out.append(
+            f"{ev['contradicted'] + ev['unknown']} of {ev['claims']} checked claims were contradicted or unverified: "
+            "the debates lean on facts the sources don't back."
+        )
     if r.get("chair_answer_errors"):
         out.append(f"The chair failed to write {r['chair_answer_errors']} answer(s).")
     if r.get("unfinished"):
@@ -191,6 +207,14 @@ def as_text(r: Dict[str, Any]) -> str:
         f"Research: {r['research']['briefs']} briefs, {r['research']['searches']} searches, "
         f"{r['research']['failed']} failed · chair answer errors: {r['chair_answer_errors']} · "
         f"drafts: {r['drafts']['written']}",
+        "Evidence: "
+        + (
+            f"{r['evidence']['claims']} claims checked (supported {r['evidence']['supported']}, partly "
+            f"{r['evidence']['partly']}, contradicted {r['evidence']['contradicted']}, unverified "
+            f"{r['evidence']['unknown']}) · answers corrected {r['evidence']['answers_corrected']}"
+            if r["evidence"]["claims"]
+            else "no claims checked yet"
+        ),
         "",
         "Models (slowest first):",
     ]

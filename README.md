@@ -50,8 +50,10 @@ A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
 - **Memorable agents.** 🦦 Otter, 🐼 Panda, 🐨 Koala, 🐧 Penguin, 🦔 Hedgehog, 🐰 Bunny, 🐢 Turtle and 🐬 Dolphin
   debate; 🐶 Beagle does the web research on a model of its own. The models only ever see these names, never each
   other's model names. Type `@` to talk to any of them.
-- **Current facts, with sources.** Beagle searches the web through [Firecrawl](https://github.com/firecrawl/firecrawl),
-  posts cited briefs, and fact-checks the claims the final answer depends on.
+- **Evidence, not agreement.** Beagle searches the web through [Firecrawl](https://github.com/firecrawl/firecrawl),
+  preferring official documentation. Before the answer is written, every claim it relies on is checked against a
+  source and backed by an exact quote; the answer can't state a contradicted claim, must keep caveats, and is audited
+  (and corrected) against that evidence. When the evidence can't pick a winner, the answer says so.
 - **Topic packs.** Pick a kind of debate (Review code, Stress-test a decision, Brainstorm ideas and more) or write
   your own in a few lines of JSON. Packs can build the council around suitable models, like coding models for code
   review, and suggest one to add when you have none.

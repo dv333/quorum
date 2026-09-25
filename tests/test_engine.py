@@ -26,6 +26,14 @@ class FakeClient(ChatClient):
         self.pick_reply = (
             '{"chair": "Panda", "researcher": "Koala", "reason": "clear, careful writer", "title": "Test title"}'
         )
+        # The claim ledger: which claims to check, how each checks out, and the audit of the final answer
+        self.claims_reply = '{"claims": [{"claim": "Go compiles fast", "query": "go compile speed"}]}'
+        self.verify_reply = lambda messages: (
+            '{"status": "supported", "source": 1, "quote": "content for go compile speed", "caveat": ""}'
+        )
+        self.audit_reply = '{"problems": []}'
+        self.revise_reply = "BOTTOM LINE: revised answer"
+        self.verdict_reply = "VERDICT TEXT"
 
     def calls_with(self, marker):
         return [m for _, m, _ in self.calls if marker in m[0]["content"]]
@@ -49,6 +57,14 @@ class FakeClient(ChatClient):
             if gate is not None:
                 await gate.wait()
             content, thinking = self.turn_fn(handle, round_no, messages)
+        elif sys.startswith("You list the factual claims"):
+            content, thinking = self.claims_reply, ""
+        elif sys.startswith("You are Beagle, a careful fact-checker"):
+            content, thinking = self.verify_reply(messages), ""
+        elif sys.startswith("You audit an AI council"):
+            content, thinking = self.audit_reply, ""
+        elif "You correct your final answer" in sys:
+            content, thinking = self.revise_reply, ""
         elif sys.startswith("You organize an AI council"):
             content, thinking = self.pick_reply, ""
         elif "the moderator of an AI council" in sys:
@@ -62,7 +78,7 @@ class FakeClient(ChatClient):
         elif "neutral chair" in sys:
             content, thinking = "SUMMARY TEXT", ""
         else:
-            content, thinking = "VERDICT TEXT", ""
+            content, thinking = self.verdict_reply, ""
         if thinking:
             yield Chunk("thinking", thinking)
         for i in range(0, len(content), 7):
@@ -397,20 +413,38 @@ async def test_opening_brief_runs_before_round_one_and_reaches_agents():
 
 async def test_agent_request_is_answered_before_next_speaker():
     def turn(h, r, m):
-        if h == "Otter" and r == 1:
+        if h == "Otter" and r == 2:
             return reply("REFINE", text="Not sure.\n@Beagle: what is the newest Go release?")
         return reply("REFINE")
 
     client = FakeClient(turn)
-    eng = make_debate(client, research=True, autopilot=False)
+    eng = make_debate(client, research=True, max_rounds=2)
     await eng.post_user_message("Q")
     await eng.task
     kinds = [(m["research_kind"], m["requested_by"], m["research_request"]) for m in researcher_messages()]
     assert ("request", "Otter", "what is the newest Go release?") in kinds
-    b_prompt = client.turn_calls("Panda")[0][0][1]["content"]
+    b_prompt = client.turn_calls("Panda")[1][0][1]["content"]  # Panda's round-2 turn, right after Otter's
     assert "Beagle (web research, asked by Otter): BRIEF" in b_prompt
-    a_prompt = client.turn_calls("Otter")[0][0][1]["content"]
+    a_prompt = client.turn_calls("Otter")[1][0][1]["content"]
     assert "asked by Otter" not in a_prompt
+
+
+async def test_round_one_is_blind_then_everyone_sees_everything():
+    def turn(h, r, m):
+        if h == "Otter" and r == 1:
+            return reply("REFINE", text="OTTER-ROUND-ONE\n@Beagle: newest Go release?")
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, research=True, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    panda_r1 = client.turn_calls("Panda")[0][0][1]["content"]
+    assert "OTTER-ROUND-ONE" not in panda_r1 and "asked by Otter" not in panda_r1
+    assert "This is round 1" in panda_r1 and "strongest objection" in panda_r1
+    assert "Beagle (web research): BRIEF" in panda_r1  # the opening brief is shared
+    panda_r2 = client.turn_calls("Panda")[1][0][1]["content"]
+    assert "OTTER-ROUND-ONE" in panda_r2
 
 
 async def test_agent_requests_capped_per_round(monkeypatch):
@@ -467,28 +501,36 @@ async def test_user_request_mid_debate_is_queued():
     assert req["id"] < b_first
 
 
-async def test_fact_check_feeds_the_verdict():
+def verdict_prompt(client):
+    return next(m for _, m, _ in reversed(client.calls) if "You turn the council's debate" in m[0]["content"])[1][
+        "content"
+    ]
+
+
+async def test_checked_claims_feed_the_verdict_as_rules():
     client = FakeClient(lambda h, r, m: reply("AGREE"))
     eng = make_debate(client, research=True)
     await eng.post_user_message("Q")
     await eng.task
     fc = [m for m in researcher_messages() if m["research_kind"] == "factcheck"]
     assert len(fc) == 1 and fc[0]["status"] == "done"
+    assert fc[0]["content"].startswith("- **Supported**: Go compiles fast") and "[1]" in fc[0]["content"]
     chair_msg = db.query_one("SELECT id FROM messages WHERE author_kind = 'chair'")["id"]
     assert fc[0]["id"] < chair_msg
-    verdict_prompt = client.calls[-1][1][1]["content"]
-    assert "Web fact-check of key claims" in verdict_prompt and "BRIEF: fact [1]" in verdict_prompt
+    prompt = verdict_prompt(client)
+    assert "Evidence ledger" in prompt and "[SUPPORTED] Go compiles fast" in prompt
+    assert "Never state a CONTRADICTED claim" in prompt
 
 
-async def test_fact_check_skipped_when_nothing_to_check():
+async def test_claim_check_skipped_when_nothing_to_check():
     client = FakeClient(lambda h, r, m: reply("AGREE"))
-    client.plan_reply = lambda prompt: "NONE" if "Final positions" in prompt else "planned query"
+    client.claims_reply = '{"claims": []}'
     eng = make_debate(client, research=True)
     await eng.post_user_message("Q")
     await eng.task
     fc = [m for m in researcher_messages() if m["research_kind"] == "factcheck"][0]
-    assert "needed a web check" in fc["content"]
-    assert "Web fact-check" not in client.calls[-1][1][1]["content"]
+    assert "needed checking" in fc["content"]
+    assert "Evidence ledger" not in verdict_prompt(client)
 
 
 async def test_search_outage_is_reported_once_per_run_and_debate_continues():
@@ -580,8 +622,8 @@ async def test_metrics_cover_every_model_call_and_search():
     assert set(actors) == {"Otter", "Panda", "Koala", "Beagle", "Chair"}
     assert actors["Otter"]["calls"] == 2 and actors["Otter"]["output_tokens"] == 20
     assert actors["Otter"]["prompt_tokens"] > 0  # estimated when the server doesn't report it
-    # opening brief + fact-check: 2 plans + 2 briefs, 2 search batches
-    assert actors["Beagle"]["calls"] == 4 and actors["Beagle"]["searches"] == 2 and actors["Beagle"]["pages"] > 0
+    # opening brief (plan + brief) and one claim check; one search batch each
+    assert actors["Beagle"]["calls"] == 3 and actors["Beagle"]["searches"] == 2 and actors["Beagle"]["pages"] > 0
     assert m["totals"]["calls"] == len([c for c in client.calls])
     assert eng.snapshot()["metrics"][1]["totals"]["searches"] == 2
     seat_msg = db.query_one("SELECT * FROM messages WHERE author_kind = 'seat' LIMIT 1")

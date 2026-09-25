@@ -10,6 +10,7 @@ MacBook Pro with eight local models, answering *Should I rent or buy a home in C
 - [Watch the council work](#watch-the-council-work)
 - [Talk to the council](#talk-to-the-council)
 - [The answer](#the-answer)
+- [Evidence behind the answer](#evidence-behind-the-answer)
 - [Why? Trace any sentence](#why-trace-any-sentence)
 - [Behind the answer](#behind-the-answer)
 - [Export and share](#export-and-share)
@@ -115,9 +116,13 @@ Beagle opens with a researched brief, then the agents speak in turn, each ending
 
 <img src="images/debate.png" alt="The debate thread with round recaps and Beagle's sourced brief">
 
-**Beagle** 🐶 searches the web through your own Firecrawl, reads the most relevant parts of the top pages and posts a
-brief with numbered sources. Agents ask it for facts mid-debate (`@Beagle: …`), and before the answer is written it
-fact-checks the claims the answer depends on. Long debates are folded into a rolling summary by the chair so they
+**Beagle** 🐶 searches the web through your own Firecrawl, puts official documentation first, reads the most relevant
+parts of the top pages and posts a brief with numbered sources and exact quotes. Agents ask it for facts mid-debate
+(`@Beagle: …`).
+
+Round 1 is **blind**: each agent gives its own recommendation and the strongest objection to it before seeing anyone
+else's, so the debate starts from independent views instead of the first speaker's. Summaries carry every open
+disagreement and unverified claim forward, and a Skeptic only agrees once its objection is answered with evidence. Long debates are folded into a rolling summary by the chair so they
 fit in small local context windows.
 
 ## Talk to the council
@@ -140,6 +145,20 @@ details.
 **Simple / Standard / Expert** rewrites the answer for the reader. Expert adds a diagram when a picture helps.
 
 <img src="images/expert.png" alt="The Expert view with a decision diagram">
+
+## Evidence behind the answer
+
+Agreement isn't evidence. Before the chair writes, it lists the claims the answer will rely on (capabilities,
+integrations, costs, speed, comparisons) and Beagle checks each one against its own search. Every claim gets a
+status: **supported**, **partly supported** (with its caveat), **contradicted** (with the correct fact) or
+**unverified**, backed by an exact quote that must really appear in the source. A page that mentions a capability
+doesn't count as proof of a whole workflow, a lower cost or a faster rollout.
+
+The ledger binds the answer: it can't state a contradicted claim, must keep caveats, can't rest a decision on an
+unverified claim, and can say "two finalists remain" when the evidence can't pick one. After writing, the answer is
+audited against the ledger and corrected if it breaks a rule. The answer shows the tally ("Evidence: 3 supported ·
+1 contradicted · 2 unverified") and **Evidence checked** lists each claim with its quote and source. Exports include
+it too.
 
 ## Why? Trace any sentence
 

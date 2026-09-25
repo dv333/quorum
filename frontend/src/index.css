@@ -760,3 +760,24 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .roles-label { font: 600 11px var(--font); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); align-self: center; }
 .role-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--fill); }
 .role-chip b { font-weight: 600; color: var(--text); }
+
+/* Evidence behind the answer: every material claim with its status and exact quote */
+.ev-summary { padding: 4px 26px 10px; font: 13px var(--font); color: var(--text-2); }
+.ev-count { font-weight: 600; }
+.ev-supported { color: var(--agree); } .ev-partly { color: var(--refine); } .ev-contradicted { color: var(--disagree); } .ev-unknown { color: var(--text-3); }
+.ev-fixed { color: var(--text-2); font-style: italic; }
+.evidence { margin: 0 26px 12px; border-radius: 14px; background: var(--fill); padding: 10px 14px; font: 13.5px/1.5 var(--font); }
+.evidence summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.evidence summary span { font-weight: 400; color: var(--text-2); }
+.evidence ul { list-style: none; margin: 10px 0 2px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.evidence li { display: grid; grid-template-columns: 118px 1fr; gap: 10px; align-items: start; }
+.ev-chip { font: 600 11px var(--font); padding: 2px 8px; border-radius: 999px; text-align: center; background: var(--card); }
+.ev-chip.ev-supported { background: color-mix(in srgb, var(--agree) 14%, var(--card)); }
+.ev-chip.ev-partly { background: color-mix(in srgb, var(--refine) 14%, var(--card)); }
+.ev-chip.ev-contradicted { background: color-mix(in srgb, var(--disagree) 14%, var(--card)); }
+.ev-claim { color: var(--text); font-weight: 500; }
+.ev-caveat { color: var(--text-2); }
+.evidence blockquote { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--hairline); color: var(--text-2); font-style: italic; }
+.evidence a { color: var(--blue); text-decoration: none; font-size: 12.5px; }
+.evidence a:hover { text-decoration: underline; }
+@media (max-width: 640px) { .evidence li { grid-template-columns: 1fr; gap: 4px; } .ev-summary { padding-left: 18px; padding-right: 18px; } .evidence { margin: 0 18px 12px; } }

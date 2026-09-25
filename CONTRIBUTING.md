@@ -18,6 +18,7 @@ The backend runs on http://localhost:8002 and the app on http://localhost:5173 w
 
 ```bash
 uv run pytest            # backend tests (no models needed)
+uv run python scripts/replay.py --all   # replay known failures against your running Quorum (real models, slow)
 uvx ruff check backend tests
 uvx ruff format backend tests
 cd frontend && npm run build

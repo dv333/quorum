@@ -20,8 +20,10 @@ from .config import (
     INTAKE_MAX_QUESTIONS,
     MIN_ROUNDS_FOR_CONSENSUS,
     MIN_SEATS,
+    RESEARCH_MAX_CLAIMS,
     RESEARCH_MAX_QUERIES,
     RESEARCH_MAX_SOURCES,
+    RESEARCH_SOURCES_PER_CLAIM,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
     RESEARCHER_NAME,
@@ -29,7 +31,6 @@ from .config import (
 from .parsing import (
     MENTION_RE,
     ThinkSplitter,
-    clean_fact_check,
     parse_json_loose,
     parse_research_requests,
     parse_stance,
@@ -178,14 +179,51 @@ def _parse_queries(text: str, limit: int) -> List[str]:
 
 
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
-    """Take results round-robin across queries so every query contributes, deduplicated by URL."""
+    """Take results round-robin across queries so every query contributes, deduplicated by URL, with primary sources
+    (official documentation, standards) moved to the front."""
     seen, out = set(), []
     for i in range(max((len(r) for r in result_lists), default=0)):
         for results in result_lists:
             if i < len(results) and results[i]["url"] not in seen:
                 seen.add(results[i]["url"])
-                out.append(results[i])
+                out.append({**results[i], "primary": firecrawl.is_primary(results[i]["url"])})
+    out.sort(key=lambda s: not s["primary"])
     return out[:limit]
+
+
+_LEDGER_LABEL = {
+    "supported": "Supported",
+    "partly": "Partly supported",
+    "contradicted": "Contradicted",
+    "unknown": "Unverified",
+}
+
+
+def _ledger_markdown(claims: List[Dict[str, Any]], sources: List[Dict[str, str]]) -> str:
+    lines = []
+    for c in claims:
+        n = next((i for i, s in enumerate(sources, 1) if s["url"] == c.get("source_url")), None)
+        line = f"- **{_LEDGER_LABEL.get(c['status'], 'Unverified')}**: {c['claim']}"
+        if c.get("caveat"):
+            line += f" — {c['caveat']}"
+        if c.get("quote"):
+            line += f" “{c['quote']}”" + (f" [{n}]" if n else "")
+        lines.append(line)
+    return "\n".join(lines)
+
+
+_NORM = re.compile(r"[^a-z0-9]+")
+
+
+def quote_in_source(quote: str, text: str) -> bool:
+    """Whether a quoted passage really appears in the source (ignoring case, spacing and punctuation)."""
+    q = _NORM.sub(" ", quote.lower()).strip()
+    if len(q) < 12:
+        return False
+    return q in _NORM.sub(" ", text.lower())
+
+
+CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
 
 
 class DebateEngine:
@@ -1031,9 +1069,7 @@ class DebateEngine:
         self.partials[msg_id]["thinking"] += text
         self.bus.publish({"type": "message_delta", "id": msg_id, "thinking": text})
 
-    async def _research(
-        self, item: Dict[str, Any], round_no: int, positions: Optional[List[Dict[str, Any]]] = None
-    ) -> Optional[str]:
+    async def _research(self, item: Dict[str, Any], round_no: int) -> Optional[str]:
         """Plan searches, run them through Firecrawl, and stream a cited brief. Returns the brief."""
         d = self.debate()
         kind = item["kind"]
@@ -1054,24 +1090,13 @@ class DebateEngine:
                 raise firecrawl.SearchError(self._search_down)
             think = await self._thinking_flag(ep_id, model, False)
             question = self._question(d["topic"])
-            if kind == "factcheck":
-                plan = prompts.factcheck_plan_messages(question, positions or [], RESEARCH_MAX_QUERIES)
-            else:
-                plan = prompts.research_plan_messages(item["request"], question, RESEARCH_MAX_QUERIES)
+            plan = prompts.research_plan_messages(item["request"], question, RESEARCH_MAX_QUERIES)
             self._log(msg_id, "Planning searches…")
             queries = _parse_queries(
                 await self._complete(RESEARCHER_NAME, "research", ep_id, model, plan, think), RESEARCH_MAX_QUERIES
             )
-            if not queries and kind != "factcheck":
-                queries = [item["request"][:200]]
             if not queries:
-                self._finish_message(
-                    msg_id,
-                    content="Nothing in the final positions needed a web check.",
-                    thinking=self.partials[msg_id]["thinking"],
-                    status="done",
-                )
-                return None
+                queries = [item["request"][:200]]
 
             for q in queries:
                 self._log(msg_id, f"Searching: {q}")
@@ -1104,8 +1129,6 @@ class DebateEngine:
             self._log(msg_id, "Reading: " + ", ".join(urlparse(s["url"]).netloc for s in sources))
 
             request = item["request"]
-            if kind == "factcheck":
-                request = "Verify these claims: " + "; ".join(queries)
             stats = await self._stream_into(
                 msg_id,
                 ep_id,
@@ -1117,10 +1140,7 @@ class DebateEngine:
                 "research",
             )
             partial = self.partials[msg_id]
-            content = strip_thinking(partial["content"]).strip()
-            if kind == "factcheck":
-                content = clean_fact_check(content)
-            content = content or "The sources didn't answer this."
+            content = strip_thinking(partial["content"]).strip() or "The sources didn't answer this."
             stored_sources = [{"url": s["url"], "title": s["title"]} for s in sources]
             self._finish_message(
                 msg_id,
@@ -1219,6 +1239,16 @@ class DebateEngine:
         msgs = self._verbatim(d["topic"], upto, exclude_id)
         # Round-0 user messages (the question) are passed separately
         msgs = [m for m in msgs if not (m["round"] == 0 and m["author_kind"] == "user")]
+        if round_no == 1:
+            # Independent first positions: no other agent's round-1 turn, nor the lookups they asked for
+            msgs = [
+                m
+                for m in msgs
+                if not (
+                    m["round"] == 1
+                    and (m["author_kind"] == "seat" or (m["author_kind"] == "researcher" and m["requested_by"]))
+                )
+            ]
 
         def build(ms: List[Dict[str, Any]]) -> List[Dict[str, str]]:
             return prompts.turn_messages(
@@ -1334,6 +1364,203 @@ class DebateEngine:
             [self.id, d["topic"], round_no, text, changed[:300], db.now()],
         )
         self.bus.publish({"type": "draft_created", "draft": db.query_one("SELECT * FROM drafts WHERE id = ?", [did])})
+
+    # ----------------------------------------------------------- claim ledger
+
+    async def _check_claims(self, positions: List[Dict[str, Any]], round_no: int) -> List[Dict[str, Any]]:
+        """Before the answer: the chair lists the material claims the answer will rely on, Beagle searches for each,
+        and each gets a status backed by an exact quote from a source. Quotes that aren't really in the source don't
+        count. Returns the ledger (also stored, and posted in the thread as Beagle's fact-check)."""
+        d = self.debate()
+        topic = d["topic"]
+        row = self._insert_message(
+            topic=topic,
+            round_no=round_no,
+            author_kind="researcher",
+            status="streaming",
+            research_kind="factcheck",
+            research_request="Check the claims the answer relies on",
+        )
+        msg_id = row["id"]
+        self.partials[msg_id] = {"content": "", "thinking": ""}
+        ep_id, model = self._researcher_model(d)
+        try:
+            if self._search_down:
+                raise firecrawl.SearchError(self._search_down)
+            summary = self._latest_summary(topic)
+            self._log(msg_id, "Listing the claims the answer relies on…")
+            text = await self._complete(
+                self._chair_label(d),
+                "claims",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.claims_messages(
+                    self._question(topic), positions, summary["content"] if summary else None, RESEARCH_MAX_CLAIMS
+                ),
+                await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+            )
+            items, seen = [], set()
+            for c in parse_json_loose(text).get("claims") or []:
+                claim = str((c or {}).get("claim") or "").strip() if isinstance(c, dict) else ""
+                if claim and claim.lower() not in seen:
+                    seen.add(claim.lower())
+                    items.append({"claim": claim[:300], "query": str(c.get("query") or claim).strip()[:200]})
+            items = items[:RESEARCH_MAX_CLAIMS]
+            if not items:
+                self._finish_message(msg_id, content="Nothing in the final positions needed checking.", status="done")
+                return []
+            for it in items:
+                self._log(msg_id, f"Checking: {it['claim']}")
+            started = time.monotonic()
+            found = await asyncio.gather(
+                *[self.search_fn(it["query"], RESEARCH_SOURCES_PER_CLAIM) for it in items], return_exceptions=True
+            )
+            pages = sum(len(r) for r in found if not isinstance(r, Exception))
+            self._record(
+                RESEARCHER_NAME,
+                "firecrawl",
+                "search",
+                {"duration_ms": int((time.monotonic() - started) * 1000)},
+                searches=len(items),
+                pages=pages,
+            )
+            if all(isinstance(r, Exception) for r in found):
+                raise found[0]
+            think = await self._thinking_flag(ep_id, model, False)
+            ledger: List[Dict[str, Any]] = []
+            for it, result in zip(items, found):
+                sources = [] if isinstance(result, Exception) else _interleave([result], RESEARCH_SOURCES_PER_CLAIM)
+                entry = {"claim": it["claim"], "status": "unknown", "quote": "", "caveat": "", "source": None}
+                if not sources:
+                    entry["caveat"] = "No sources found."
+                else:
+                    try:
+                        v = parse_json_loose(
+                            await self._complete(
+                                RESEARCHER_NAME,
+                                "verify",
+                                ep_id,
+                                model,
+                                prompts.verify_claim_messages(it["claim"], sources),
+                                think,
+                            )
+                        )
+                    except Exception as e:
+                        log.warning("claim check failed: %s", e)
+                        v = {}
+                    status = str(v.get("status") or "").strip().lower()
+                    status = "partly" if status.startswith("part") else status
+                    quote = str(v.get("quote") or "").strip().strip('"“”')
+                    try:
+                        src = sources[int(v.get("source")) - 1]
+                    except (TypeError, ValueError, IndexError):
+                        src = None
+                    if status in CLAIM_STATUSES and status != "unknown":
+                        # The passage has to really be in the page, or the verdict doesn't count
+                        if src and quote_in_source(quote, src["content"]):
+                            entry.update(status=status, quote=quote[:500], source=src)
+                        else:
+                            status = "unknown"
+                    entry["caveat"] = str(v.get("caveat") or "").strip()[:300] if entry["status"] != "unknown" else ""
+                ledger.append(entry)
+            stored = []
+            for e in ledger:
+                src = e.pop("source")
+                e["source_url"], e["source_title"] = (src["url"], src["title"]) if src else (None, None)
+                db.execute(
+                    "INSERT INTO claims (debate_id, topic, claim, status, quote, caveat, source_url, source_title, "
+                    "created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        self.id,
+                        topic,
+                        e["claim"],
+                        e["status"],
+                        e["quote"],
+                        e["caveat"],
+                        e["source_url"],
+                        e["source_title"],
+                        db.now(),
+                    ],
+                )
+                stored.append(e)
+            sources_out: List[Dict[str, str]] = []
+            for e in stored:
+                if e["source_url"] and all(s["url"] != e["source_url"] for s in sources_out):
+                    sources_out.append({"url": e["source_url"], "title": e["source_title"] or e["source_url"]})
+            self._finish_message(
+                msg_id,
+                content=_ledger_markdown(stored, sources_out),
+                sources_json=json.dumps(sources_out),
+                status="done",
+            )
+            self.bus.publish({"type": "claims_created", "topic": topic, "claims": self._claims(topic)})
+            return stored
+        except asyncio.CancelledError:
+            self._finish_message(msg_id, status="stopped")
+            raise
+        except firecrawl.SearchError as e:
+            if "reach" in str(e) or "API key" in str(e):
+                self._search_down = str(e)
+            self._finish_message(msg_id, status="error", content=f"Web search failed: {e}")
+        except Exception as e:
+            log.warning("claim check failed: %s", e)
+            self._finish_message(msg_id, status="error", content=f"The claim check ({model}) failed: {e}")
+        finally:
+            self.partials.pop(msg_id, None)
+        return []
+
+    def _claims(self, topic: Optional[int] = None) -> List[Dict[str, Any]]:
+        if topic is None:
+            return db.query("SELECT * FROM claims WHERE debate_id = ? ORDER BY id", [self.id])
+        return db.query("SELECT * FROM claims WHERE debate_id = ? AND topic = ? ORDER BY id", [self.id, topic])
+
+    async def _audit_answer(self, msg_id: int, claims: List[Dict[str, Any]]) -> None:
+        """After the answer: check it against the ledger and, if it breaks the evidence rules, have the chair revise it
+        once. The answer records that it was checked, and what was fixed."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not claims or not row or row["status"] != "done" or not row["content"]:
+            return
+        d = self.debate()
+        chair = self._chair_label(d)
+        think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+        try:
+            text = await self._complete(
+                chair,
+                "audit",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.answer_check_messages(row["content"], claims),
+                think,
+            )
+            raw = parse_json_loose(text).get("problems") or []
+        except Exception as e:
+            log.warning("answer audit failed: %s", e)
+            return
+        problems = [
+            {"text": str(p.get("text") or "").strip()[:300], "issue": str(p.get("issue") or "").strip()[:300]}
+            for p in raw
+            if isinstance(p, dict) and str(p.get("issue") or "").strip()
+        ][:6]
+        meta = {"evidence": {"checked": True, "problems": problems}}
+        content = row["content"]
+        if problems:
+            try:
+                revised = strip_thinking(
+                    await self._complete(
+                        chair,
+                        "revise",
+                        d["chair_endpoint_id"],
+                        d["chair_model"],
+                        prompts.answer_revise_messages(row["content"], problems, claims),
+                        think,
+                    )
+                ).strip()
+                if re.search(r"BOTTOM\s*LINE", revised, re.I):
+                    content = revised
+                    meta["evidence"]["revised"] = True
+            except Exception as e:
+                log.warning("answer revision failed: %s", e)
+        self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
 
     # ----------------------------------------------------------------- why?
 
@@ -1460,15 +1687,11 @@ class DebateEngine:
             question = self._question(topic)
             positions = self._final_positions(topic)
 
-            # 1. Any pending lookups, then a web fact-check of the claims the answer will rely on
+            # 1. Any pending lookups, then each material claim the answer will rely on, checked against sources
             await self._drain_research(d["round"])
-            fact_check = None
+            claims: List[Dict[str, Any]] = []
             if d["research_enabled"] and positions:
-                fact_check = await self._research(
-                    {"request": "Fact-check the final positions", "requested_by": None, "kind": "factcheck"},
-                    d["round"],
-                    positions=positions,
-                )
+                claims = await self._check_claims(positions, d["round"])
 
             # 2. Chair synthesizes the final answer, streamed like any other message
             summary = self._latest_summary(topic)
@@ -1485,11 +1708,12 @@ class DebateEngine:
                 summary=summary["content"] if summary else None,
                 transcript=prompts.render_transcript(msgs[-len(handles) * 2 :], handles),
                 positions=positions,
-                fact_check=fact_check,
+                fact_check=None,
                 reason=reason,
                 criteria=d["criteria"],
                 custom_rubric=d["custom_rubric"],
                 guidance=(d["pack"] or {}).get("guidance", ""),
+                claims=claims,
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:
@@ -1541,6 +1765,7 @@ class DebateEngine:
                 self._finish_message(row["id"], status="error", content=f"The chair ({d['chair_model']}) failed: {e}")
             finally:
                 self.partials.pop(row["id"], None)
+            await self._audit_answer(row["id"], claims)
 
             vid = db.execute(
                 "INSERT INTO verdicts (debate_id, topic, reason, rounds, message_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -1587,6 +1812,7 @@ class DebateEngine:
             "messages": [serialize_message(r, self.partials.get(r["id"])) for r in rows],
             "summaries": db.query("SELECT * FROM summaries WHERE debate_id = ? ORDER BY id", [self.id]),
             "drafts": db.query("SELECT * FROM drafts WHERE debate_id = ? ORDER BY id", [self.id]),
+            "claims": self._claims(),
             "verdicts": db.query(
                 "SELECT id, debate_id, topic, reason, rounds, message_id, created_at "
                 "FROM verdicts WHERE debate_id = ? ORDER BY id",

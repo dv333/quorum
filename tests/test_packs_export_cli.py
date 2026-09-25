@@ -93,7 +93,11 @@ async def test_export_has_answer_sources_and_optional_debate():
     short = export.to_markdown(eng.snapshot())
     assert short.startswith("# t\n") and "> Rust or Go?" in short
     assert "VERDICT TEXT" in short and "all agreed in round 2" in short
-    assert "**Sources (Beagle's fact-check)**" in short and "(https://example.com/" in short
+    assert (
+        "**Evidence checked**" in short
+        and "- **Supported**: Go compiles fast" in short
+        and "(https://example.com/" in short
+    )
     assert "How the council got here" not in short
     full = export.to_markdown(eng.snapshot(), include_debate=True)
     assert "### Round 1" in full and "### Round 2" in full

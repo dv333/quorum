@@ -70,7 +70,9 @@ RESEARCH_TIMEOUT = _env_float("LLC_RESEARCH_TIMEOUT", 90.0)
 RESEARCH_MAX_QUERIES = 3  # searches the Researcher runs per request
 RESEARCH_RESULTS_PER_QUERY = 3
 RESEARCH_MAX_SOURCES = 5  # pages it reads before writing a brief
-RESEARCH_PAGE_CHARS = 2500  # characters kept from each page
+RESEARCH_PAGE_CHARS = 3500  # characters kept from each page (longer excerpts keep caveats and context)
+RESEARCH_MAX_CLAIMS = 5  # material claims checked before the answer is written
+RESEARCH_SOURCES_PER_CLAIM = 3
 RESEARCH_REQUESTS_PER_ROUND = _env_int("LLC_RESEARCH_PER_ROUND", 3)  # agent requests honored per round
 
 # Cloud providers with OpenAI-compatible chat endpoints (base URLs used as given)
