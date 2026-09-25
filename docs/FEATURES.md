@@ -93,11 +93,15 @@ each ending with a stance: **agrees**, **refines** or **disagrees**, plus its po
 - **The living answer.** After every round, the chair rewrites a short draft answer pinned at the top. Words that
   changed since the last draft are highlighted, the note says what changed and whose argument changed it, and you can
   step back through earlier drafts. The wait becomes watching the answer get better.
-- **The stage.** Every agent's avatar, who's speaking, and where each one stands.
+- **The stage.** A slim row of avatars: the speaker pulses, and a colored dot shows where each agent stands (hover
+  for its name, model and status). The chevron opens the full view with names, models and status, and Quorum
+  remembers your choice. The consensus pill on the right jumps to the current round.
 - **A live status line** by the message box says what's happening in plain words ("Round 2 of 3 · 5 of 8 spoken ·
   Hedgehog is writing…"), so the quiet gaps between turns never look frozen.
 - **Round recaps.** Each round's divider shows how the council stands after it ("3 agree · 4 refine · Hedgehog
   dissents"). Click it to fold the round away.
+- **Scannable turns.** Long messages fold to their first lines with **Show more**; each agent's stance and
+  one-line position stay visible, so you can skim a whole round quickly.
 - **Thinking.** Reasoning models think before they speak; open **Thinking** on any message to read it. It's never
   shown to the other agents.
 

@@ -111,12 +111,52 @@ function Thread({ items, seatsById, debate, onIntake }) {
   return out
 }
 
+// The stage's compact view is a per-viewer preference; storage can be unavailable (private windows)
+function useCompactStage() {
+  const [compact, setCompact] = useState(() => {
+    try { return localStorage.getItem('quorum.stage') !== 'full' } catch { return true }
+  })
+  const toggle = () => setCompact((c) => {
+    try { localStorage.setItem('quorum.stage', c ? 'full' : 'compact') } catch { /* keep it for this visit */ }
+    return !c
+  })
+  return [compact, toggle]
+}
+
+function MiniSeats({ seats, stances, speakingSeatIds, debate, beagleBusy, searches }) {
+  return (
+    <div className="mini-seats">
+      {seats.map((seat, i) => {
+        const picking = i === 0 && debate.chair_mode === 'auto' && !debate.chair_handle && debate.status === 'running'
+        const speaking = speakingSeatIds.has(seat.id) || picking
+        const st = stances[i]
+        const status = picking ? 'choosing the chair' : speaking ? 'speaking' : st ? STANCE_LABEL[st] : 'waiting'
+        return (
+          <span className={`mini-seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${seat.handle} · ${modelShort(seat.model)} · ${status}`}>
+            <Orb handle={seat.handle} speaking={speaking} chair={seat.handle === debate.chair_handle} />
+            {st && !speaking && <i className={`mini-st dot ${st.toLowerCase()}`} aria-hidden="true" />}
+          </span>
+        )
+      })}
+      {debate.research_enabled && (
+        <span className={`mini-seat ${beagleBusy ? 'on' : ''}`} title={`${RESEARCHER} · ${modelShort(debate.researcher_model)} · ${beagleBusy ? 'searching' : `${searches} searches`}`}>
+          <Orb handle={RESEARCHER} speaking={beagleBusy} dim={!beagleBusy} />
+        </span>
+      )}
+    </div>
+  )
+}
+
 function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
   const { debate, seats, messages } = state
   const stances = latestStances(messages, debate.topic, seats)
+  const [compact, toggleCompact] = useCompactStage()
   return (
     <div className="stage-wrap">
-    <div className="stage">
+    <div className={`stage ${compact ? 'compact' : ''}`}>
+      {compact ? (
+        <MiniSeats seats={seats} stances={stances} speakingSeatIds={speakingSeatIds} debate={debate} beagleBusy={beagleBusy} searches={searches} />
+      ) : (
       <div className="seats">
         {seats.map((seat, i) => {
           // In automatic mode the first (largest) member picks the chair before round 1
@@ -143,6 +183,7 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           </div>
         )}
       </div>
+      )}
       {debate.round > 0 && (() => {
         const done = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done')
         const dissent = done.filter((m) => m.stance === 'DISAGREE').map((m) => seats.find((s) => s.id === m.seat_id)?.handle)
@@ -159,6 +200,12 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           </button>
         )
       })()}
+      <button className="icon-btn stage-toggle" onClick={toggleCompact} aria-expanded={!compact}
+        aria-label={compact ? 'Show agent details' : 'Compact view'} title={compact ? 'Show agent details' : 'Compact view'}>
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d={compact ? 'm5 8 5 5 5-5' : 'm5 12 5-5 5 5'} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
     </div>
       <LivingAnswer drafts={(state.drafts || []).filter((d) => d.topic === debate.topic)} chair={debate.chair_handle} />
     </div>

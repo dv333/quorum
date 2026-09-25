@@ -95,6 +95,22 @@ function Thinking({ text, label = 'Thinking', live }) {
   )
 }
 
+// Long finished turns fold to their first lines so the debate stays scannable; the stance line below stays visible
+const FOLD_WORDS = 110
+function Folding({ text, fold, children }) {
+  const [open, setOpen] = useState(false)
+  const long = fold && text.split(/\s+/).length > FOLD_WORDS
+  if (!long) return children
+  return (
+    <>
+      <div className={`folding ${open ? 'open' : ''}`}>{children}</div>
+      <button className="linkish fold-btn" onClick={() => setOpen(!open)} aria-expanded={open}>
+        {open ? 'Show less' : 'Show more'}
+      </button>
+    </>
+  )
+}
+
 export function AgentMessage({ msg, seat, isChair }) {
   const streaming = msg.status === 'streaming'
   const body = visibleBody(msg)
@@ -108,7 +124,7 @@ export function AgentMessage({ msg, seat, isChair }) {
       <div className="bubble">
         <div className="who">{seat?.handle}<span>{meta.filter(Boolean).join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
         <Thinking text={msg.thinking} live={streaming && !body} />
-        {body ? <Markdown>{body}</Markdown>
+        {body ? <Folding text={body} fold={!streaming}><Markdown>{body}</Markdown></Folding>
           : streaming ? <Typing />
           : msg.status === 'stopped' ? <span className="faint">Stopped before replying</span> : null}
         {msg.status === 'done' && <StanceTag stance={msg.stance} position={msg.position_line} parsed={msg.stance_parsed} />}
