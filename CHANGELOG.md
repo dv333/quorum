@@ -10,7 +10,8 @@
   highlighted, what changed and whose argument changed it, and earlier drafts one click away
 - Why?: select any part of the answer to see which agents argued for it, who pushed back, and the sources behind it
 - A compact stage (the default): one slim row of avatars with stance dots; the chevron shows the full view with
-  names, models and status. On phones the header also takes less room
+  names, models and status. Only the agent working right now is in color; the others wait in gray. On phones the
+  header also takes less room
 - Long agent messages fold to their first lines (Show more), keeping each stance and position visible
 - Round recaps (stances, who dissents, fold a round away) and a plain-words live status line by the message box
 - Councils built for the pack: a pack can prefer certain models (Review code prefers coding models); the council

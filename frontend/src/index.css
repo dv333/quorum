@@ -745,3 +745,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent); mask-image: linear-gradient(to bottom, #000 60%, transparent); }
 .fold-btn { display: block; margin: 2px 0 6px; font-size: 13px; }
 @media print { .folding:not(.open) { max-height: none; -webkit-mask-image: none; mask-image: none; } .fold-btn { display: none; } }
+
+/* Only the agent that's working right now is in color; everyone else waits in gray (stance dots keep their color) */
+.mini-seat .orb, .seat .orb { transition: filter 0.4s var(--ease), opacity 0.4s var(--ease); }
+.mini-seat:not(.on) .orb, .seat:not(.on) .orb { filter: grayscale(1); opacity: 0.5; }

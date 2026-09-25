@@ -140,7 +140,7 @@ function MiniSeats({ seats, stances, speakingSeatIds, debate, beagleBusy, search
       })}
       {debate.research_enabled && (
         <span className={`mini-seat ${beagleBusy ? 'on' : ''}`} title={`${RESEARCHER} · ${modelShort(debate.researcher_model)} · ${beagleBusy ? 'searching' : `${searches} searches`}`}>
-          <Orb handle={RESEARCHER} speaking={beagleBusy} dim={!beagleBusy} />
+          <Orb handle={RESEARCHER} speaking={beagleBusy} />
         </span>
       )}
     </div>
@@ -164,7 +164,7 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           const speaking = speakingSeatIds.has(seat.id) || picking
           const st = stances[i]
           return (
-            <div className="seat" key={seat.id} title={`${seat.handle} · ${seat.model}`}>
+            <div className={`seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${seat.handle} · ${seat.model}`}>
               <Orb handle={seat.handle} size="lg" speaking={speaking} chair={seat.handle === debate.chair_handle} />
               <b>{seat.handle}</b>
               <small className="mdl">({modelShort(seat.model)})</small>
@@ -175,8 +175,8 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           )
         })}
         {debate.research_enabled && (
-          <div className="seat" title={`${RESEARCHER} · web search using ${debate.researcher_model}`}>
-            <Orb handle={RESEARCHER} size="lg" speaking={beagleBusy} dim={!beagleBusy} />
+          <div className={`seat ${beagleBusy ? 'on' : ''}`} title={`${RESEARCHER} · web search using ${debate.researcher_model}`}>
+            <Orb handle={RESEARCHER} size="lg" speaking={beagleBusy} />
             <b>{RESEARCHER}</b>
             <small className="mdl">({modelShort(debate.researcher_model)})</small>
             <span className="st">{beagleBusy ? 'searching…' : `${searches} search${searches === 1 ? '' : 'es'}`}</span>
