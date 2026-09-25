@@ -749,3 +749,14 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 /* Only the agent that's working right now is in color; everyone else waits in gray (stance dots keep their color) */
 .mini-seat .orb, .seat .orb { transition: filter 0.4s var(--ease), opacity 0.4s var(--ease); }
 .mini-seat:not(.on) .orb, .seat:not(.on) .orb { filter: grayscale(1); opacity: 0.5; }
+
+/* Roles the chair assigned */
+.role-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font: 600 10.5px/1.5 var(--font);
+  letter-spacing: 0.02em; color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, transparent); vertical-align: 1px; }
+.seat .seat-role { font-size: 10.5px; font-weight: 600; color: var(--blue); margin-top: -3px; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.roles-row { align-self: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; max-width: 92%;
+  font-size: 12px; color: var(--text-2); padding: 4px 0; }
+.roles-label { font: 600 11px var(--font); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); align-self: center; }
+.role-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 4px; border-radius: 999px; background: var(--fill); }
+.role-chip b { font-weight: 600; color: var(--text); }

@@ -122,7 +122,7 @@ export function AgentMessage({ msg, seat, isChair }) {
     <div className="msg">
       <Orb handle={seat?.handle} speaking={streaming} chair={isChair} />
       <div className="bubble">
-        <div className="who">{seat?.handle}<span>{meta.filter(Boolean).join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
+        <div className="who">{seat?.handle}{(msg.meta?.role || seat?.role) && <span className="role-tag">{msg.meta?.role || seat?.role}</span>}<span>{meta.filter(Boolean).join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
         <Thinking text={msg.thinking} live={streaming && !body} />
         {body ? <Folding text={body} fold={!streaming}><Markdown>{body}</Markdown></Folding>
           : streaming ? <Typing />
@@ -193,6 +193,18 @@ export function BeagleCard({ msg, model }) {
 }
 
 export function SystemRow({ msg }) {
+  if (msg.meta?.kind === 'roles') {
+    return (
+      <div className="roles-row" aria-label="Roles the chair assigned">
+        <span className="roles-label">Roles</span>
+        {msg.meta.roles.map((r) => (
+          <span className="role-chip" key={r.handle} title={r.focus || r.role}>
+            <Orb handle={r.handle} size="xs" /><b>{r.handle}</b> {r.role}
+          </span>
+        ))}
+      </div>
+    )
+  }
   return <div className={`sysrow ${msg.status === 'error' ? 'error' : ''}`}>{msg.content}</div>
 }
 

@@ -33,11 +33,29 @@ def guidance_line(guidance: str) -> str:
     return f"\n- How to approach this conundrum: {guidance.strip()}" if guidance and guidance.strip() else ""
 
 
+def role_line(role: Optional[Dict[str, str]]) -> str:
+    """The role the chair gave this agent for the current conundrum."""
+    if not role or not role.get("role"):
+        return ""
+    focus = f" {role['focus']}" if role.get("focus") else ""
+    return (
+        f"\nYour role in this debate: {role['role']}.{focus} Argue from this perspective, but stay honest: "
+        "if the evidence goes against your role's usual view, say so."
+    )
+
+
 def agent_system_prompt(
-    handle: str, others: List[str], criteria: List[str], custom_rubric: str, research: bool = False, guidance: str = ""
+    handle: str,
+    others: List[str],
+    criteria: List[str],
+    custom_rubric: str,
+    research: bool = False,
+    guidance: str = "",
+    role: Optional[Dict[str, str]] = None,
+    roster: Optional[List[str]] = None,
 ) -> str:
-    return f"""Today is {today()}. You are {handle}, one member of a council of AI agents working together to give the user the best possible answer, by debating in a group chat.
-The other agents are: {", ".join(others)}. The user may also post messages; treat them as guidance from the person you all serve.
+    return f"""Today is {today()}. You are {handle}, one member of a council of AI agents working together to give the user the best possible answer, by debating in a group chat.{role_line(role)}
+The other agents are: {", ".join(roster or others)}. The user may also post messages; treat them as guidance from the person you all serve.
 
 How to debate:
 - Work toward the best answer, not toward winning. Change your mind when another agent makes a better point, and say so.
@@ -118,6 +136,8 @@ def turn_messages(
     max_rounds: int,
     research: bool = False,
     guidance: str = "",
+    role: Optional[Dict[str, str]] = None,
+    roster: Optional[List[str]] = None,
 ) -> List[Dict[str, str]]:
     user = [history_block(prior_topics), f"THE QUESTION:\n{question}\n"]
     if summary:
@@ -132,7 +152,10 @@ def turn_messages(
         f"Reply with your message only, ending with the STANCE and POSITION lines."
     )
     return [
-        {"role": "system", "content": agent_system_prompt(handle, others, criteria, custom_rubric, research, guidance)},
+        {
+            "role": "system",
+            "content": agent_system_prompt(handle, others, criteria, custom_rubric, research, guidance, role, roster),
+        },
         {"role": "user", "content": "".join(user)},
     ]
 
@@ -308,6 +331,36 @@ One or two sentences naming the agents who disagreed and why, or "Nothing signif
 
 ## Details
 A short paragraph with anything else the user needs: caveats, conditions, next steps."""
+
+
+def assign_roles_messages(
+    question: str, members: List[Dict[str, str]], required: List[str], guidance: str = ""
+) -> List[Dict[str, str]]:
+    """The chair gives every agent a distinct role so the debate covers the perspectives this question needs."""
+    roster = "\n".join(f"- {m['handle']}: {m['description']}" for m in members)
+    must = ", ".join(required)
+    pack = f"\nThe user chose this kind of debate: {guidance}\n" if guidance else ""
+    return [
+        {
+            "role": "system",
+            "content": "You chair an AI council and assign debate roles. Reply with a single JSON object and nothing else.",
+        },
+        {
+            "role": "user",
+            "content": f"""Today is {today()}. The council will debate:
+{question}
+{pack}
+Agents (with the model behind each, so you can match roles to strengths):
+{roster}
+
+Give every agent one distinct role, so that together they cover every perspective this question needs.
+- These roles must be included: {must}. A Skeptic looks for the strongest reasons the emerging answer is wrong; a Pragmatist weighs cost, effort and what's realistic; a User advocate keeps the answer grounded in the person's situation.
+- Give the other agents expert roles specific to this question (for example "Tax advisor", "Security engineer", "Pediatrician"), each a different angle.
+- Role names: 1 to 3 words. Focus: what that agent should look at, under 15 words.
+
+Reply like: {{"roles": [{{"agent": "{members[0]["handle"]}", "role": "...", "focus": "..."}}]}}""",
+        },
+    ]
 
 
 def pick_roles_messages(question: str, members: List[Dict[str, str]]) -> List[Dict[str, str]]:

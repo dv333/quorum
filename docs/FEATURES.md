@@ -85,8 +85,15 @@ greeting, a quick fact) get a direct answer with no debate at all.
 
 ## Watch the council work
 
-The chair sizes the debate (one to ten rounds). Beagle opens with a researched brief, then the agents speak in turn,
-each ending with a stance: **agrees**, **refines** or **disagrees**, plus its position in one line.
+The chair sizes the debate (one to ten rounds) and gives every agent a **role**, so the council covers every angle.
+There is always a **Skeptic** (the strongest reasons the emerging answer is wrong), a **Pragmatist** (cost, effort,
+what's realistic) and a **User advocate** (your situation); the other seats get experts specific to the question. For
+"Oracle CPQ or Salesforce CPQ?" that meant an Integration Architect, a Compliance Expert, a Pricing Specialist, a
+Security Engineer and an Adoption Coach. The chair matches roles to each model's strengths, the roles appear next to
+every agent's name, and each agent argues from its role but is told to agree when the evidence says so.
+
+Beagle opens with a researched brief, then the agents speak in turn, each ending with a stance: **agrees**,
+**refines** or **disagrees**, plus its position in one line.
 
 <img src="images/live.png" alt="A live debate with the draft answer pinned at the top">
 

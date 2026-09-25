@@ -19,15 +19,17 @@ Browser (React) ── /api (REST + Server-Sent Events) ──► FastAPI backen
    (greetings, simple facts) it answers directly with no debate; otherwise it sets the number of rounds (1–10), and if
    the answer depends on something only the user knows, it asks up to three questions (one at a time, with suggested
    answers) and ends with a summary of assumptions for the user to confirm.
-2. **Opening brief.** Beagle (the researcher) plans searches, reads the most relevant parts of the top pages and posts a
+2. **Roles.** The chair gives every agent a role for this question (always a Skeptic, a Pragmatist and a User advocate
+   in councils of four or more, then question-specific experts); `settle_roles` fills anything the chair leaves out.
+3. **Opening brief.** Beagle (the researcher) plans searches, reads the most relevant parts of the top pages and posts a
    cited brief.
-3. **Rounds.** Agents speak round-robin under animal names (Otter, Panda, Koala, Penguin, Hedgehog). Every message ends
+4. **Rounds.** Agents speak round-robin under animal names (Otter, Panda, Koala, Penguin, Hedgehog). Every message ends
    with a stance (`AGREE`, `REFINE`, `DISAGREE`) and a one-line position. Agents can ask `@Beagle: …` for facts; the
    brief lands before the next speaker. The user can interject at any time.
-4. **Consensus.** The debate ends when everyone agrees (from round 2), at the round limit, or when the user asks for the
+5. **Consensus.** The debate ends when everyone agrees (from round 2), at the round limit, or when the user asks for the
    answer. After every round that isn't the last, the chair writes a short draft answer (the "living answer", stored
    in `drafts`). Long debates are compressed into a rolling summary written by the chair.
-5. **Answer.** Beagle fact-checks the claims the answer will rely on, then the chair writes a structured answer: bottom
+6. **Answer.** Beagle fact-checks the claims the answer will rely on, then the chair writes a structured answer: bottom
    line, key points, an optional Mermaid diagram (shown in the Expert view), where the agents differed, and details.
    Simple and Expert versions are rewritten on demand, and **Why?** traces a selected passage back to the agents and
    sources behind it (on demand, cached in `provenance`).

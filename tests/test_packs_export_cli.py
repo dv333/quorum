@@ -97,7 +97,7 @@ async def test_export_has_answer_sources_and_optional_debate():
     assert "How the council got here" not in short
     full = export.to_markdown(eng.snapshot(), include_debate=True)
     assert "### Round 1" in full and "### Round 2" in full
-    assert "**🦦 Otter** (model-0) · AGREE" in full and "Otter says hi in round 1." in full
+    assert "**🦦 Otter**, Domain expert (model-0) · AGREE" in full and "Otter says hi in round 1." in full
     assert "STANCE:" not in full  # the stance footer is shown in the heading, not repeated
     assert "opening brief" in full
 
@@ -238,9 +238,10 @@ class ChairScript(FakeClient):
 
     async def stream(self, endpoint, model, messages, **kw):
         sys = messages[0]["content"]
-        if sys.startswith("You chair an AI council") or sys.startswith("You trace claims"):
+        drafting = sys.startswith("You chair an AI council. While the council debates")
+        if drafting or sys.startswith("You trace claims"):
             self.calls.append((model, messages, kw))
-            if sys.startswith("You chair"):
+            if drafting:
                 self.drafts_written += 1
                 text = self.draft_reply(self.drafts_written)
             else:
@@ -262,7 +263,7 @@ async def test_chair_drafts_the_answer_after_every_round_but_the_last():
     assert (
         drafts[0]["content"] == "BOTTOM LINE: draft 1\n- a point" and drafts[1]["changed"] == "Otter's point in round 2"
     )
-    second_prompt = [m for _, m, _ in client.calls if m[0]["content"].startswith("You chair")][1][1]["content"]
+    second_prompt = [m for _, m, _ in client.calls if "keep a short draft" in m[0]["content"]][1][1]["content"]
     assert "Your draft after the previous round:\nBOTTOM LINE: draft 1" in second_prompt
     usage = db.query("SELECT kind FROM usage WHERE kind = 'draft'")
     assert len(usage) == 2

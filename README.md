@@ -45,6 +45,8 @@ A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
   a debate sized by the chair, from one round to ten.
 - **It asks before it guesses.** When the answer depends on something only you know (budget, timeline, where you
   live), the chair asks, one question at a time, three at most. Otherwise it gets straight to work.
+- **Every angle covered.** The chair gives each agent a role for your question: always a Skeptic, a Pragmatist and a
+  User advocate, plus experts specific to it (a Tax advisor, a Security engineer…). Roles show next to every name.
 - **Memorable agents.** 🦦 Otter, 🐼 Panda, 🐨 Koala, 🐧 Penguin, 🦔 Hedgehog, 🐰 Bunny, 🐢 Turtle and 🐬 Dolphin
   debate; 🐶 Beagle does the web research on a model of its own. The models only ever see these names, never each
   other's model names. Type `@` to talk to any of them.

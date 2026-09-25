@@ -9,6 +9,9 @@
 - The living answer: after every round the chair updates a draft answer pinned at the top, with changed words
   highlighted, what changed and whose argument changed it, and earlier drafts one click away
 - Why?: select any part of the answer to see which agents argued for it, who pushed back, and the sources behind it
+- Roles: before round 1 the chair gives every agent a role matched to its model: always a Skeptic, a Pragmatist and a
+  User advocate, plus experts specific to the question. Roles appear next to agent names (messages, stage, @mentions,
+  exports), a Roles row opens the debate, and each message keeps the role it was written under
 - A compact stage (the default): one slim row of avatars with stance dots; the chevron shows the full view with
   names, models and status. Only the agent working right now is in color; the others wait in gray. On phones the
   header also takes less room

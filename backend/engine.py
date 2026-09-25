@@ -87,6 +87,71 @@ def serialize_message(row: Dict[str, Any], partial: Optional[Dict[str, str]] = N
     return msg
 
 
+# Roles every council gets (fewer for tiny councils), and the defaults used to fill any the chair leaves out
+DEFAULT_ROLES = [
+    ("Domain expert", "Brings the specialist knowledge this question needs."),
+    ("Skeptic", "Finds the strongest reasons the emerging answer is wrong."),
+    ("Pragmatist", "Weighs cost, effort and what is realistic to do."),
+    ("User advocate", "Keeps the answer grounded in the person's situation and constraints."),
+    ("Risk analyst", "Looks for what could go wrong and how to limit it."),
+    ("Evidence checker", "Separates facts from assumptions and asks for sources."),
+    ("Optimist", "Makes the best case for the most promising option."),
+    ("Contrarian", "Tests the options nobody else is considering."),
+]
+_ROLE_MATCH = {
+    "Skeptic": re.compile(r"skeptic|sceptic|critic|devil|red team", re.I),
+    "Pragmatist": re.compile(r"pragmat|practical|feasib|cost|operator", re.I),
+    "User advocate": re.compile(r"user|customer|client|advocate for", re.I),
+}
+
+
+def required_roles(n: int) -> List[str]:
+    return (
+        ["Skeptic"] if n <= 2 else ["Skeptic", "Pragmatist"] if n == 3 else ["Skeptic", "Pragmatist", "User advocate"]
+    )
+
+
+def settle_roles(
+    handles: List[str], proposed: Dict[str, Dict[str, str]], required: List[str]
+) -> Dict[str, Dict[str, str]]:
+    """Every agent gets a distinct role. The chair's proposal is kept where usable; agents it left out get the missing
+    required roles first, then defaults. If the chair skipped a required role for everyone, it replaces a default role
+    before any of the chair's own choices. Returned in seat order."""
+    roles: Dict[str, Dict[str, str]] = {}
+    by_chair = set()
+    used = set()
+    for h in handles:
+        r = proposed.get(h.lower())
+        if r and r["role"].lower() not in used:
+            roles[h] = r
+            by_chair.add(h)
+            used.add(r["role"].lower())
+    defaults = dict(DEFAULT_ROLES)
+
+    def covered(need: str) -> bool:
+        return any(_ROLE_MATCH[need].search(r["role"]) for r in roles.values())
+
+    # With nothing from the chair, the default order already puts the required roles early
+    missing_required = [(n, defaults[n]) for n in required if not covered(n)] if by_chair else []
+    spare = missing_required + [
+        (n, f) for n, f in DEFAULT_ROLES if n.lower() not in used and (n, f) not in missing_required
+    ]
+    for h in handles:
+        if h not in roles:
+            name, focus = spare.pop(0) if spare else (f"Perspective {len(used) + 1}", "")
+            roles[h] = {"role": name, "focus": focus}
+            used.add(name.lower())
+    for need in required:
+        if covered(need):
+            continue
+        essential = lambda h: any(_ROLE_MATCH[x].search(roles[h]["role"]) for x in required)  # noqa: E731
+        candidates = [h for h in reversed(handles) if not essential(h)]
+        candidates.sort(key=lambda h: h in by_chair)  # defaults go before the chair's own choices
+        if candidates:
+            roles[candidates[0]] = {"role": need, "focus": defaults[need]}
+    return {h: roles[h] for h in handles}
+
+
 _WORD = re.compile(r"[a-z]{4,}|\d[\d.,]*%?", re.IGNORECASE)
 
 
@@ -207,9 +272,15 @@ class DebateEngine:
         self.bus.publish({"type": "message_created", "message": serialize_message(row)})
         return row
 
-    def _system_message(self, text: str) -> None:
+    def _system_message(self, text: str, meta: Optional[Dict[str, Any]] = None) -> None:
         d = self.debate()
-        self._insert_message(topic=d["topic"], round_no=d["round"], author_kind="system", content=text)
+        self._insert_message(
+            topic=d["topic"],
+            round_no=d["round"],
+            author_kind="system",
+            content=text,
+            **({"meta_json": json.dumps(meta)} if meta else {}),
+        )
 
     def _finish_message(self, msg_id: int, **fields: Any) -> Dict[str, Any]:
         db.update("messages", msg_id, **fields)
@@ -469,6 +540,7 @@ class DebateEngine:
     async def _begin_debate(self) -> None:
         d = self.debate()
         self._set(status="running")
+        await self._assign_roles()
         if d["research_enabled"]:
             self._queue_research(self._question(d["topic"]), None, "brief")
         await self._run_rounds()
@@ -719,17 +791,15 @@ class DebateEngine:
 
     # ------------------------------------------------------------ chair pick
 
-    async def _pick_roles(self) -> None:
-        """The largest council model reads the question and picks the chair, the researcher model and a title."""
+    async def _describe_members(self, seats: List[Dict[str, Any]]) -> Tuple[List[Dict[str, str]], Dict[int, Any]]:
+        """Each member's model, family, size and whether it reasons (for choosing the chair and assigning roles)."""
         d = self.debate()
-        seats = self.seats()
         metas = {}
         for s in seats:
             try:
                 metas[s["id"]] = await self.meta_lookup(s["endpoint_id"], s["model"], d["num_ctx"]) or {}
             except Exception:
                 metas[s["id"]] = {}
-        picker = max(seats, key=lambda s: metas[s["id"]].get("est_bytes") or 0)
         members = []
         for s in seats:
             m = metas[s["id"]]
@@ -739,6 +809,14 @@ class DebateEngine:
             members.append(
                 {"handle": s["handle"], "description": f"{s['model']}" + (f" ({', '.join(bits)})" if bits else "")}
             )
+        return members, metas
+
+    async def _pick_roles(self) -> None:
+        """The largest council model reads the question and picks the chair, the researcher model and a title."""
+        d = self.debate()
+        seats = self.seats()
+        members, metas = await self._describe_members(seats)
+        picker = max(seats, key=lambda s: metas[s["id"]].get("est_bytes") or 0)
         by_name = {s["handle"].lower(): s for s in seats}
         choice: Dict[str, Any] = {}
         try:
@@ -779,6 +857,47 @@ class DebateEngine:
         else:
             self._system_message(f"{picker['handle']} chose {chair['handle']} to chair{why}.")
 
+    # ----------------------------------------------------------------- roles
+
+    async def _assign_roles(self) -> None:
+        """The chair gives every agent a distinct role for this conundrum. A Skeptic, a Pragmatist and a User advocate
+        are always included (fewer for tiny councils); anything the chair leaves out is filled in from a default set."""
+        d = self.debate()
+        seats = self.seats()
+        if not seats:
+            return
+        required = required_roles(len(seats))
+        members, _ = await self._describe_members(seats)
+        proposed: Dict[str, Dict[str, str]] = {}
+        try:
+            text = await self._complete(
+                self._chair_label(d),
+                "roles",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.assign_roles_messages(
+                    self._question(d["topic"]), members, required, (d["pack"] or {}).get("guidance", "")
+                ),
+                await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+            )
+            for item in parse_json_loose(text).get("roles") or []:
+                if isinstance(item, dict) and str(item.get("role") or "").strip():
+                    proposed[str(item.get("agent") or "").strip().lower()] = {
+                        "role": str(item["role"]).strip().strip(".")[:28],
+                        "focus": str(item.get("focus") or "").strip()[:120],
+                    }
+        except Exception as e:
+            log.warning("role assignment failed: %s", e)
+        roles = settle_roles([s["handle"] for s in seats], proposed, required)
+        for s in seats:
+            r = roles[s["handle"]]
+            db.update("seats", s["id"], role=r["role"], role_focus=r["focus"])
+        self.bus.publish({"type": "seats_updated", "seats": self._public_seats()})
+        self._system_message(
+            "Roles: " + " · ".join(f"{s['handle']}, {roles[s['handle']]['role']}" for s in seats),
+            meta={"kind": "roles", "roles": [{"handle": s["handle"], **roles[s["handle"]]} for s in seats]},
+        )
+
     # --------------------------------------------------------- reading level
 
     async def rewrite_level(self, verdict_id: int, level: str) -> str:
@@ -815,7 +934,12 @@ class DebateEngine:
     async def _seat_turn(self, seat: Dict[str, Any], round_no: int, upcoming: Optional[Dict[str, Any]]) -> None:
         d = self.debate()
         row = self._insert_message(
-            topic=d["topic"], round_no=round_no, author_kind="seat", seat_id=seat["id"], status="streaming"
+            topic=d["topic"],
+            round_no=round_no,
+            author_kind="seat",
+            seat_id=seat["id"],
+            status="streaming",
+            meta_json=json.dumps({"role": seat["role"]}) if seat.get("role") else None,
         )
         msg_id = row["id"]
         self.partials[msg_id] = {"content": "", "thinking": ""}
@@ -1111,8 +1235,12 @@ class DebateEngine:
                 max_rounds=d["max_rounds"],
                 research=d["research_enabled"],
                 guidance=(d["pack"] or {}).get("guidance", ""),
+                role={"role": seat["role"], "focus": seat.get("role_focus") or ""} if seat.get("role") else None,
+                roster=roster,
             )
 
+        others = [s for s in self.seats() if s["id"] != seat["id"]]
+        roster = [f"{s['handle']} ({s['role']})" if s.get("role") else s["handle"] for s in others]
         messages = build(msgs)
         # Hard cap: if still over budget (summary pending or failed), drop the oldest messages
         keep_min = len(handles)
@@ -1431,10 +1559,9 @@ class DebateEngine:
 
     # --------------------------------------------------------------- snapshot
 
-    def snapshot(self) -> Dict[str, Any]:
-        d = self.debate()
+    def _public_seats(self) -> List[Dict[str, Any]]:
         endpoint_names = {e.id: e.name for e in inventory.endpoints()}
-        seats = [
+        return [
             {
                 **s,
                 "thinking_enabled": bool(s["thinking_enabled"]),
@@ -1442,6 +1569,11 @@ class DebateEngine:
             }
             for s in self.seats()
         ]
+
+    def snapshot(self) -> Dict[str, Any]:
+        d = self.debate()
+        endpoint_names = {e.id: e.name for e in inventory.endpoints()}
+        seats = self._public_seats()
         rows = db.query("SELECT * FROM messages WHERE debate_id = ? ORDER BY id", [self.id])
         r_ep, r_model = self._researcher_model(d)
         return {

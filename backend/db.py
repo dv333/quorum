@@ -154,6 +154,8 @@ MIGRATIONS = [
     ("endpoints", "api_key", "TEXT"),
     ("messages", "meta_json", "TEXT"),
     ("debates", "pack_json", "TEXT"),
+    ("seats", "role", "TEXT"),
+    ("seats", "role_focus", "TEXT"),
 ]
 
 _lock = threading.RLock()

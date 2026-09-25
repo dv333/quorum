@@ -131,8 +131,9 @@ function MiniSeats({ seats, stances, speakingSeatIds, debate, beagleBusy, search
         const speaking = speakingSeatIds.has(seat.id) || picking
         const st = stances[i]
         const status = picking ? 'choosing the chair' : speaking ? 'speaking' : st ? STANCE_LABEL[st] : 'waiting'
+        const who = seat.role ? `${seat.handle}, ${seat.role}` : seat.handle
         return (
-          <span className={`mini-seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${seat.handle} · ${modelShort(seat.model)} · ${status}`}>
+          <span className={`mini-seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${who} · ${modelShort(seat.model)} · ${status}`}>
             <Orb handle={seat.handle} speaking={speaking} chair={seat.handle === debate.chair_handle} />
             {st && !speaking && <i className={`mini-st dot ${st.toLowerCase()}`} aria-hidden="true" />}
           </span>
@@ -167,6 +168,7 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
             <div className={`seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${seat.handle} · ${seat.model}`}>
               <Orb handle={seat.handle} size="lg" speaking={speaking} chair={seat.handle === debate.chair_handle} />
               <b>{seat.handle}</b>
+              {seat.role && <small className="seat-role" title={seat.role_focus || seat.role}>{seat.role}</small>}
               <small className="mdl">({modelShort(seat.model)})</small>
               <span className="st">
                 {picking ? 'choosing chair…' : speaking ? 'speaking…' : st ? <><i className={`dot ${st.toLowerCase()}`} /> {STANCE_LABEL[st]}</> : <><i className="dot idle" /> waiting</>}
@@ -214,7 +216,7 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
 
 // Agents you can @mention from the composer: the council plus Beagle
 function mentionables(seats, debate) {
-  const list = seats.map((s) => ({ name: s.handle, model: s.model }))
+  const list = seats.map((s) => ({ name: s.handle, model: s.model, hint: s.role }))
   if (debate.research_enabled) list.push({ name: RESEARCHER, model: debate.researcher_model, hint: 'searches the web' })
   return list
 }

@@ -37,6 +37,8 @@ function reducer(state, event) {
             : m,
         ),
       }
+    case 'seats_updated':
+      return { ...state, seats: event.seats }
     case 'draft_created':
       return { ...state, drafts: [...state.drafts, event.draft] }
     case 'summary_created':
