@@ -1,0 +1,22 @@
+{
+  "_note": "Curated council candidates. size_gb is the approximate Ollama download (Q4) and is only used to estimate fit before pulling.",
+  "models": [
+    {"model": "llama3.2:3b", "size_gb": 2.0, "family": "Llama", "strengths": "Tiny and fast, good for quick sanity rounds"},
+    {"model": "qwen3:4b", "size_gb": 2.5, "family": "Qwen", "strengths": "Small reasoning model with thinking mode"},
+    {"model": "gemma3:4b", "size_gb": 3.3, "family": "Gemma", "strengths": "Compact generalist, strong writing"},
+    {"model": "llama3.1:8b", "size_gb": 4.9, "family": "Llama", "strengths": "Solid all-rounder, different training lineage"},
+    {"model": "granite3.3:8b", "size_gb": 4.9, "family": "Granite", "strengths": "Business and instruction following"},
+    {"model": "qwen3:8b", "size_gb": 5.2, "family": "Qwen", "strengths": "Reasoning with thinking mode"},
+    {"model": "deepseek-r1:8b", "size_gb": 5.2, "family": "DeepSeek", "strengths": "Chain-of-thought reasoning"},
+    {"model": "gemma3:12b", "size_gb": 8.1, "family": "Gemma", "strengths": "Balanced quality and speed"},
+    {"model": "phi4:14b", "size_gb": 9.1, "family": "Phi", "strengths": "Math and logic"},
+    {"model": "qwen3:14b", "size_gb": 9.3, "family": "Qwen", "strengths": "Strong reasoning, good chair"},
+    {"model": "deepseek-r1:14b", "size_gb": 9.0, "family": "DeepSeek", "strengths": "Deeper reasoning"},
+    {"model": "gpt-oss:20b", "size_gb": 14.0, "family": "gpt-oss", "strengths": "OpenAI open-weight reasoning model"},
+    {"model": "mistral-small3.2:24b", "size_gb": 15.0, "family": "Mistral", "strengths": "Precise, concise answers"},
+    {"model": "gemma3:27b", "size_gb": 17.0, "family": "Gemma", "strengths": "High quality generalist"},
+    {"model": "qwen3:30b", "size_gb": 19.0, "family": "Qwen", "strengths": "Fast mixture-of-experts, great chair"},
+    {"model": "qwen3:32b", "size_gb": 20.0, "family": "Qwen", "strengths": "Dense, strong reasoning"},
+    {"model": "gpt-oss:120b", "size_gb": 65.0, "family": "gpt-oss", "strengths": "Frontier-class open weights, needs 80 GB+"}
+  ]
+}
