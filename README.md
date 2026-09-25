@@ -100,7 +100,17 @@ cd quorum
 ./start.sh
 ```
 
-On Windows, run `.\start.ps1` in PowerShell.
+`start.sh` checks everything Quorum needs. On a Mac with [Homebrew](https://brew.sh) it offers to install anything
+missing (uv, Node.js, Ollama, Docker Desktop), starts Ollama and Docker if they aren't running, and installs the
+app's packages. Run `./start.sh --check` to only check and install, or `./start.sh --yes` to install without asking.
+On Windows, run `.\start.ps1` in PowerShell; it offers the same installs through winget.
+
+Prefer to install the prerequisites yourself?
+
+```bash
+brew install uv node ollama
+brew install --cask docker    # for web search
+```
 
 Open **http://localhost:5173**. `start.sh` also starts private web search in the background when Docker is running
 (the first time downloads about 4 GB). On first launch a short walkthrough checks Ollama, downloads a starter council
@@ -181,6 +191,21 @@ See [.env.example](.env.example) for the full list.
 
 The backend isn't running. Start everything with `./start.sh`. If port 8002 is taken, stop the other program or set
 `LLC_PORT` (and update `frontend/vite.config.js`).
+</details>
+
+<details>
+<summary><b>"vite: command not found" or "Cannot find package vite"</b></summary>
+
+The app's packages are missing or were half-installed (for example, the first run was interrupted). Run
+`./start.sh` again: it notices an incomplete install and repairs it. Or install them yourself:
+`cd frontend && npm install`. Vite doesn't need to be installed globally or with Homebrew.
+</details>
+
+<details>
+<summary><b>Ollama isn't running</b></summary>
+
+`./start.sh` starts Ollama when it's installed. If it isn't, install it with `brew install ollama` (or from
+[ollama.com/download](https://ollama.com/download)) and run `./start.sh` again.
 </details>
 
 <details>

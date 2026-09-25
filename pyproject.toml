@@ -1,6 +1,6 @@
 [project]
 name = "quorum"
-version = "0.1.0"
+version = "0.1.1"
 description = "Many minds. One answer. A council of local AI models that debate your question."
 readme = "README.md"
 license = "MIT"

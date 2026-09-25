@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (2026-09-25)
+
+- `start.sh` / `start.ps1` check prerequisites and offer to install missing ones (Homebrew on macOS, winget on
+  Windows), start Ollama and Docker when they aren't running, and add `--check` and `--yes`
+- Repair a half-finished `npm install` (for example after an interrupted first run) instead of failing with
+  "vite: command not found"
+
 ## 0.1.0 (2026-09-24)
 
 First public release.
