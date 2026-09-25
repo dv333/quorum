@@ -27,7 +27,46 @@ export function useAutoGrow(ref, value) {
   }, [ref, value])
 }
 
+const joinNames = (names) => names.length <= 2 ? names.join(' & ') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`
+
+// A round's divider doubles as its recap: how the council stands, who dissents, and a way to fold the round away
+function RoundDivider({ round, turns, seatsCount, collapsed, onToggle }) {
+  const spoken = turns.filter((m) => m.status === 'done')
+  const done = spoken.filter((m) => m.stance)
+  const count = (s) => done.filter((m) => m.stance === s).length
+  const dissent = done.filter((m) => m.stance === 'DISAGREE').map((m) => m.handle)
+  let recap
+  if (spoken.length < seatsCount && turns.some((m) => m.status === 'streaming')) recap = `${spoken.length} of ${seatsCount} spoken`
+  else if (done.length && count('AGREE') === done.length) recap = `all ${done.length} agree`
+  else recap = [count('AGREE') && `${count('AGREE')} agree`, count('REFINE') && `${count('REFINE')} refine`].filter(Boolean).join(' · ')
+  return (
+    <button className={`round-divider ${collapsed ? 'collapsed' : ''}`} onClick={onToggle} aria-expanded={!collapsed}
+      title={collapsed ? 'Show this round' : 'Fold this round away'}>
+      <span className="rd-line" />
+      <span className="rd-label">
+        <b>Round {round}</b>
+        <span className="rd-dots" aria-hidden="true">{done.map((m) => <i key={m.id} className={`dot ${m.stance.toLowerCase()}`} />)}</span>
+        {recap}{dissent.length > 0 && <>{recap && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}
+        <span className="chev" aria-hidden="true">›</span>
+      </span>
+      <span className="rd-line" />
+    </button>
+  )
+}
+
 function Thread({ items, seatsById, debate, onIntake }) {
+  const [collapsed, setCollapsed] = useState(() => new Set())
+  const toggleRound = (r) => setCollapsed((prev) => {
+    const next = new Set(prev)
+    if (next.has(r)) next.delete(r); else next.add(r)
+    return next
+  })
+  const seatsCount = Object.keys(seatsById).length
+  const turnsByRound = {}
+  for (const m of items) {
+    if (m.author_kind !== 'seat') continue
+    ;(turnsByRound[m.round] ||= []).push({ ...m, handle: seatsById[m.seat_id]?.handle })
+  }
   let lastRound = null
   const out = []
   const lastModerator = [...items].reverse().find((m) => m.author_kind === 'moderator')
@@ -43,8 +82,13 @@ function Thread({ items, seatsById, debate, onIntake }) {
     }
     if (m.author_kind === 'seat' && m.round !== lastRound) {
       lastRound = m.round
-      out.push(<div className="divider" key={`r${m.id}`}>Round {m.round}</div>)
+      out.push(
+        <RoundDivider key={`r${m.id}`} round={m.round} turns={turnsByRound[m.round] || []} seatsCount={seatsCount}
+          collapsed={collapsed.has(m.round)} onToggle={() => toggleRound(m.round)} />,
+      )
     }
+    // A folded round hides its turns and the lookups made during it
+    if (lastRound !== null && collapsed.has(lastRound) && m.round === lastRound && ['seat', 'researcher'].includes(m.author_kind)) continue
     if (m.author_kind === 'user') out.push(<UserMessage key={m.id} msg={m} />)
     else if (m.author_kind === 'researcher') out.push(<BeagleCard key={m.id} msg={m} model={debate.researcher_model} />)
     else if (m.author_kind === 'system') out.push(<SystemRow key={m.id} msg={m} />)
@@ -119,7 +163,32 @@ function mentionables(seats, debate) {
   return list
 }
 
-function Composer({ debate, seats, onError }) {
+// One line of plain words where the user is looking, so the quiet gaps between turns never look frozen
+function LiveStatus({ state }) {
+  const { debate, seats, messages } = state
+  const streaming = messages.filter((m) => m.status === 'streaming')
+  const seatName = (id) => seats.find((s) => s.id === id)?.handle
+  const writer = streaming.find((m) => m.author_kind === 'seat')
+  let text
+  if (debate.status === 'concluding') {
+    text = streaming.some((m) => m.research_kind === 'factcheck') ? `${RESEARCHER} is fact-checking the answer…`
+      : `${debate.chair_handle || 'The chair'} is writing the answer…`
+  } else if (debate.status === 'paused') {
+    text = `Paused after round ${debate.round}`
+  } else if (debate.status === 'running' && debate.round > 0) {
+    const spoken = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done').length
+    const who = writer ? `${seatName(writer.seat_id)} is writing…`
+      : streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is searching…`
+      : 'next speaker is thinking…'
+    text = `Round ${debate.round} of ${debate.max_rounds} · ${spoken} of ${seats.length} spoken · ${who}`
+  } else if (debate.status === 'running') {
+    text = streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is researching before round 1…` : 'Getting started…'
+  }
+  if (!text) return null
+  return <span className="live-status" role="status"><i className="live-dot" />{text}</span>
+}
+
+function Composer({ debate, seats, onError, state }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [picker, setPicker] = useState(null) // { query, start, index }
@@ -200,6 +269,7 @@ function Composer({ debate, seats, onError }) {
         <button className="send" style={{ width: 34, height: 34, fontSize: 16 }} disabled={!text.trim() || busy} onClick={send} aria-label="Send">↑</button>
       </div>
       <div className="composer-meta">
+        {state && <LiveStatus state={state} />}
         <label className="switch" title="Opening brief, lookups when agents ask, and a fact-check before the answer">
           <input type="checkbox" checked={debate.research_enabled}
             onChange={(e) => act(() => api.updateDebate(id, { research_enabled: e.target.checked }))} />
@@ -383,7 +453,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           {error && <div className="sysrow error">{error}</div>}
         </div>
       </div>
-      <Composer debate={debate} seats={seats} onError={setError} />
+      <Composer debate={debate} seats={seats} onError={setError} state={state} />
     </>
   )
 }

@@ -648,3 +648,20 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   #print-root .copy-btn, #print-root .export, #print-root .seg, #print-root .diagram-hint { display: none; }
   #print-root .stats, #print-root .bars, #print-root .diagram { break-inside: avoid; }
 }
+
+/* Round recaps: the divider shows how the council stands and folds the round away */
+.round-divider { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: 100%; margin: 10px 0 0; cursor: pointer;
+  font: 500 12px var(--font); color: var(--text-2); }
+.round-divider .rd-line { flex: 1; height: 1px; background: var(--hairline); }
+.round-divider .rd-label { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 999px; transition: background 0.2s; }
+.round-divider:hover .rd-label, .round-divider:focus-visible .rd-label { background: var(--fill); color: var(--text); }
+.round-divider b { font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11px; color: var(--text-3); }
+.round-divider em { font-style: normal; color: var(--disagree); }
+.round-divider .rd-dots { display: inline-flex; gap: 3px; }
+.round-divider .rd-dots .dot { width: 6px; height: 6px; }
+.round-divider .chev { display: inline-block; transform: rotate(90deg); transition: transform 0.2s var(--ease); color: var(--text-3); }
+.round-divider.collapsed .chev { transform: rotate(0deg); }
+
+/* Live status in the composer row */
+.live-status { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.live-status .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: pulse 1.6s ease-in-out infinite; }
