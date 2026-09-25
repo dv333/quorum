@@ -152,9 +152,17 @@ ok "Python packages"
 # or older than package-lock.json.
 if [ ! -x frontend/node_modules/.bin/vite ] || [ ! -f frontend/node_modules/.package-lock.json ] \
   || [ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]; then
+  # A custom registry in ~/.npmrc (often a company mirror) may only resolve on a work network or VPN.
+  # Every package in package-lock.json comes from the public registry, so fall back to it.
+  PUBLIC_REGISTRY="https://registry.npmjs.org/"
+  NPM_REGISTRY="$(cd frontend && npm config get registry 2>/dev/null || echo "$PUBLIC_REGISTRY")"
+  if [ "$NPM_REGISTRY" != "$PUBLIC_REGISTRY" ] && ! curl -s --max-time 5 -o /dev/null "$NPM_REGISTRY"; then
+    warn "npm is set to use $NPM_REGISTRY, which isn't reachable (off VPN?). Using the public registry instead."
+    NPM_REGISTRY="$PUBLIC_REGISTRY"
+  fi
   printf '  … installing app packages (npm install)\n'
-  if ! (cd frontend && npm install --no-audit --no-fund --loglevel=error); then
-    fail "npm install failed. Try again, or run it yourself: cd frontend && npm install"
+  if ! (cd frontend && npm install --no-audit --no-fund --loglevel=error --registry="$NPM_REGISTRY"); then
+    fail "npm install failed. Check your network, then try again (npm registry: $NPM_REGISTRY)"
     exit 1
   fi
 fi

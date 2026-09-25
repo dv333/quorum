@@ -202,6 +202,14 @@ The app's packages are missing or were half-installed (for example, the first ru
 </details>
 
 <details>
+<summary><b>npm install fails with ENOTFOUND</b></summary>
+
+Your npm is probably set to a company registry (check with `npm config get registry`) that only works on your work
+network or VPN. `./start.sh` notices an unreachable registry and uses the public one for Quorum. To do it yourself:
+`cd frontend && npm install --registry=https://registry.npmjs.org/`
+</details>
+
+<details>
 <summary><b>Ollama isn't running</b></summary>
 
 `./start.sh` starts Ollama when it's installed. If it isn't, install it with `brew install ollama` (or from

@@ -100,12 +100,24 @@ $marker = "frontend/node_modules/.package-lock.json"
 $stale = -not (Test-Path "frontend/node_modules/.bin/vite.cmd") -or -not (Test-Path $marker) -or
     ((Get-Item "frontend/package-lock.json").LastWriteTime -gt (Get-Item $marker -ErrorAction SilentlyContinue).LastWriteTime)
 if ($stale) {
-    Write-Host "  ... installing app packages (npm install)"
     Push-Location frontend
-    npm install --no-audit --no-fund --loglevel=error
+    # A custom registry in .npmrc (often a company mirror) may only resolve on a work network or VPN.
+    # Every package in package-lock.json comes from the public registry, so fall back to it.
+    $publicRegistry = "https://registry.npmjs.org/"
+    $registry = (npm config get registry).Trim()
+    if ($registry -ne $publicRegistry) {
+        try { Invoke-WebRequest $registry -TimeoutSec 5 -UseBasicParsing | Out-Null; $reachable = $true }
+        catch { $reachable = [bool]$_.Exception.Response }  # an HTTP error still means the host answered
+        if (-not $reachable) {
+            Warn "npm is set to use $registry, which isn't reachable (off VPN?). Using the public registry instead."
+            $registry = $publicRegistry
+        }
+    }
+    Write-Host "  ... installing app packages (npm install)"
+    npm install --no-audit --no-fund --loglevel=error --registry=$registry
     $code = $LASTEXITCODE
     Pop-Location
-    if ($code -ne 0) { Fail "npm install failed. Try again, or run: cd frontend; npm install"; exit 1 }
+    if ($code -ne 0) { Fail "npm install failed. Check your network, then try again (npm registry: $registry)"; exit 1 }
 }
 Ok "App packages"
 

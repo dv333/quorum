@@ -6,6 +6,8 @@
   Windows), start Ollama and Docker when they aren't running, and add `--check` and `--yes`
 - Repair a half-finished `npm install` (for example after an interrupted first run) instead of failing with
   "vite: command not found"
+- Fall back to the public npm registry when a custom one in `~/.npmrc` isn't reachable (for example, a company mirror
+  when you're off VPN)
 
 ## 0.1.0 (2026-09-24)
 
