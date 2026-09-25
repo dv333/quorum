@@ -1,0 +1,35 @@
+name: Bug report
+description: Something isn't working as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Ask "…"
+        2. …
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: macOS 27, M3 Pro 36 GB / Ubuntu 24.04, RTX 4090
+    validations:
+      required: true
+  - type: input
+    id: models
+    attributes:
+      label: Models in the council
+      placeholder: qwen3:14b, gemma3:12b, llama3.1:8b
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Backend output from the terminal running ./start.sh is especially helpful.
