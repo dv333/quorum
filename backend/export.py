@@ -48,7 +48,7 @@ def _sources(sources: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-BOTTOM_LINE = re.compile(r"^\s*[*_#]*\s*BOTTOM LINE\s*[*_]*\s*[:：]\s*(.+)$", re.IGNORECASE | re.MULTILINE)
+BOTTOM_LINE = re.compile(r"^\s*[*_#]*\s*BOTTOM\s*LINE\s*[*_]*\s*[:：]\s*(.+)$", re.IGNORECASE | re.MULTILINE)
 
 
 def _readable(answer: str) -> str:

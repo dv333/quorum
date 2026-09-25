@@ -24,10 +24,12 @@ Browser (React) ── /api (REST + Server-Sent Events) ──► FastAPI backen
    with a stance (`AGREE`, `REFINE`, `DISAGREE`) and a one-line position. Agents can ask `@Beagle: …` for facts; the
    brief lands before the next speaker. The user can interject at any time.
 4. **Consensus.** The debate ends when everyone agrees (from round 2), at the round limit, or when the user asks for the
-   answer. Long debates are compressed into a rolling summary written by the chair.
+   answer. After every round that isn't the last, the chair writes a short draft answer (the "living answer", stored
+   in `drafts`). Long debates are compressed into a rolling summary written by the chair.
 5. **Answer.** Beagle fact-checks the claims the answer will rely on, then the chair writes a structured answer: bottom
    line, key points, an optional Mermaid diagram (shown in the Expert view), where the agents differed, and details.
-   Simple and Expert versions are rewritten on demand.
+   Simple and Expert versions are rewritten on demand, and **Why?** traces a selected passage back to the agents and
+   sources behind it (on demand, cached in `provenance`).
 
 ## Backend (`backend/`)
 

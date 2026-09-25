@@ -338,10 +338,6 @@ textarea.input { resize: vertical; }
 .seat .st { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .dot.agree { background: var(--agree); } .dot.refine { background: var(--refine); } .dot.disagree { background: var(--disagree); } .dot.idle { background: var(--text-3); }
-.progress { margin-left: auto; text-align: right; font-size: 12px; color: var(--text-2); padding-bottom: 8px; flex: none; }
-.progress .bar { width: 170px; height: 6px; margin: 6px 0 0 auto; display: flex; gap: 2px; }
-.progress .bar i { flex: 1; border-radius: 3px; background: var(--fill-2); transition: background 0.4s; }
-.progress .bar i.agree { background: var(--agree); } .progress .bar i.refine { background: var(--refine); } .progress .bar i.disagree { background: var(--disagree); }
 
 .thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: 1360px; margin: 0 auto; }
 .divider { text-align: center; font: 600 11px var(--font); color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; margin: 8px 0 -2px; }
@@ -543,8 +539,6 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   .stage { padding: 10px 12px 4px; flex-direction: column; align-items: stretch; gap: 6px; }
   .seat { width: 74px; }
   .orb.lg { width: 46px; height: 46px; font-size: 25px; }
-  .progress { margin: 0; text-align: left; padding: 0 4px; display: flex; align-items: center; gap: 10px; }
-  .progress .bar { margin: 0; flex: 1; width: auto; }
   .thread { padding: 8px 12px 20px; gap: 12px; }
   .msg { gap: 8px; }
   .msg > .orb { width: 28px; height: 28px; font-size: 15px; }
@@ -645,7 +639,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
     -webkit-backdrop-filter: none; backdrop-filter: none; }
   #print-root .print-only { display: block; }
   #print-root .print-q { font: 600 15px var(--font); padding: 0 26px 10px; color: #333; }
-  #print-root .copy-btn, #print-root .export, #print-root .seg, #print-root .diagram-hint { display: none; }
+  #print-root .copy-btn, #print-root .export, #print-root .seg, #print-root .diagram-hint, #print-root .why-hint { display: none; }
   #print-root .stats, #print-root .bars, #print-root .diagram { break-inside: avoid; }
 }
 
@@ -665,3 +659,57 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 /* Live status in the composer row */
 .live-status { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .live-status .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: pulse 1.6s ease-in-out infinite; }
+
+/* Living answer: the chair's draft, pinned in the stage while the council debates */
+.living { max-width: 1360px; margin: 0 auto; padding: 0 32px 10px; }
+.living-head { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: baseline; gap: 10px; cursor: pointer;
+  padding: 9px 14px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline); transition: background 0.2s; }
+.living-head:hover, .living-head:focus-visible { background: color-mix(in srgb, var(--blue) 5%, var(--card)); }
+.living-label { flex: none; font: 600 11px var(--font); letter-spacing: 0.05em; text-transform: uppercase; color: var(--blue); }
+.living-bl { flex: 1; min-width: 0; font: 500 14px/1.45 var(--font); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.living.open .living-bl { white-space: normal; }
+.living-head .chev { flex: none; color: var(--text-3); transition: transform 0.2s var(--ease); }
+.living.open .living-head .chev { transform: rotate(90deg); }
+.living mark { background: color-mix(in srgb, var(--blue) 16%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; animation: fade 0.6s ease; }
+.living-body { padding: 8px 14px 4px; font: 14px/1.5 var(--font); color: var(--text-2); animation: fade 0.2s ease; }
+.living-body ul { margin: 0 0 6px; padding-left: 18px; }
+.living-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
+.living-changed { flex: 1; min-width: 200px; }
+.living-nav { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.living-nav button { all: unset; cursor: pointer; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: var(--text-2); }
+.living-nav button:hover:not(:disabled) { background: var(--fill); }
+.living-nav button:disabled { opacity: 0.3; cursor: default; }
+@media (max-width: 720px) { .living { padding: 0 14px 8px; } .living-head { flex-wrap: wrap; } }
+
+/* "Why?": trace a selected passage of the answer */
+.answer { position: relative; }
+.why-hint { padding: 0 26px 14px; font: 12px var(--font); color: var(--text-3); }
+.why-btn { position: absolute; transform: translate(-50%, calc(-100% - 8px)); z-index: 20; border: 0; cursor: pointer;
+  padding: 6px 12px; border-radius: 999px; background: var(--text); color: var(--window); font: 600 13px var(--font);
+  box-shadow: var(--shadow-lg); animation: pop 0.15s var(--ease); }
+.why-panel { position: absolute; z-index: 25; left: clamp(12px, calc(var(--x) - 190px), calc(100% - 392px)); width: min(380px, calc(100% - 24px));
+  margin-top: 10px; background: var(--card); border-radius: 16px; padding: 12px 14px 14px;
+  box-shadow: var(--shadow-lg), 0 0 0 0.5px var(--hairline); font: 13px/1.45 var(--font); animation: pop 0.18s var(--ease); max-height: 60vh; overflow-y: auto; }
+.why-head { display: flex; gap: 8px; align-items: flex-start; color: var(--text-2); font-style: italic; }
+.why-head span { flex: 1; }
+.why-head .icon-btn { font-style: normal; }
+.why-loading { display: flex; gap: 8px; align-items: center; padding: 10px 0 2px; color: var(--text-2); }
+.why-summary { margin: 8px 0 4px; color: var(--text); }
+.why-group { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.why-group small { font: 600 11px var(--font); letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-3); }
+.why-row { display: flex; gap: 8px; align-items: flex-start; }
+.why-row b { flex: none; font-weight: 600; }
+.why-row span { color: var(--text-2); }
+.why-src { color: var(--blue); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.why-src:hover { text-decoration: underline; }
+
+/* Consensus pill in the stage: where the council stands this round; click to jump there */
+.consensus-pill { all: unset; box-sizing: border-box; margin-left: auto; margin-bottom: 8px; flex: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 999px; background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline); font: 12px var(--font); color: var(--text-2);
+  font-variant-numeric: tabular-nums; transition: background 0.2s; }
+.consensus-pill:hover, .consensus-pill:focus-visible { background: var(--fill); color: var(--text); }
+.consensus-pill .cp-round { font-weight: 600; color: var(--text); }
+.consensus-pill .cp-dots { display: inline-flex; gap: 3px; }
+.consensus-pill .cp-dots .dot { width: 6px; height: 6px; }
+.consensus-pill em { font-style: normal; color: var(--disagree); }
+@media (max-width: 720px) { .consensus-pill { margin: 4px 0 8px; } }

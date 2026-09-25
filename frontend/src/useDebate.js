@@ -2,7 +2,7 @@ import { useEffect, useReducer } from 'react'
 
 // Live debate state: a snapshot on connect, then incremental SSE events.
 
-const empty = { loaded: false, debate: null, seats: [], messages: [], summaries: [], verdicts: [], mode: null, metrics: {} }
+const empty = { loaded: false, debate: null, seats: [], messages: [], summaries: [], drafts: [], verdicts: [], mode: null, metrics: {} }
 
 function upsert(list, item) {
   const i = list.findIndex((x) => x.id === item.id)
@@ -17,7 +17,7 @@ function reducer(state, event) {
     case 'reset':
       return empty
     case 'snapshot':
-      return { ...event.state, loaded: true }
+      return { drafts: [], ...event.state, loaded: true }
     case 'debate_updated':
       return { ...state, debate: { ...state.debate, ...event.debate } }
     case 'message_created':
@@ -37,6 +37,8 @@ function reducer(state, event) {
             : m,
         ),
       }
+    case 'draft_created':
+      return { ...state, drafts: [...state.drafts, event.draft] }
     case 'summary_created':
       return { ...state, summaries: [...state.summaries, event.summary] }
     case 'metrics_updated':

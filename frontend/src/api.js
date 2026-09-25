@@ -33,6 +33,7 @@ export const api = {
   deleteDebate: (id) => request(`/debates/${id}`, { method: 'DELETE' }),
   updateDebate: (id, body) => request(`/debates/${id}`, { method: 'PATCH', body }),
   postMessage: (id, content) => request(`/debates/${id}/messages`, { method: 'POST', body: { content } }),
+  why: (id, verdictId, passage) => request(`/debates/${id}/verdicts/${verdictId}/why`, { method: 'POST', body: { passage } }),
   rewriteLevel: (id, verdictId, level) => request(`/debates/${id}/verdicts/${verdictId}/level`, { method: 'POST', body: { level } }),
   confirmIntake: (id) => request(`/debates/${id}/intake/confirm`, { method: 'POST' }),
   setupStatus: () => request('/setup/status'),

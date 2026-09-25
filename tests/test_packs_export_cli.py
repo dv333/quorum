@@ -3,6 +3,7 @@ import json
 import pytest
 
 from backend import cli, db, export, packs
+from backend.providers import Chunk
 from tests.test_engine import FakeClient, FakeSearch, make_debate, reply
 
 
@@ -219,3 +220,86 @@ def test_cli_reports_an_unreachable_server(monkeypatch, capsys):
     monkeypatch.setattr(cli, "API_URL", "http://127.0.0.1:9")  # nothing listens on the discard port
     assert cli.main(["list"]) == 1
     assert "Can't reach Quorum" in capsys.readouterr().err
+
+
+# ------------------------------------------------------------------ living answer and "why?"
+
+
+class ChairScript(FakeClient):
+    """FakeClient that also scripts the chair's draft and trace replies."""
+
+    def __init__(self, turn_fn, draft_reply=None, why_reply=None):
+        super().__init__(turn_fn)
+        self.draft_reply = draft_reply or (
+            lambda n: f"BOTTOM LINE: draft {n}\n- a point\nCHANGED: Otter's point in round {n}"
+        )
+        self.why_reply = why_reply or (lambda: "{}")
+        self.drafts_written = 0
+
+    async def stream(self, endpoint, model, messages, **kw):
+        sys = messages[0]["content"]
+        if sys.startswith("You chair an AI council") or sys.startswith("You trace claims"):
+            self.calls.append((model, messages, kw))
+            if sys.startswith("You chair"):
+                self.drafts_written += 1
+                text = self.draft_reply(self.drafts_written)
+            else:
+                text = self.why_reply()
+            yield Chunk("content", text)
+            yield Chunk("done", stats={"tokens": 5})
+            return
+        async for chunk in super().stream(endpoint, model, messages, **kw):
+            yield chunk
+
+
+async def test_chair_drafts_the_answer_after_every_round_but_the_last():
+    client = ChairScript(lambda h, r, m: reply("REFINE"))
+    eng = make_debate(client, max_rounds=3)
+    await eng.post_user_message("Rust or Go?")
+    await eng.task
+    drafts = eng.snapshot()["drafts"]
+    assert [d["round"] for d in drafts] == [1, 2]
+    assert (
+        drafts[0]["content"] == "BOTTOM LINE: draft 1\n- a point" and drafts[1]["changed"] == "Otter's point in round 2"
+    )
+    second_prompt = [m for _, m, _ in client.calls if m[0]["content"].startswith("You chair")][1][1]["content"]
+    assert "Your draft after the previous round:\nBOTTOM LINE: draft 1" in second_prompt
+    usage = db.query("SELECT kind FROM usage WHERE kind = 'draft'")
+    assert len(usage) == 2
+
+
+async def test_a_failed_draft_never_stops_the_debate():
+    def boom(n):
+        raise RuntimeError("model fell over")
+
+    client = ChairScript(lambda h, r, m: reply("REFINE"), draft_reply=boom)
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Rust or Go?")
+    await eng.task
+    assert eng.debate()["status"] == "concluded" and eng.snapshot()["drafts"] == []
+
+
+async def test_why_traces_a_passage_and_drops_made_up_agents_and_sources():
+    reply_json = json.dumps(
+        {
+            "summary": "Otter argued it; Koala pushed back.",
+            "support": [{"agent": "Otter", "point": "Go compiles fast"}, {"agent": "Gandalf", "point": "not a member"}],
+            "challenges": [{"agent": "Koala", "point": "Rust is safer"}],
+            "sources": [1, 99, "x"],
+        }
+    )
+    client = ChairScript(lambda h, r, m: reply("AGREE"), why_reply=lambda: reply_json)
+    client.plan_reply = lambda prompt: "one query"
+    eng = make_debate(client, research=True, search=FakeSearch())
+    await eng.post_user_message("Rust or Go?")
+    await eng.task
+    verdict = db.query_one("SELECT * FROM verdicts")
+    result = await eng.why(verdict["id"], "  Use   Go. ")
+    assert result["support"] == [{"agent": "Otter", "point": "Go compiles fast"}]
+    assert result["challenges"] == [{"agent": "Koala", "point": "Rust is safer"}]
+    assert len(result["sources"]) == 1 and result["sources"][0]["url"].startswith("https://example.com/")
+    calls = len(client.calls)
+    assert await eng.why(verdict["id"], "Use Go.") == result  # cached (whitespace-normalized)
+    assert len(client.calls) == calls
+    with pytest.raises(KeyError):
+        await eng.why(999, "Use Go.")

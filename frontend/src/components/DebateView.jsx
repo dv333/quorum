@@ -3,6 +3,7 @@ import { api } from '../api'
 import { RESEARCHER, displayTitle, modelShort } from '../agents'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
+import LivingAnswer from './Living'
 import { AgentMessage, BeagleCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
 const INTAKE = ['intake', 'clarifying', 'confirming']
@@ -30,7 +31,7 @@ export function useAutoGrow(ref, value) {
 const joinNames = (names) => names.length <= 2 ? names.join(' & ') : `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`
 
 // A round's divider doubles as its recap: how the council stands, who dissents, and a way to fold the round away
-function RoundDivider({ round, turns, seatsCount, collapsed, onToggle }) {
+function RoundDivider({ round, turns, seatsCount, collapsed, onToggle, anchor }) {
   const spoken = turns.filter((m) => m.status === 'done')
   const done = spoken.filter((m) => m.stance)
   const count = (s) => done.filter((m) => m.stance === s).length
@@ -40,7 +41,7 @@ function RoundDivider({ round, turns, seatsCount, collapsed, onToggle }) {
   else if (done.length && count('AGREE') === done.length) recap = `all ${done.length} agree`
   else recap = [count('AGREE') && `${count('AGREE')} agree`, count('REFINE') && `${count('REFINE')} refine`].filter(Boolean).join(' · ')
   return (
-    <button className={`round-divider ${collapsed ? 'collapsed' : ''}`} onClick={onToggle} aria-expanded={!collapsed}
+    <button id={anchor} className={`round-divider ${collapsed ? 'collapsed' : ''}`} onClick={onToggle} aria-expanded={!collapsed}
       title={collapsed ? 'Show this round' : 'Fold this round away'}>
       <span className="rd-line" />
       <span className="rd-label">
@@ -84,6 +85,7 @@ function Thread({ items, seatsById, debate, onIntake }) {
       lastRound = m.round
       out.push(
         <RoundDivider key={`r${m.id}`} round={m.round} turns={turnsByRound[m.round] || []} seatsCount={seatsCount}
+          anchor={`round-${m.topic}-${m.round}`}
           collapsed={collapsed.has(m.round)} onToggle={() => toggleRound(m.round)} />,
       )
     }
@@ -112,10 +114,6 @@ function Thread({ items, seatsById, debate, onIntake }) {
 function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
   const { debate, seats, messages } = state
   const stances = latestStances(messages, debate.topic, seats)
-  const agreeN = stances.filter((s) => s === 'AGREE').length
-  const phase = debate.status === 'concluding' ? 'writing the answer'
-    : agreeN === seats.length && agreeN > 0 ? 'in agreement'
-    : agreeN > 0 ? 'converging' : 'debating'
   return (
     <div className="stage-wrap">
     <div className="stage">
@@ -145,13 +143,24 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           </div>
         )}
       </div>
-      {debate.round > 0 && (
-        <div className="progress">
-          <span>Round {debate.round} of {debate.max_rounds} · {phase}</span>
-          <div className="bar">{stances.map((s, i) => <i key={i} className={s ? s.toLowerCase() : ''} />)}</div>
-        </div>
-      )}
+      {debate.round > 0 && (() => {
+        const done = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done')
+        const dissent = done.filter((m) => m.stance === 'DISAGREE').map((m) => seats.find((s) => s.id === m.seat_id)?.handle)
+        const n = (s) => done.filter((m) => m.stance === s).length
+        const tally = done.length === 0 ? ''
+          : n('AGREE') === done.length ? `all ${done.length} agree`
+          : [n('AGREE') && `${n('AGREE')} agree`, n('REFINE') && `${n('REFINE')} refine`].filter(Boolean).join(' · ')
+        const jump = () => document.getElementById(`round-${debate.topic}-${debate.round}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return (
+          <button className="consensus-pill" onClick={jump} title="Jump to this round">
+            <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>
+            <span className="cp-dots" aria-hidden="true">{stances.map((s, i) => <i key={i} className={`dot ${s ? s.toLowerCase() : 'idle'}`} />)}</span>
+            {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
+          </button>
+        )
+      })()}
     </div>
+      <LivingAnswer drafts={(state.drafts || []).filter((d) => d.topic === debate.topic)} chair={debate.chair_handle} />
     </div>
   )
 }

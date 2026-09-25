@@ -87,6 +87,22 @@ def serialize_message(row: Dict[str, Any], partial: Optional[Dict[str, str]] = N
     return msg
 
 
+_WORD = re.compile(r"[a-z]{4,}|\d[\d.,]*%?", re.IGNORECASE)
+
+
+def _most_related(passage: str, messages: List[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
+    """The messages sharing the most words (numbers count triple) with a passage, kept in debate order."""
+    want = {w.lower().rstrip(".,") for w in _WORD.findall(passage)}
+
+    def score(m: Dict[str, Any]) -> float:
+        have = {w.lower().rstrip(".,") for w in _WORD.findall(m["content"])}
+        shared = want & have
+        return sum(3 if w[0].isdigit() else 1 for w in shared) / (1 + len(have)) ** 0.25
+
+    ranked = sorted(messages, key=score, reverse=True)[:limit]
+    return sorted(ranked, key=lambda m: m["id"])
+
+
 def _parse_queries(text: str, limit: int) -> List[str]:
     queries = []
     for line in strip_thinking(text).splitlines():
@@ -536,6 +552,7 @@ class DebateEngine:
                     break
 
                 await self._maybe_summarize(round_no)
+                await self._write_draft(round_no)
                 if not self.debate()["autopilot"]:
                     self._set(status="paused")
                     return
@@ -1143,6 +1160,146 @@ class DebateEngine:
             {"type": "summary_created", "summary": db.query_one("SELECT * FROM summaries WHERE id = ?", [sid])}
         )
 
+    # ---------------------------------------------------------- living answer
+
+    def _drafts(self, topic: int) -> List[Dict[str, Any]]:
+        return db.query("SELECT * FROM drafts WHERE debate_id = ? AND topic = ? ORDER BY id", [self.id, topic])
+
+    async def _write_draft(self, round_no: int) -> None:
+        """After each round that isn't the last, the chair updates its draft answer so the user can watch it improve."""
+        d = self.debate()
+        previous = self._drafts(d["topic"])
+        if previous and previous[-1]["round"] >= round_no:
+            return
+        turns = [m for m in self._round_messages(d["topic"], round_no) if m["author_kind"] == "seat" and m["content"]]
+        if not turns:
+            return
+        try:
+            think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+            text = await self._complete(
+                self._chair_label(d),
+                "draft",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.draft_messages(
+                    question=self._question(d["topic"]),
+                    previous_draft=previous[-1]["content"] if previous else None,
+                    transcript=prompts.render_transcript(turns, self._handles()),
+                    positions=self._final_positions(d["topic"]),
+                    round_no=round_no,
+                ),
+                think,
+            )
+        except Exception as e:
+            log.warning("draft after round %s failed: %s", round_no, e)
+            return
+        text = strip_thinking(text).strip()
+        changed = ""
+        m = re.search(r"^\s*[*_]*CHANGED[*_]*\s*:\s*(.+)$", text, re.IGNORECASE | re.MULTILINE)
+        if m:
+            changed = m.group(1).strip()
+            text = text[: m.start()].strip()
+        if not text:
+            return
+        did = db.execute(
+            "INSERT INTO drafts (debate_id, topic, round, content, changed, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [self.id, d["topic"], round_no, text, changed[:300], db.now()],
+        )
+        self.bus.publish({"type": "draft_created", "draft": db.query_one("SELECT * FROM drafts WHERE id = ?", [did])})
+
+    # ----------------------------------------------------------------- why?
+
+    async def why(self, verdict_id: int, passage: str) -> Dict[str, Any]:
+        """Trace a passage of the final answer to the agents who argued for or against it and the sources behind it."""
+        passage = " ".join(passage.split())[:600]
+        cached = db.query_one(
+            "SELECT content FROM provenance WHERE verdict_id = ? AND passage = ?", [verdict_id, passage]
+        )
+        if cached:
+            return json.loads(cached["content"])
+        v = db.query_one("SELECT * FROM verdicts WHERE id = ? AND debate_id = ?", [verdict_id, self.id])
+        if not v:
+            raise KeyError(verdict_id)
+        answer = db.query_one("SELECT content FROM messages WHERE id = ?", [v["message_id"]])
+        d = self.debate()
+        topic = v["topic"]
+        handles = self._handles()
+        rows = [
+            serialize_message(r)
+            for r in db.query(
+                "SELECT * FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'researcher' "
+                "AND status = 'done' ORDER BY id",
+                [self.id, topic],
+            )
+        ]
+        sources: List[Dict[str, Any]] = []
+        for r in rows:
+            for s in r["sources"]:
+                if s.get("url") and all(s["url"] != x["url"] for x in sources):
+                    sources.append(s)
+        sources = sources[:20]
+        # The passage may come from any round or from a research brief: give the chair the most related messages
+        candidates = [
+            m
+            for m in self._verbatim(topic, 0)
+            if m["author_kind"] in ("seat", "researcher") and m["round"] > 0 and m["content"]
+        ]
+        transcript = prompts.render_transcript(_most_related(passage, candidates, limit=10), handles)
+        empty: Dict[str, Any] = {"summary": "", "support": [], "challenges": [], "sources": []}
+        result = empty
+        for _attempt in range(2):
+            try:
+                text = await self._complete(
+                    self._chair_label(d),
+                    "why",
+                    d["chair_endpoint_id"],
+                    d["chair_model"],
+                    prompts.why_messages(
+                        question=self._question(topic),
+                        answer=answer["content"] if answer else "",
+                        passage=passage,
+                        transcript=transcript,
+                        positions=self._final_positions(topic),
+                        sources=sources,
+                        handles=list(handles.values()),
+                    ),
+                    await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                    topic=topic,
+                )
+                result = parse_json_loose(text)
+                if result:
+                    break
+            except Exception as e:
+                log.warning("why failed: %s", e)
+        known = set(handles.values())
+
+        def people(key: str) -> List[Dict[str, str]]:
+            out = []
+            for item in result.get(key) or []:
+                if isinstance(item, dict) and str(item.get("agent", "")).strip() in known:
+                    out.append({"agent": item["agent"].strip(), "point": str(item.get("point") or "").strip()[:200]})
+            return out[:8]
+
+        cited = []
+        for n in result.get("sources") or []:
+            try:
+                s = sources[int(n) - 1]
+            except (TypeError, ValueError, IndexError):
+                continue
+            cited.append({"title": s.get("title") or s["url"], "url": s["url"]})
+        clean = {
+            "summary": str(result.get("summary") or "").strip()[:300],
+            "support": people("support"),
+            "challenges": people("challenges"),
+            "sources": cited[:6],
+        }
+        if clean != empty:
+            db.execute(
+                "INSERT OR REPLACE INTO provenance (verdict_id, passage, content) VALUES (?, ?, ?)",
+                [verdict_id, passage, json.dumps(clean)],
+            )
+        return clean
+
     # -------------------------------------------------------------- conclude
 
     def _final_positions(self, topic: int) -> List[Dict[str, Any]]:
@@ -1297,6 +1454,7 @@ class DebateEngine:
             "seats": seats,
             "messages": [serialize_message(r, self.partials.get(r["id"])) for r in rows],
             "summaries": db.query("SELECT * FROM summaries WHERE debate_id = ? ORDER BY id", [self.id]),
+            "drafts": db.query("SELECT * FROM drafts WHERE debate_id = ? ORDER BY id", [self.id]),
             "verdicts": db.query(
                 "SELECT id, debate_id, topic, reason, rounds, message_id, created_at "
                 "FROM verdicts WHERE debate_id = ? ORDER BY id",

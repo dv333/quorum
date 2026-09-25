@@ -50,19 +50,29 @@ A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
   other's model names. Type `@` to talk to any of them.
 - **Current facts, with sources.** Beagle searches the web through [Firecrawl](https://github.com/firecrawl/firecrawl),
   posts cited briefs, and fact-checks the claims the final answer depends on.
+- **Topic packs.** Pick a kind of debate (Review code, Stress-test a decision, Brainstorm ideas and more) or write
+  your own in a few lines of JSON.
+- **Watch the answer improve.** After every round the chair updates a draft answer pinned at the top, with the
+  changed words highlighted. Round recaps show who agrees and who dissents.
 - **Answers for everyone.** The bottom line comes first. Switch between Simple, Standard and Expert; the Expert view
   adds a diagram when one helps. Every message has a copy button and a timestamp.
+- **Why? on any sentence.** Select part of the answer to see which agents argued for it, who pushed back, and the
+  sources behind it.
 - **Nothing hidden.** Expand the whole debate, every source and each model's thinking (reasoning models think by
   default). *Behind the answer* shows tokens, time per model, searches and pages read.
 - **You're in the loop.** Add a thought mid-debate, ask `@Beagle` anything, pause, or ask for the answer now. A soft chime,
   a notification and a badge tell you when the chair needs you or the answer is ready.
 - **Knows your hardware.** Memory, CPU and GPU charts; per-model memory estimates; councils that don't fit are run one
   model at a time instead of crashing.
+- **Take it with you.** Export an answer as Markdown (with or without the debate) or PDF, or ask from the terminal
+  and scripts with the `quorum` command.
 - **Bring cloud models if you like.** Add OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, Together, DeepSeek or
   any OpenAI-compatible API with your own key. Cloud models are never picked automatically.
 - **A native-feeling app.** Light and dark mode, glass materials, and layouts from phone to ultrawide.
 
 ## Tour
+
+> Every feature, with screenshots: **[docs/FEATURES.md](docs/FEATURES.md)**
 
 One real conundrum, *Should I rent or buy a home in Cupertino in 2026?*, answered by eight local models on a
 MacBook Pro. Click any image to see it full size.

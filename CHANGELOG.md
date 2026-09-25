@@ -6,6 +6,11 @@
   as JSON in `data/packs/`; the pack's guidance reaches every agent and the chair
 - `quorum` command: ask from the terminal, scripts or CI (`git diff | quorum ask --pack code-review`), with JSON output
 - Export: copy or download an answer as Markdown (optionally with the whole debate), or print / save it as PDF
+- The living answer: after every round the chair updates a draft answer pinned at the top, with changed words
+  highlighted, what changed and whose argument changed it, and earlier drafts one click away
+- Why?: select any part of the answer to see which agents argued for it, who pushed back, and the sources behind it
+- Round recaps (stances, who dissents, fold a round away) and a plain-words live status line by the message box
+- A features guide with screenshots: [docs/FEATURES.md](docs/FEATURES.md)
 - The frontend's backend address can be changed with `QUORUM_URL`
 
 ## 0.1.1 (2026-09-25)

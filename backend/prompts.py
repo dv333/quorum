@@ -1,7 +1,7 @@
 """Prompt builders for debate turns, rolling summaries, peer votes and the chair's verdict."""
 
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .config import RESEARCHER_NAME
 
@@ -152,6 +152,88 @@ def summary_messages(question: str, previous_summary: Optional[str], transcript:
 {transcript}
 
 Write an updated summary in at most 200 words. For each agent (by handle), note their current position and key arguments; note any user guidance; list points of agreement and open disagreements. No preamble.""",
+        },
+    ]
+
+
+def draft_messages(
+    *,
+    question: str,
+    previous_draft: Optional[str],
+    transcript: str,
+    positions: List[Dict[str, str]],
+    round_no: int,
+) -> List[Dict[str, str]]:
+    """The chair's running draft of the answer, rewritten after every round so the user sees it improve."""
+    pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
+    prev = f"Your draft after the previous round:\n{previous_draft}\n\n" if previous_draft else ""
+    return [
+        {
+            "role": "system",
+            "content": "You chair an AI council. While the council debates, you keep a short draft of the answer up to date.",
+        },
+        {
+            "role": "user",
+            "content": f"""Today is {today()}.
+Question: {question}
+
+{prev}Round {round_no}, as it was argued:
+{transcript}
+
+Current positions:
+{pos}
+
+Write the draft answer as it stands after round {round_no}, in exactly this format and nothing else:
+BOTTOM LINE: <one sentence>
+- <key point>
+- <key point>
+- <key point>
+CHANGED: <one short sentence: what changed since your previous draft and whose argument changed it, or "First draft." if there is no previous draft>
+
+Keep it under 90 words. Change only what the debate gave you a reason to change.""",
+        },
+    ]
+
+
+def why_messages(
+    *,
+    question: str,
+    answer: str,
+    passage: str,
+    transcript: str,
+    positions: List[Dict[str, str]],
+    sources: List[Dict[str, Any]],
+    handles: List[str],
+) -> List[Dict[str, str]]:
+    """Trace one passage of the final answer back to the agents and sources behind it."""
+    pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
+    src = "\n".join(f"[{i}] {s.get('title') or s.get('url')}" for i, s in enumerate(sources, 1)) or "(none)"
+    return [
+        {
+            "role": "system",
+            "content": "You trace claims in an AI council's final answer back to the debate. You only report what the debate actually contains.",
+        },
+        {
+            "role": "user",
+            "content": f"""Question: {question}
+
+Final answer:
+{answer}
+
+Debate (latest rounds):
+{transcript}
+
+Final positions:
+{pos}
+
+Research sources:
+{src}
+
+Passage to trace: "{passage}"
+
+Which agents argued for this passage, which challenged or qualified it, and which research sources support it? Agents are: {", ".join(handles)}. Use only what appears above; leave a list empty rather than guess.
+Reply with JSON only:
+{{"summary": "<one sentence on where this came from>", "support": [{{"agent": "<name>", "point": "<what they argued, under 20 words>"}}], "challenges": [{{"agent": "<name>", "point": "<their objection, under 20 words>"}}], "sources": [<source numbers>]}}""",
         },
     ]
 

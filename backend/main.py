@@ -119,6 +119,10 @@ class LevelIn(BaseModel):
     level: str = Field(pattern="^(simple|expert)$")
 
 
+class WhyIn(BaseModel):
+    passage: str = Field(min_length=3, max_length=2000)
+
+
 class ResearchTestIn(BaseModel):
     query: str = Field("latest stable Python release", min_length=2)
 
@@ -408,6 +412,18 @@ async def post_level(debate_id: str, verdict_id: int, body: LevelIn):
         raise HTTPException(404, "Answer not found")
     except Exception as e:
         raise HTTPException(502, f"Couldn't rewrite the answer: {e}")
+
+
+@app.post("/api/debates/{debate_id}/verdicts/{verdict_id}/why")
+async def post_why(debate_id: str, verdict_id: int, body: WhyIn):
+    """Who argued for (and against) a passage of the answer, and which sources back it."""
+    _require_debate(debate_id)
+    try:
+        return await get_engine(debate_id).why(verdict_id, body.passage)
+    except KeyError:
+        raise HTTPException(404, "Answer not found")
+    except Exception as e:
+        raise HTTPException(502, f"Couldn't trace that passage: {e}")
 
 
 @app.post("/api/debates/{debate_id}/intake/confirm")

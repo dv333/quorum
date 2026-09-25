@@ -18,7 +18,7 @@ export function parseAnswer(text) {
   if (!text) return out
   // Some models write footnote-style citations ([^1]); show them like the rest ([1])
   let rest = text.replace(/\[\^(\d+)\]/g, '[$1]')
-  const bl = rest.match(/^\s*[*_#]*\s*BOTTOM LINE\s*[*_]*\s*[:：]\s*(.+)$/im)
+  const bl = rest.match(/^\s*[*_#]*\s*BOTTOM\s*LINE\s*[*_]*\s*[:：]\s*(.+)$/im)
   if (bl) {
     let bottom = bl[1].trim()
     // Models sometimes leave a bold marker unclosed; drop them all rather than show asterisks
@@ -122,6 +122,77 @@ function FragmentRow({ actor, chair, models, width, detail, title }) {
   )
 }
 
+// "Why?": select any passage of the answer to see who argued for it, who pushed back, and the sources behind it
+function useSelection(cardRef, enabled) {
+  const [sel, setSel] = useState(null) // { text, x, y }
+  useEffect(() => {
+    if (!enabled) return undefined
+    const check = () => {
+      const s = window.getSelection()
+      const text = s?.toString().trim() || ''
+      const card = cardRef.current
+      if (!card || !s?.rangeCount || text.length < 3 || text.length > 600) { setSel(null); return }
+      const range = s.getRangeAt(0)
+      const body = card.querySelector('.answer-text')
+      if (!body?.contains(range.commonAncestorContainer)) { setSel(null); return }
+      const r = range.getBoundingClientRect()
+      const c = card.getBoundingClientRect()
+      setSel({ text, x: r.left + r.width / 2 - c.left, y: r.top - c.top, below: r.bottom - c.top })
+    }
+    const onUp = () => setTimeout(check, 0)
+    document.addEventListener('mouseup', onUp)
+    document.addEventListener('keyup', onUp)
+    document.addEventListener('touchend', onUp)
+    return () => {
+      document.removeEventListener('mouseup', onUp)
+      document.removeEventListener('keyup', onUp)
+      document.removeEventListener('touchend', onUp)
+    }
+  }, [cardRef, enabled])
+  return [sel, setSel]
+}
+
+function WhyPanel({ state, x, y, onClose }) {
+  const { loading, data, error, text, chair } = state
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+  const empty = data && !data.support.length && !data.challenges.length && !data.sources.length
+  return (
+    <div className="why-panel" style={{ '--x': `${x}px`, top: y }} role="dialog" aria-label="Why the council said this">
+      <div className="why-head">
+        <span>“{text.length > 90 ? `${text.slice(0, 90)}…` : text}”</span>
+        <button className="icon-btn" onClick={onClose} aria-label="Close">×</button>
+      </div>
+      {loading && <div className="why-loading"><span className="typing"><i /><i /><i /></span> {chair} is tracing this through the debate…</div>}
+      {error && <div className="why-loading error">{error}</div>}
+      {data && (
+        <>
+          {data.summary && <p className="why-summary">{data.summary}</p>}
+          {data.support.length > 0 && (
+            <div className="why-group"><small>Argued for by</small>
+              {data.support.map((s, i) => <div className="why-row" key={i}><Orb handle={s.agent} size="sm" /><b>{s.agent}</b><span>{s.point}</span></div>)}
+            </div>
+          )}
+          {data.challenges.length > 0 && (
+            <div className="why-group"><small>Challenged by</small>
+              {data.challenges.map((s, i) => <div className="why-row" key={i}><Orb handle={s.agent} size="sm" /><b>{s.agent}</b><span>{s.point}</span></div>)}
+            </div>
+          )}
+          {data.sources.length > 0 && (
+            <div className="why-group"><small>Sources</small>
+              {data.sources.map((s, i) => <a key={i} className="why-src" href={s.url} target="_blank" rel="noreferrer">{s.title}</a>)}
+            </div>
+          )}
+          {empty && <p className="why-summary faint">The debate doesn't clearly trace this passage to one agent or source; the chair likely combined several points.</p>}
+        </>
+      )}
+    </div>
+  )
+}
+
 // Export: Markdown to the clipboard or a file (with or without the debate), or print / save as PDF
 function ExportMenu({ debateId, level, onPrint }) {
   const [open, setOpen] = useState(false)
@@ -166,6 +237,22 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
   const [diagramFailed, setDiagramFailed] = useState(false)
   const cardRef = useRef(null)
   const onDiagramFail = useCallback(() => setDiagramFailed(true), [])
+  const canTrace = !!verdict && verdict.reason !== 'direct' && msg?.status === 'done'
+  const [sel, setSel] = useSelection(cardRef, canTrace)
+  const [why, setWhy] = useState(null) // { text, x, y, loading, data, error, chair }
+  const closeWhy = useCallback(() => setWhy(null), [])
+  const traceSelection = async () => {
+    const at = sel
+    setSel(null)
+    window.getSelection()?.removeAllRanges()
+    setWhy({ ...at, loading: true, chair: chairHandle || 'The chair' })
+    try {
+      const data = await api.why(debateId, verdict.id, at.text)
+      setWhy((w) => w && w.text === at.text && { ...w, loading: false, data })
+    } catch (e) {
+      setWhy((w) => w && w.text === at.text && { ...w, loading: false, error: e.message })
+    }
+  }
 
   // Print just this answer: a copy goes into a plain top-level container (the app itself scrolls inside a
   // fixed-height window, which would cut the printout at one page), and print CSS hides everything else.
@@ -243,7 +330,7 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
           <div className="shimmer" style={{ width: '70%' }} />
         </div>
       ) : (
-        <>
+        <div className="answer-text">
           {a.bottom && (
             <div className="bottom-line">
               <ReactMarkdown remarkPlugins={GFM} components={{ p: ({ children }) => <p>{children}</p> }}>{a.bottom}</ReactMarkdown>
@@ -258,8 +345,15 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
           ))}
           {a.sections.length === 0 && diagram}
           {a.dissent && <div className="dissent"><b>Where they differed: </b><Markdown className="inline">{a.dissent}</Markdown></div>}
-        </>
+        </div>
       )}
+      {canTrace && <div className="why-hint">Select any part of the answer to see who argued for it.</div>}
+      {sel && !why && (
+        <button className="why-btn" style={{ left: sel.x, top: sel.y }} onMouseDown={(e) => e.preventDefault()} onClick={traceSelection}>
+          Why?
+        </button>
+      )}
+      {why && <WhyPanel state={why} x={why.x} y={why.below} onClose={closeWhy} />}
       {verdict && <Behind metrics={metrics} seats={seats} chairHandle={chairHandle} rounds={verdict.rounds} />}
     </div>
   )

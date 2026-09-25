@@ -113,6 +113,21 @@ CREATE TABLE IF NOT EXISTS verdicts (
     message_id INTEGER,
     created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    debate_id TEXT NOT NULL REFERENCES debates(id) ON DELETE CASCADE,
+    topic INTEGER NOT NULL,
+    round INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    changed TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS provenance (
+    verdict_id INTEGER NOT NULL REFERENCES verdicts(id) ON DELETE CASCADE,
+    passage TEXT NOT NULL,
+    content TEXT NOT NULL,
+    PRIMARY KEY (verdict_id, passage)
+);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
