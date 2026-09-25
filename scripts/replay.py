@@ -12,6 +12,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -21,6 +22,11 @@ from backend import cli  # noqa: E402  (talks to the running backend over HTTP)
 HERE = os.path.dirname(__file__)
 
 
+def says(text: str, phrase: str) -> bool:
+    """Whether text contains the phrase at the start of a word ("OIC" doesn't match inside "choice")."""
+    return re.search(r"(?<![a-z0-9])" + re.escape(phrase.lower()), text.lower()) is not None
+
+
 def check(spec, answer: str, claims: list) -> list:
     """(passed, description) for each expectation."""
     expect = spec["expect"]
@@ -28,12 +34,12 @@ def check(spec, answer: str, claims: list) -> list:
     text = f"{answer}\n{ledger}".lower()
     results = []
     for phrase in expect.get("mentions_all", []):
-        results.append((phrase.lower() in text, f'mentions "{phrase}"'))
+        results.append((says(text, phrase), f'mentions "{phrase}"'))
     if expect.get("mentions_any"):
         options = expect["mentions_any"]
-        results.append((any(o.lower() in text for o in options), "mentions one of: " + ", ".join(options)))
+        results.append((any(says(text, o) for o in options), "mentions one of: " + ", ".join(options)))
     for phrase in expect.get("never_says", []):
-        results.append((phrase.lower() not in answer.lower(), f'the answer never says "{phrase}"'))
+        results.append((not says(answer, phrase), f'the answer never says "{phrase}"'))
     for phrase in expect.get("claims_not_supported", []):
         bad = [c["claim"] for c in claims if phrase.lower() in c["claim"].lower() and c["status"] == "supported"]
         results.append((not bad, f'no "{phrase}" claim is marked supported' + (f" (found: {bad[0]})" if bad else "")))

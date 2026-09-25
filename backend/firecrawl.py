@@ -65,7 +65,7 @@ async def status() -> Dict[str, Any]:
 
 
 _PRIMARY_HOST = re.compile(
-    r"^(docs|developer|developers|learn|support|help|documentation|dev|api)\.|\.gov(\.[a-z]{2})?$|"
+    r"^(docs|developer|developers|learn|support|help|documentation|dev|api)[.-]|\.gov(\.[a-z]{2})?$|"
     r"(^|\.)(iso\.org|w3\.org|ietf\.org|sec\.gov|europa\.eu|who\.int|nih\.gov|python\.org)$"
 )
 _PRIMARY_PATH = re.compile(r"/(docs|documentation|help|manual|reference|readiness|api)(/|$)", re.I)

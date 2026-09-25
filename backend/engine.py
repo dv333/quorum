@@ -1404,7 +1404,14 @@ class DebateEngine:
                 claim = str((c or {}).get("claim") or "").strip() if isinstance(c, dict) else ""
                 if claim and claim.lower() not in seen:
                     seen.add(claim.lower())
-                    items.append({"claim": claim[:300], "query": str(c.get("query") or claim).strip()[:200]})
+                    site = re.sub(r"^https?://", "", str(c.get("docs_site") or "").strip().lower()).split("/")[0]
+                    items.append(
+                        {
+                            "claim": claim[:300],
+                            "query": str(c.get("query") or claim).strip()[:200],
+                            "site": site if re.fullmatch(r"[a-z0-9.-]+\.[a-z]{2,}", site) else "",
+                        }
+                    )
             items = items[:RESEARCH_MAX_CLAIMS]
             if not items:
                 self._finish_message(msg_id, content="Nothing in the final positions needed checking.", status="done")
@@ -1412,16 +1419,25 @@ class DebateEngine:
             for it in items:
                 self._log(msg_id, f"Checking: {it['claim']}")
             started = time.monotonic()
-            found = await asyncio.gather(
-                *[self.search_fn(it["query"], RESEARCH_SOURCES_PER_CLAIM) for it in items], return_exceptions=True
+            # Each claim is searched as asked and, when it names one, on the vendor's documentation site
+            site_q = {id(it): f"site:{it['site']} {it['query']}" for it in items if it["site"]}
+            queries = [it["query"] for it in items] + list(site_q.values())
+            results = await asyncio.gather(
+                *[self.search_fn(q, RESEARCH_SOURCES_PER_CLAIM) for q in queries], return_exceptions=True
             )
-            pages = sum(len(r) for r in found if not isinstance(r, Exception))
+            by_query = dict(zip(queries, results))
+            found = []
+            for it in items:
+                parts = [by_query[it["query"]]] + ([by_query[site_q[id(it)]]] if id(it) in site_q else [])
+                ok = [r for r in parts if not isinstance(r, Exception)]
+                found.append(ok[0] + [s for r in ok[1:] for s in r] if ok else parts[0])
+            pages = sum(len(r) for r in results if not isinstance(r, Exception))
             self._record(
                 RESEARCHER_NAME,
                 "firecrawl",
                 "search",
                 {"duration_ms": int((time.monotonic() - started) * 1000)},
-                searches=len(items),
+                searches=len(queries),
                 pages=pages,
             )
             if all(isinstance(r, Exception) for r in found):
@@ -1429,7 +1445,7 @@ class DebateEngine:
             think = await self._thinking_flag(ep_id, model, False)
             ledger: List[Dict[str, Any]] = []
             for it, result in zip(items, found):
-                sources = [] if isinstance(result, Exception) else _interleave([result], RESEARCH_SOURCES_PER_CLAIM)
+                sources = [] if isinstance(result, Exception) else _interleave([result], RESEARCH_SOURCES_PER_CLAIM + 1)
                 entry = {"claim": it["claim"], "status": "unknown", "quote": "", "caveat": "", "source": None}
                 if not sources:
                     entry["caveat"] = "No sources found."
@@ -1455,13 +1471,15 @@ class DebateEngine:
                         src = sources[int(v.get("source")) - 1]
                     except (TypeError, ValueError, IndexError):
                         src = None
+                    caveat = str(v.get("caveat") or "").strip()[:300]
                     if status in CLAIM_STATUSES and status != "unknown":
                         # The passage has to really be in the page, or the verdict doesn't count
                         if src and quote_in_source(quote, src["content"]):
-                            entry.update(status=status, quote=quote[:500], source=src)
+                            entry.update(status=status, quote=quote[:500], source=src, caveat=caveat)
                         else:
-                            status = "unknown"
-                    entry["caveat"] = str(v.get("caveat") or "").strip()[:300] if entry["status"] != "unknown" else ""
+                            entry["caveat"] = (
+                                f"Judged {status}, but the quote isn't in the source, so it stays unverified."
+                            )
                 ledger.append(entry)
             stored = []
             for e in ledger:

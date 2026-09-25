@@ -321,7 +321,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each.
 
 {ANSWER_FORMAT}""",
         },
@@ -532,9 +532,9 @@ def claims_messages(
 {summ}Final positions:
 {pos}
 
-List up to {max_claims} factual claims the final answer will rely on, most decisive first. Focus on claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write one web search query likely to reach primary documentation (the vendor's docs, standards, filings).
+List up to {max_claims} factual claims the final answer will rely on, most decisive first. Include what the debate asserts about how the options meet each requirement stated in the question, then claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write a web search query naming the specific product and feature and, when the claim is about one vendor's product, that vendor's documentation site (like "docs.oracle.com" or "help.salesforce.com").
 
-Reply like: {{"claims": [{{"claim": "...", "query": "..."}}]}}""",
+Reply like: {{"claims": [{{"claim": "...", "query": "...", "docs_site": "..."}}]}}""",
         },
     ]
 

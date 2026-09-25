@@ -204,3 +204,68 @@ def test_the_replay_checks_catch_the_original_failure():
         "speed are unverified without matched quotes."
     )
     assert all(ok for ok, _ in replay.check(spec, good, [{"claim": "Oracle is cheaper", "status": "unknown"}]))
+
+
+def test_replay_phrases_match_whole_words():
+    import importlib.util
+
+    loader = importlib.util.spec_from_file_location("replay", "scripts/replay.py")
+    replay = importlib.util.module_from_spec(loader)
+    loader.loader.exec_module(replay)
+    assert not replay.says("the right choice depends on your ERP", "OIC")
+    assert replay.says("it runs through OIC (Oracle Integration Cloud)", "OIC")
+    assert replay.says("large account hierarchies", "account hierarch")
+
+
+def test_vendor_help_sites_with_hyphens_are_primary():
+    assert firecrawl.is_primary("https://help-cxsales.oraclecloud.com/cpq/Content/Integration_Guides/SubscriptionM")
+    assert not firecrawl.is_primary("https://helpful-cpq-tips.example.com/oracle")
+
+
+async def test_claims_are_also_searched_on_the_vendors_docs_site():
+    queries = []
+
+    async def search_spy(query, limit):
+        queries.append(query)
+        if query.startswith("site:docs.oracle.com"):
+            return [
+                {
+                    "url": "https://docs.oracle.com/cpq/subscriptions.html",
+                    "title": "Oracle docs",
+                    "description": "",
+                    "content": ORACLE_DOC,
+                }
+            ]
+        return [
+            {
+                "url": "https://www.cpq-blog.example/x",
+                "title": "Blog",
+                "description": "",
+                "content": "Oracle CPQ integrates natively, so no middleware is needed.",
+            }
+        ]
+
+    client = cpq_client()
+    client.claims_reply = json.dumps(
+        {
+            "claims": [
+                {
+                    "claim": MIDDLEWARE,
+                    "query": "oracle cpq subscription integration",
+                    "docs_site": "https://docs.oracle.com/en/",
+                }
+            ]
+        }
+    )
+    eng = make_debate(client, research=True, search=search_spy)
+    await eng.post_user_message("Which CPQ?")
+    await eng.task
+    assert "site:docs.oracle.com oracle cpq subscription integration" in queries
+    claim = eng.snapshot()["claims"][0]
+    assert claim["status"] == "contradicted" and claim["source_url"] == "https://docs.oracle.com/cpq/subscriptions.html"
+
+
+async def test_a_quote_that_isnt_in_the_source_is_explained():
+    _, eng = await run_cpq()
+    cost = next(c for c in eng.snapshot()["claims"] if c["claim"] == COST)
+    assert cost["status"] == "unknown" and "quote isn't in the source" in cost["caveat"]
