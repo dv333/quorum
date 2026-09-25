@@ -62,20 +62,62 @@ A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
   any OpenAI-compatible API with your own key. Cloud models are never picked automatically.
 - **A native-feeling app.** Light and dark mode, glass materials, and layouts from phone to ultrawide.
 
-## Screenshots
+## Tour
 
-| | |
-|:---:|:---:|
-| <img src="docs/images/home-light.png" alt="Home"> | <img src="docs/images/welcome.png" alt="First-launch walkthrough"> |
-| Every model you have joins the council | A two-minute first-launch setup |
-| <img src="docs/images/clarify.png" alt="The chair's clarifying questions"> | <img src="docs/images/answer-light.png" alt="A final answer"> |
-| The chair clarifies first | One clear answer, bottom line first |
-| <img src="docs/images/expert.png" alt="The Expert view with a diagram"> | <img src="docs/images/home-dark.png" alt="Home in dark mode"> |
-| The Expert view adds a diagram | Dark mode |
-| <img src="docs/images/metrics.png" alt="Behind the answer metrics"> | <img src="docs/images/activity.png" alt="Live Memory, CPU and GPU charts"> |
-| Tokens, time and searches per model | Live Memory, CPU and GPU |
-| <img src="docs/images/settings.png" alt="Settings"> | |
-| Local and cloud providers | |
+One real conundrum, *Should I rent or buy a home in Cupertino in 2026?*, answered by eight local models on a
+MacBook Pro. Click any image to see it full size.
+
+### 1. Ask
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/home-light.png" width="100%" alt="The home screen with the question typed and the council below it"></td>
+<td width="50%"><img src="docs/images/home-dark.png" width="100%" alt="The home screen in dark mode"></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><b>Just type</b><br>Every model you have installed joins the council as an animal agent. Beagle 🐶 does the research.</td>
+<td width="50%" valign="top"><b>Light or dark</b><br>Follows your system appearance, from phone to ultrawide.</td>
+</tr>
+</table>
+
+### 2. Clarify and debate
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/clarify.png" width="100%" alt="The chair's clarifying questions and its summary of assumptions"></td>
+<td width="50%"><img src="docs/images/activity.png" width="100%" alt="Live Memory, CPU and GPU charts"></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><b>The chair asks first</b><br>Up to three questions, one at a time, then a summary of assumptions for you to confirm.</td>
+<td width="50%" valign="top"><b>Watch your machine work</b><br>Live Memory, CPU and GPU charts while the council debates.</td>
+</tr>
+</table>
+
+### 3. Get one answer
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/answer-light.png" width="100%" alt="The final answer with its bottom line, reading levels and metrics"></td>
+<td width="50%"><img src="docs/images/expert.png" width="100%" alt="The Expert view with a decision diagram"></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><b>Bottom line first</b><br>Key points, where the agents differed, reading levels, and the tokens and time behind it.</td>
+<td width="50%" valign="top"><b>Expert adds a diagram</b><br>The chair draws the decision when a picture helps.</td>
+</tr>
+</table>
+
+### 4. Set up once
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/welcome.png" width="100%" alt="The first-launch walkthrough"></td>
+<td width="50%"><img src="docs/images/settings.png" width="100%" alt="Local servers and cloud providers in Settings"></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><b>Two-minute setup</b><br>Checks Ollama, downloads a starter council sized for your machine, and turns on web search.</td>
+<td width="50%" valign="top"><b>Local first, cloud optional</b><br>Ollama, LM Studio and llama.cpp are found automatically. Cloud models need your own key.</td>
+</tr>
+</table>
 
 ## Requirements
 
@@ -280,4 +322,4 @@ Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 Deepak Vijayan. Third-party licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Quorum is released under the [MIT License](LICENSE). Third-party licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
