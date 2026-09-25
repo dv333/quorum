@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Local state and secrets
+.env
+data/
+vendor/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+
+# Demo recording frames (scripts/record_demo.py)
+.demo-frames/
