@@ -259,6 +259,12 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
     return out[:limit]
 
 
+def model_size(model: str) -> float:
+    """Billions of parameters from a model tag like "gpt-oss:20b" or "qwen3:14b" (0 when the tag doesn't say)."""
+    m = re.search(r"(\d+(?:\.\d+)?)\s*b\b", model.lower())
+    return float(m.group(1)) if m else 0.0
+
+
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
     """Take results round-robin across queries so every query contributes, deduplicated by URL, with the strongest
     evidence (systematic reviews, then randomized trials) and official documentation moved to the front."""
@@ -1811,6 +1817,15 @@ class DebateEngine:
             return db.query("SELECT * FROM claims WHERE debate_id = ? ORDER BY id", [self.id])
         return db.query("SELECT * FROM claims WHERE debate_id = ? AND topic = ? ORDER BY id", [self.id, topic])
 
+    def _auditor(self, d: Dict[str, Any]) -> Tuple[str, int, str]:
+        """Who checks the chair's answer: the largest council model other than the chair's, so the answer isn't
+        audited by the model that wrote it (falls back to the chair when every seat runs the same model)."""
+        others = [s for s in self.seats() if s["model"] != d["chair_model"]]
+        if not others:
+            return self._chair_label(d), d["chair_endpoint_id"], d["chair_model"]
+        s = max(others, key=lambda s: model_size(s["model"]))
+        return s["handle"], s["endpoint_id"], s["model"]
+
     async def _audit_answer(
         self, msg_id: int, claims: List[Dict[str, Any]], studies: Optional[List[Dict[str, str]]] = None
     ) -> None:
@@ -1822,12 +1837,13 @@ class DebateEngine:
         d = self.debate()
         chair = self._chair_label(d)
         think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+        auditor, a_ep, a_model = self._auditor(d)
         try:
             text = await self._complete(
-                chair,
+                auditor,
                 "audit",
-                d["chair_endpoint_id"],
-                d["chair_model"],
+                a_ep,
+                a_model,
                 prompts.answer_check_messages(
                     row["content"],
                     claims,
@@ -1860,7 +1876,7 @@ class DebateEngine:
                 if isinstance(p, dict) and str(p.get("issue") or "").strip()
             ]
         )[:8]
-        meta = {"evidence": {"checked": True, "problems": problems}}
+        meta = {"evidence": {"checked": True, "problems": problems, "auditor": auditor}}
         content = plain_answer(row["content"])
         if problems:
             try:

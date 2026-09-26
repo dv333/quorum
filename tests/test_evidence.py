@@ -143,7 +143,8 @@ async def test_a_clean_answer_is_marked_checked_and_left_alone():
     await eng.task
     answer = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert answer["content"] == "BOTTOM LINE: Two finalists remain."
-    assert json.loads(answer["meta_json"])["evidence"] == {"checked": True, "problems": []}
+    evidence = json.loads(answer["meta_json"])["evidence"]
+    assert evidence["checked"] and evidence["problems"] == [] and evidence["auditor"] != "Chair"
 
 
 def test_quotes_must_really_be_in_the_source():

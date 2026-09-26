@@ -594,7 +594,10 @@ async def test_largest_member_picks_chair_researcher_and_title():
     assert d["chair_reason"] == "clear, careful writer" and d["title"] == "Test title"
     pick_call = [c for c in client.calls if c[1][0]["content"].startswith("You organize")][0]
     assert pick_call[0] == "model-1" and "Otter: model-0" in pick_call[1][1]["content"]
-    assert client.calls[-1][0] == "model-1"  # the chair writes the final answer
+    answer_call = [c for c in client.calls if c[1][0]["content"].startswith("You are the chair of an AI council. You turn")]
+    assert answer_call[-1][0] == "model-1"  # the chair writes the final answer
+    audit_call = [c for c in client.calls if c[1][0]["content"].startswith("You audit")]
+    assert audit_call and audit_call[-1][0] != "model-1"  # and a different model checks it
     assert (
         "Panda will chair — “clear, careful writer”"
         in db.query_one("SELECT content FROM messages WHERE author_kind = 'system' ORDER BY id LIMIT 1")["content"]
@@ -620,7 +623,8 @@ async def test_metrics_cover_every_model_call_and_search():
     m = eng.metrics(1)
     actors = {a["actor"]: a for a in m["actors"]}
     assert set(actors) == {"Otter", "Panda", "Koala", "Beagle", "Chair"}
-    assert actors["Otter"]["calls"] == 2 and actors["Otter"]["output_tokens"] == 20
+    # two turns, plus auditing the chair's answer (the auditor is a council model other than the chair's)
+    assert actors["Otter"]["calls"] == 3 and actors["Otter"]["output_tokens"] == 30
     assert actors["Otter"]["prompt_tokens"] > 0  # estimated when the server doesn't report it
     # opening brief (plan + brief) and one claim check; one search batch each
     assert actors["Beagle"]["calls"] == 3 and actors["Beagle"]["searches"] == 2 and actors["Beagle"]["pages"] > 0
