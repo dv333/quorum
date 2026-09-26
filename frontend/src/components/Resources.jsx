@@ -49,15 +49,35 @@ export function ResourceCards({ series, onOpen }) {
   const samples = series?.samples || []
   const last = samples[samples.length - 1]
   const hasGpu = samples.some((s) => s.gpu != null)
+  const loaded = series?.loaded || []
   return (
-    <div className="res-cards">
-      {METRICS.filter((m) => m.key !== 'gpu' || hasGpu).map((m) => (
-        <button key={m.key} className="res-card" onClick={() => onOpen(m.key)} title={`${m.label} over the last few minutes`}>
-          <div className="res-top"><span>{m.label}</span><b>{current(last, m.key)}</b></div>
-          <Sparkline values={samples.slice(-60).map((s) => pct(s, m.key))} color={m.color} />
+    <>
+      <div className="res-cards">
+        {METRICS.filter((m) => m.key !== 'gpu' || hasGpu).map((m) => (
+          <button key={m.key} className="res-card" onClick={() => onOpen(m.key)} title={`${m.label} over the last few minutes`}>
+            <div className="res-top"><span>{m.label}</span><b>{current(last, m.key)}</b></div>
+            <Sparkline values={samples.slice(-60).map((s) => pct(s, m.key))} color={m.color} />
+          </button>
+        ))}
+      </div>
+      {/* The models in memory right now (Ollama keeps a model loaded for a few minutes after it's used) */}
+      {series && (
+        <button className="res-loaded" onClick={() => onOpen('mem')}
+          title={loaded.length ? loaded.map((m) => `${m.model} · ${formatGB(m.size_bytes)}`).join('\n') : 'No models loaded'}>
+          <span className="res-loaded-h">Loaded</span>
+          {loaded.length ? (
+            <span className="res-loaded-list">
+              {loaded.slice(0, 2).map((m) => (
+                <span key={`${m.endpoint}-${m.model}`} className="res-model">
+                  <i className="live-dot" />{modelShort(m.model)}<span className="gb">{formatGB(m.size_bytes)}</span>
+                </span>
+              ))}
+              {loaded.length > 2 && <span className="res-more">+{loaded.length - 2} more</span>}
+            </span>
+          ) : <span className="res-none">None</span>}
         </button>
-      ))}
-    </div>
+      )}
+    </>
   )
 }
 

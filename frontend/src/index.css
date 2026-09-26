@@ -285,6 +285,17 @@ textarea.input { resize: vertical; }
 .res-card { border: 0; border-radius: 10px; background: var(--fill); padding: 6px 7px 4px; text-align: left; min-width: 0; transition: background 0.2s, transform 0.15s var(--ease); }
 .res-card:hover { background: var(--fill-2); }
 .res-card:active { transform: scale(0.97); }
+.res-loaded {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%; margin-top: 6px; padding: 6px 8px; border: 0; border-radius: 10px;
+  background: var(--fill); text-align: left; font: 11px var(--font); color: var(--text-2); cursor: pointer; transition: background 0.2s;
+}
+.res-loaded:hover { background: var(--fill-2); }
+.res-loaded-h { flex: none; font-weight: 600; color: var(--text-3); padding-top: 1px; }
+.res-loaded-list { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.res-model { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; }
+.res-model .live-dot { width: 5px; height: 5px; flex: none; }
+.res-model .gb { margin-left: auto; padding-left: 6px; color: var(--text-3); font-weight: 400; font-variant-numeric: tabular-nums; }
+.res-more, .res-none { color: var(--text-3); }
 .res-top { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; font-size: 10.5px; color: var(--text-2); }
 .res-top b { font: 600 12px var(--font); color: var(--text); font-variant-numeric: tabular-nums; }
 .spark { display: block; width: 100%; height: 22px; margin-top: 2px; }
