@@ -912,3 +912,33 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 }
 .jump-pill:hover { color: var(--blue); }
 @media (prefers-reduced-motion: reduce) { .jump-pill { animation: none; } }
+
+/* Citations in the answer: [n] previews the checked claim behind it */
+.cite { position: relative; display: inline-block; }
+.cite-n {
+  border: 0; padding: 0 5px; margin: 0 1px; min-width: 18px; height: 17px; border-radius: 6px; cursor: pointer;
+  font: 600 10.5px/17px var(--font); vertical-align: 2px; background: var(--fill); color: var(--text-2);
+}
+.cite-n.ev-supported { background: color-mix(in srgb, var(--agree) 16%, transparent); color: var(--agree); }
+.cite-n.ev-partly { background: color-mix(in srgb, var(--refine) 16%, transparent); color: var(--refine); }
+.cite-n.ev-contradicted { background: color-mix(in srgb, var(--disagree) 14%, transparent); color: var(--disagree); }
+.cite-n:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.cite-plain { color: var(--text-3); font-size: 0.85em; }
+.cite-pop {
+  position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); z-index: 20;
+  width: max-content; max-width: min(340px, 80vw); display: flex; flex-direction: column; gap: 6px; align-items: flex-start;
+  padding: 10px 12px; border-radius: 12px; text-align: left; font: 400 12.5px/1.45 var(--font); color: var(--text);
+  background: var(--glass-strong); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow-lg), 0 0 0 0.5px var(--hairline-strong);
+  display: none; pointer-events: none;
+}
+.cite:hover .cite-pop, .cite-n:focus-visible + .cite-pop { display: flex; transform: translateX(-50%); animation: cite-in 0.15s var(--ease); }
+.cite.start .cite-pop { left: -4px; transform: none; }
+.cite.end .cite-pop { left: auto; right: -4px; transform: none; }
+@keyframes cite-in { from { opacity: 0; } }
+.cite-claim { font-weight: 600; }
+.cite-quote { color: var(--text-2); font-style: italic; }
+.cite-src { color: var(--text-3); font-size: 11.5px; }
+.evidence li.flash { animation: flash 1.6s var(--ease); border-radius: 10px; }
+@keyframes flash { 0%, 40% { background: color-mix(in srgb, var(--blue) 14%, transparent); } 100% { background: transparent; } }
+@media print { .cite-pop { display: none; } .cite-n { background: none; color: inherit; padding: 0; } }
