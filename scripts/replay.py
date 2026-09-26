@@ -22,9 +22,18 @@ from backend import cli  # noqa: E402  (talks to the running backend over HTTP)
 HERE = os.path.dirname(__file__)
 
 
+# Models write non-breaking spaces and hyphens ("Ioniq\u00a05", "800\u2011V"); compare them as plain ones
+_SPACES = re.compile(r"[\u00a0\u2007\u202f\u2009]")
+_HYPHENS = re.compile(r"[\u2010\u2011]")
+
+
+def _plain(text: str) -> str:
+    return _HYPHENS.sub("-", _SPACES.sub(" ", text)).lower()
+
+
 def says(text: str, phrase: str) -> bool:
     """Whether text contains the phrase at the start of a word ("OIC" doesn't match inside "choice")."""
-    return re.search(r"(?<![a-z0-9])" + re.escape(phrase.lower()), text.lower()) is not None
+    return re.search(r"(?<![a-z0-9])" + re.escape(_plain(phrase)), _plain(text)) is not None
 
 
 def check(spec, answer: str, claims: list) -> list:

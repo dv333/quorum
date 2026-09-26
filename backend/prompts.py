@@ -292,6 +292,7 @@ def verdict_messages(
     claims: Optional[List[Dict[str, Any]]] = None,
     research: str = "",
     studies: str = "",
+    options: Sequence[str] = (),
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -305,6 +306,11 @@ def verdict_messages(
         found += (
             "\nKey studies (checked against their pages; lead with these and use their names, years and numbers "
             f"exactly, without inventing other details):\n{studies}\n"
+        )
+    if options:
+        found += (
+            f"\nOptions the research found: {', '.join(options)}. Compare each of them on what the question asks "
+            "(a short markdown table in the key points works well when there are several), and say which suits whom.\n"
         )
     if claims:
         check = f"\nEvidence ledger (checked against sources; it overrides the agents):\n{ledger_text(claims)}\n\n{EVIDENCE_RULES}\n"
@@ -331,7 +337,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. For buying or choosing questions, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
 {ANSWER_FORMAT}""",
         },
@@ -583,6 +589,28 @@ Decide what the sources establish about the claim:
 Prefer systematic reviews, meta-analyses and sources marked [primary source]. The quote must be copied word for word from one source (one or two sentences); use an empty quote for "unknown".
 
 Reply like: {{"status": "partly", "source": 1, "quote": "...", "caveat": "..."}}""",
+        },
+    ]
+
+
+def shortlist_messages(question: str, pages: List[Dict[str, Any]], max_options: int = 6) -> List[Dict[str, str]]:
+    """The specific options (products, services, approaches) the pages name that fit the question's constraints."""
+    blocks = "\n\n".join(f"[{i + 1}] {p['title']} ({p['url']})\n{p['content']}" for i, p in enumerate(pages))
+    return [
+        {
+            "role": "system",
+            "content": f"You are {RESEARCHER_NAME}, a careful researcher. You report only what the pages literally say. Reply with a single JSON object and nothing else.",
+        },
+        {
+            "role": "user",
+            "content": f"""Question: {question}
+
+Pages:
+{blocks}
+
+List up to {max_options} specific options these pages name that could answer the question and fit its constraints (price limits, dates, sizes). Use the name as the page writes it, short (like "Tesla Model Y" or "ECS on Fargate"), and give one page number where it appears. Include every serious contender the pages mention, not only the one they favor; leave out options that break the question's constraints.
+
+Reply like: {{"options": [{{"name": "...", "source": 1}}]}}""",
         },
     ]
 

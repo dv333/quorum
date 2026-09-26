@@ -259,6 +259,31 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
     return out[:limit]
 
 
+_CHOICE_Q = re.compile(r"\b(which|best|or|vs\.?|versus|should|choose|pick|recommend)\b", re.I)
+
+
+def check_shortlist(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 6) -> List[str]:
+    """Option names that really appear on the page they're attributed to (or any page), deduplicated."""
+    out: List[str] = []
+    text_all = " ".join(f"{p.get('title', '')} {p.get('content', '')}" for p in pages).lower()
+    for o in raw:
+        name = " ".join(str((o or {}).get("name") or "").split())[:60] if isinstance(o, dict) else ""
+        if len(name) < 3 or name.lower() in (x.lower() for x in out):
+            continue
+        # The name, or its distinctive part without the maker ("Model Y" for "Tesla Model Y"), has to be on a page
+        core = name.split(" ", 1)[1] if " " in name and len(name.split(" ", 1)[1]) >= 4 else name
+        if name.lower() in text_all or core.lower() in text_all:
+            out.append(name)
+    return out[:limit]
+
+
+def option_mentioned(name: str, text: str) -> bool:
+    """Whether the answer names an option: its full name or its distinctive part, ignoring case."""
+    low = " ".join(text.lower().split())
+    core = name.split(" ", 1)[1] if " " in name and len(name.split(" ", 1)[1]) >= 4 else name
+    return name.lower() in low or core.lower() in low
+
+
 def model_size(model: str) -> float:
     """Billions of parameters from a model tag like "gpt-oss:20b" or "qwen3:14b" (0 when the tag doesn't say)."""
     m = re.search(r"(\d+(?:\.\d+)?)\s*b\b", model.lower())
@@ -435,6 +460,7 @@ class DebateEngine:
         self._requests_per_round: Dict[Tuple[int, int], int] = {}
         self._search_down: Optional[str] = None
         self._research_pages: Dict[int, List[Dict[str, Any]]] = {}  # pages Beagle read, per topic, for the claim check
+        self._shortlist: Dict[int, List[str]] = {}  # options the research names, for choice questions
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
 
@@ -1339,6 +1365,11 @@ class DebateEngine:
             )
             partial = self.partials[msg_id]
             content = strip_thinking(partial["content"]).strip() or "The sources didn't answer this."
+            if kind == "brief" and _CHOICE_Q.search(question):
+                # Choice questions: name every contender the pages mention, so the debate doesn't anchor on one
+                options = await self._make_shortlist(d["topic"], question, ep_id, model, think)
+                if options:
+                    content += "\n\nOptions the sources name: " + ", ".join(options) + "."
             stored_sources = [
                 {"url": s["url"], "title": s["title"], "evidence": s["evidence"], "primary": s["primary"]} for s in sources
             ]
@@ -1753,6 +1784,21 @@ class DebateEngine:
             self.partials.pop(msg_id, None)
         return []
 
+    async def _make_shortlist(self, topic: int, question: str, ep_id: int, model: str, think: Optional[bool]) -> List[str]:
+        pages = self._research_pages.get(topic, [])[:8]
+        if not pages:
+            return []
+        try:
+            text = await self._complete(
+                RESEARCHER_NAME, "shortlist", ep_id, model, prompts.shortlist_messages(question, pages), think
+            )
+            options = check_shortlist(parse_json_loose(text).get("options") or [], pages)
+        except Exception as e:
+            log.warning("shortlist failed: %s", e)
+            return []
+        self._shortlist[topic] = options
+        return options
+
     async def _key_studies(self, topic: int) -> List[Dict[str, str]]:
         """The strongest studies the research read (reviews and trials first), with details checked against their
         pages, for the chair to lead with and for the answer's "Key studies" section."""
@@ -1867,7 +1913,15 @@ class DebateEngine:
             }
             for r in stated_requirements(question)
             if not requirement_covered(r, row["content"])
-        ] + check_arithmetic(row["content"])
+        ] + check_arithmetic(row["content"]) + [
+            {
+                "text": "",
+                "issue": f"The research found {o} as an option, but the answer doesn't mention it; compare it with the "
+                "others on what the question asks, using the research.",
+            }
+            for o in self._shortlist.get(row["topic"], [])
+            if not option_mentioned(o, row["content"])
+        ]
         problems = (
             checked
             + [
@@ -2063,6 +2117,7 @@ class DebateEngine:
                 guidance=(d["pack"] or {}).get("guidance", ""),
                 claims=claims,
                 studies=prompts.studies_text(studies),
+                options=self._shortlist.get(topic, []),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:

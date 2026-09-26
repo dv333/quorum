@@ -623,3 +623,13 @@ def test_listings_and_social_posts_are_skipped_when_there_is_better():
     assert is_low_value("https://www.facebook.com/groups/runlocalai/posts/1")
     assert not is_low_value("https://www.amazon.com/some-product/dp/B0C1")
     assert not is_low_value("https://www.macworld.com/article/2964754/mac-mini.html")
+
+
+def test_shortlisted_options_must_be_on_the_pages_and_in_the_answer():
+    from backend.engine import check_shortlist, option_mentioned
+
+    pages = [{"title": "Best EVs under $45k", "url": "u", "content": "The Tesla Model Y and Hyundai Ioniq 5 lead."}]
+    raw = [{"name": "Tesla Model Y", "source": 1}, {"name": "Kia EV9", "source": 1}, {"name": "Hyundai Ioniq 5"}]
+    assert check_shortlist(raw, pages) == ["Tesla Model Y", "Hyundai Ioniq 5"]  # the EV9 isn't on any page
+    assert option_mentioned("Tesla Model Y", "The Model Y Standard is the safest pick.")
+    assert not option_mentioned("Cloud Run", "We run twelve services.")
