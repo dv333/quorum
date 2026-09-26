@@ -1,0 +1,16 @@
+{
+  "name": "Hardware: 30B model on a 48 GB Mac vs a 24 GB NVIDIA GPU",
+  "why": "The answer has to size each quantization against 24 GB of VRAM and the Mac's GPU-usable memory, explain that speed follows memory bandwidth (NVIDIA ~1 TB/s vs 273-307 GB/s on M4/M5 Pro), price a used 3090 build against a 48 GB Mac, and note that 30B mixture-of-experts models change the trade-off.",
+  "question": "Best way to run a 30B-parameter model locally: 48 GB Mac or a PC with a 24 GB NVIDIA GPU? Speed, cost, quantization.",
+  "expect": {
+    "mentions_groups": [
+      ["bandwidth"],
+      ["Q4", "4-bit", "4 bit"],
+      ["Q8", "8-bit", "8 bit"],
+      ["KV cache", "context"],
+      ["3090", "4090"],
+      ["MoE", "mixture-of-experts", "mixture of experts", "A3B"]
+    ],
+    "never_says": ["[UNVERIFIED]", "ledger"]
+  }
+}
