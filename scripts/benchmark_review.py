@@ -185,7 +185,7 @@ def run_quorum(case: Dict[str, Any], repo: Path, mode: str) -> Dict[str, Any]:
 # ------------------------------------------------------------------ findings and scoring
 
 _ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*)")
-_HEADING = re.compile(r"^\s*(?:#{1,6}\s+(.*)|\*\*([^*]{1,80})\*\*:?\s*|([A-Z][\w &/()-]{0,60}):\s*)$")
+_HEADING = re.compile(r"^\s*(?:#{1,6}\s+(.*)|\*\*(.{1,160}?)\*\*:?\s*|([A-Z][\w &/()-]{0,60}):\s*)$")
 SEVERITY = [
     ("high", re.compile(r"\bhigh\b|must.fix|critical|blocker|severe", re.I)),
     ("medium", re.compile(r"\bmedium\b|should.fix|moderate", re.I)),
@@ -203,39 +203,52 @@ def severity_of(text: str) -> Optional[str]:
 
 
 def split_findings(answer: str) -> List[Dict[str, str]]:
-    """The answer's findings: list items under a High, Medium or Low heading, or that start with one of those words.
+    """The answer's findings, from either layout reviewers use: list items under a High, Medium or Low heading (or
+    starting with one of those words), or a numbered or bold title per finding followed by paragraphs and sub-bullets.
     Items under 'looks correct', 'where they differed', 'next steps' and similar headings aren't findings; items under
     'key points' or 'summary' count toward finding a bug but are never counted as false alarms."""
     items: List[Dict[str, Any]] = []
-    section: Optional[str] = None  # severity of the current section; "skip" for non-findings; None if unknown
+    section: Optional[str] = None  # severity of the current section; "skip", "summary", or None if unknown
     current: Optional[Dict[str, Any]] = None
     for line in answer.splitlines():
         if not line.strip():
-            current = None
+            if current is not None and not current["titled"]:
+                current = None
             continue
         heading = _HEADING.match(line)
         item = _ITEM.match(line)
         if heading and not item:
-            title = next(g for g in heading.groups() if g is not None)
-            section = severity_of(title) or (
-                "skip" if NOT_FINDINGS.search(title) else "summary" if SUMMARY.search(title) else None
-            )
-            current = None
+            title = re.sub(r"[*_`]", "", next(g for g in heading.groups() if g is not None)).strip()
+            sev = severity_of(title)
+            numbered = re.match(r"\d+[.)]\s", title)
+            if not numbered and len(title) <= 45 and (sev or NOT_FINDINGS.search(title) or SUMMARY.search(title)):
+                section = sev or ("skip" if NOT_FINDINGS.search(title) else "summary")
+                current = None
+            elif section in ("high", "medium", "low") or numbered or sev:
+                current = {"severity": section if section in ("high", "medium", "low") else sev, "text": title}
+                current["titled"] = True
+                items.append(current)
+            else:
+                section, current = None, None
             continue
         if item:
+            indented = len(line) - len(line.lstrip()) >= 2
+            if current is not None and (current["titled"] or indented):
+                current["text"] += " " + item.group(1)
+                continue
             text = item.group(1)
             lead = (
                 severity_of(re.sub(r"[*_`]", "", text)[:40])
                 if re.match(r"[*_]*(high|medium|low)\b", text, re.I)
                 else None
             )
-            current = {"severity": lead or section, "text": text}
+            current = {"severity": lead or section, "text": text, "titled": False}
             items.append(current)
         elif current is not None:
             current["text"] += " " + line.strip()
     findings = [i for i in items if i["severity"] in ("high", "medium", "low", "summary")]
     if not any(f["severity"] != "summary" for f in findings):
-        # no severity structure: every list item outside a skipped or summary section counts as medium
+        # no severity structure: every item outside a skipped or summary section counts as medium
         findings += [{"severity": "medium", "text": i["text"]} for i in items if i["severity"] is None]
     return [{"severity": f["severity"], "text": f["text"]} for f in findings]
 
@@ -355,6 +368,8 @@ def main() -> int:
         for c in cases:
             for x in results["cases"].get(c["name"], {}).values():
                 if "error" not in x:
+                    if "answer" in x:
+                        x["findings"] = split_findings(x["answer"])
                     x["score"] = score(c, x["findings"])
     else:
         previous = out / "results.json"

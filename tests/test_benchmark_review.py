@@ -78,3 +78,30 @@ def test_every_case_has_a_task_and_a_base_and_change(case):
     assert c.get("clean") or c["bugs"]
     for point in c["bugs"] + c["acceptable"]:
         assert point["match"], point["id"]
+
+
+TITLED = """I found two problems.
+
+## High
+
+**1. `get_all` never fetches anything (`fetcher.py:29-33`)**
+The coroutine is never awaited.
+*Fix:* use gather.
+
+**2. Running out of retries caches an error page**
+- **Last attempt got an HTTP error:** the body is cached.
+- **Every attempt failed:** `UnboundLocalError`.
+
+## Medium
+
+**3. No tests**
+- a request that fails twice then succeeds
+"""
+
+
+def test_titled_findings_keep_their_paragraphs_and_sub_bullets():
+    findings = bench.split_findings(TITLED)
+    assert [f["severity"] for f in findings] == ["high", "high", "medium"]
+    assert "never awaited" in findings[0]["text"] and "use gather" in findings[0]["text"]
+    assert "UnboundLocalError" in findings[1]["text"]
+    assert findings[2]["text"].startswith("3. No tests") and "fails twice" in findings[2]["text"]
