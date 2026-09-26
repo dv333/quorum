@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, formatGB } from '../api'
 import { RESEARCHER, modelShort } from '../agents'
+import { THEMES, getTheme, setTheme } from '../theme'
 
-const TABS = [['models', 'Models'], ['providers', 'Providers'], ['search', 'Web search']]
+const TABS = [['models', 'Models'], ['providers', 'Providers'], ['search', 'Web search'], ['appearance', 'Appearance']]
 const FIT = { fits: ['ok', 'Fits'], too_big: ['bad', 'Too big'], unknown: ['', 'Unknown size'], cloud: ['', 'Cloud'] }
 
 function SearchField({ value, onChange, placeholder }) {
@@ -41,6 +42,25 @@ function PullButton({ endpoints, model, onDone }) {
     )
   }
   return <button className="btn small" disabled={!ollama} title={ollama ? '' : 'Ollama is not running'} onClick={pull}>Get</button>
+}
+
+function AppearanceTab() {
+  const [theme, choose] = useState(getTheme)
+  return (
+    <section>
+      <h3>Theme</h3>
+      <div className="appearance" role="radiogroup" aria-label="Appearance">
+        {THEMES.map(([k, label]) => (
+          <button key={k} role="radio" aria-checked={theme === k} className={`theme-card ${theme === k ? 'on' : ''}`}
+            onClick={() => { setTheme(k); choose(k) }}>
+            <span className={`swatch ${k}`}><i /></span>
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="muted small" style={{ marginTop: 12 }}>System follows your computer's light or dark setting. This choice is kept in this browser.</p>
+    </section>
+  )
 }
 
 function matches(q, ...fields) {
@@ -333,7 +353,8 @@ export default function Settings({ mobileBar, onRunSetup }) {
           )}
           {error && <p className="error">{error}</p>}
           {tab === 'search' && <WebSearchTab />}
-          {tab !== 'search' && !inv && <p className="muted">Checking your models…</p>}
+          {tab === 'appearance' && <AppearanceTab />}
+          {!['search', 'appearance'].includes(tab) && !inv && <p className="muted">Checking your models…</p>}
           {tab === 'models' && inv && <ModelsTab inv={inv} catalog={catalog} reload={() => load(true)} />}
           {tab === 'providers' && inv && <ProvidersTab inv={inv} reload={() => load(true)} />}
         </div>
