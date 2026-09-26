@@ -295,7 +295,7 @@ def cmd_packs(args: argparse.Namespace) -> int:
 
 
 def cmd_list(args: argparse.Namespace) -> int:
-    debates = get("/debates")[: args.n]
+    debates = get(f"/debates?limit={max(1, args.n)}")
     if args.json:
         print(json.dumps(debates, indent=2, ensure_ascii=False))
         return 0

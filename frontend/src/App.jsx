@@ -8,7 +8,10 @@ import Onboarding from './components/Onboarding'
 import Settings from './components/Settings'
 import ShortcutsHelp from './components/ShortcutsHelp'
 import { ResourceSheet } from './components/Resources'
-import Sidebar, { SidebarIcon } from './components/Sidebar'
+import Sidebar, { ComposeIcon, SidebarIcon } from './components/Sidebar'
+
+// Statuses worth watching: live debates and ones waiting for your answer
+const TRACKED = ['intake', 'clarifying', 'confirming', 'running', 'paused', 'concluding', 'researching']
 
 function readCollapsed() {
   try { return localStorage.getItem('quorum.sidebar') === 'hidden' } catch { return false }
@@ -29,7 +32,11 @@ function readHash() {
 
 export default function App() {
   const [config, setConfig] = useState(null)
-  const [debates, setDebates] = useState([])
+  // Only conundrums that are live or waiting for you are tracked here (for alerts and the dock badge); the sidebar
+  // pages through history from the server itself, so millions of conundrums cost nothing up front
+  const [live, setLive] = useState([])
+  const [refreshKey, setRefreshKey] = useState(0)
+  const refreshSidebar = useCallback(() => setRefreshKey((k) => k + 1), [])
   const [route, setRoute] = useState(readHash)
   const [drawer, setDrawer] = useState(false)
   const [series, setSeries] = useState(null)
@@ -65,8 +72,12 @@ export default function App() {
 
   const loadDebates = useCallback(async () => {
     try {
-      const list = await api.listDebates()
-      setDebates(list)
+      const prevIds = Object.keys(prevStatus.current || {})
+      const current = await api.listDebates({ status: TRACKED })
+      // Conundrums that were live and aren't any more: fetch them to see how they ended (answered, stopped)
+      const ended = prevIds.filter((id) => !current.some((d) => d.id === id))
+      const list = ended.length ? [...current, ...(await api.listDebates({ ids: ended }))] : current
+      setLive(current)
       setBackendError(null)
       // Alert on transitions: the chair needs you, or an answer is ready
       const prev = prevStatus.current
@@ -86,16 +97,19 @@ export default function App() {
           }
         }
       }
-      prevStatus.current = Object.fromEntries(list.map((d) => [d.id, d.status]))
+      const before = prevStatus.current
+      prevStatus.current = Object.fromEntries(current.map((d) => [d.id, d.status]))
+      // Any change in what's live (new, ended, moved on) refreshes the sidebar's loaded pages
+      if (!before || ended.length || current.some((d) => before[d.id] !== d.status)) refreshSidebar()
     } catch (e) {
       setBackendError(e.message)
     }
-  }, [])
+  }, [refreshSidebar])
 
   useEffect(() => {
     api.config().then(setConfig, (e) => setBackendError(e.message))
     // First launch (never set up, nothing asked yet): start with the walkthrough
-    api.listDebates().then((list) => {
+    api.listDebates({ limit: 1 }).then((list) => {
       if (!onboarded() && list.length === 0 && !window.location.hash) go('welcome')
     }, () => {})
     loadDebates()
@@ -112,7 +126,7 @@ export default function App() {
   }, [])
 
   // Live debates change status/title without navigation; keep the sidebar fresh
-  const anyActive = debates.some((d) => ['running', 'concluding', 'researching', 'intake'].includes(d.status))
+  const anyActive = live.some((d) => ['running', 'concluding', 'researching', 'intake'].includes(d.status))
   useEffect(() => {
     if (!anyActive) return undefined
     const t = setInterval(loadDebates, 2500)
@@ -126,7 +140,7 @@ export default function App() {
     }
   }, [route, unseen])
 
-  const waiting = debates.filter((d) => ['clarifying', 'confirming'].includes(d.status)).map((d) => d.id)
+  const waiting = live.filter((d) => ['clarifying', 'confirming'].includes(d.status)).map((d) => d.id)
   const attention = new Set([...waiting, ...unseen])
   useEffect(() => { if (config) setBadge(attention.size, config.app_name) }, [attention.size, config])
 
@@ -148,12 +162,12 @@ export default function App() {
     try { await api.deleteDebate(pending.id) } catch { /* already gone */ }
     setPendingDelete((p) => (p && p.id === pending.id ? null : p))
     loadDebates()
-  }, [loadDebates])
+    refreshSidebar()
+  }, [loadDebates, refreshSidebar])
 
-  const requestDelete = (id) => {
+  const requestDelete = (id, title) => {
     if (pendingDelete) finishDelete(pendingDelete) // one undo at a time
-    const d = debates.find((x) => x.id === id)
-    const pending = { id, title: d?.title || d?.question || 'Conundrum' }
+    const pending = { id, title: title || 'Conundrum' }
     pending.timer = setTimeout(() => finishDelete(pending), 6000)
     setPendingDelete(pending)
     if (id === route.id) go('home')
@@ -191,7 +205,7 @@ export default function App() {
   if (route.view === 'welcome') {
     return (
       <Onboarding appName={config.app_name} onDone={() => go('home')}
-        onStartQuestion={async (q) => { const snap = await api.createDebate({ question: q }); loadDebates(); go('debate', snap.debate.id) }} />
+        onStartQuestion={async (q) => { const snap = await api.createDebate({ question: q }); loadDebates(); refreshSidebar(); go('debate', snap.debate.id) }} />
     )
   }
 
@@ -208,7 +222,9 @@ export default function App() {
       <div className="ambient" />
       <Sidebar
         appName={config.app_name}
-        debates={pendingDelete ? debates.filter((d) => d.id !== pendingDelete.id) : debates}
+        refreshKey={refreshKey}
+        polling={anyActive}
+        hiddenId={pendingDelete?.id}
         currentId={route.id}
         view={route.view}
         series={series}
@@ -223,15 +239,18 @@ export default function App() {
       <div className="scrim" onClick={() => setDrawer(false)} />
       <main className={`main ${route.view === 'home' ? 'plain' : ''}`}>
         {collapsed && (
-          <button className="icon-btn expand-btn" onClick={toggleSidebar} aria-label="Show sidebar" title="Show sidebar (⌃⌘S)"><SidebarIcon /></button>
+          <>
+            <button className="icon-btn expand-btn" onClick={toggleSidebar} aria-label="Show sidebar" title="Show sidebar (⌃⌘S)"><SidebarIcon /></button>
+            <button className="icon-btn expand-btn new" onClick={() => go('home')} aria-label="New conundrum" title="New conundrum (⌘N)"><ComposeIcon /></button>
+          </>
         )}
         <ErrorBoundary resetKey={`${route.view}/${route.id}`}>
         {route.view === 'home' && (
           <Home config={config} mobileBar={mobileBar} onOpenSettings={() => go('settings')}
-            onCreated={(id) => { loadDebates(); go('debate', id) }} />
+            onCreated={(id) => { loadDebates(); refreshSidebar(); go('debate', id) }} />
         )}
         {route.view === 'debate' && route.id && (
-          <DebateView key={route.id} debateId={route.id} onChanged={loadDebates} mobileBar={mobileBar} />
+          <DebateView key={route.id} debateId={route.id} onChanged={() => { loadDebates(); refreshSidebar() }} mobileBar={mobileBar} />
         )}
         {route.view === 'settings' && <Settings mobileBar={mobileBar} onRunSetup={() => go('welcome')} />}
         </ErrorBoundary>

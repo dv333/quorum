@@ -19,6 +19,13 @@ async function request(path, options = {}) {
   return res.json()
 }
 
+function query(params) {
+  const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && !v.length))
+    .map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : String(v)]))
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
 export const api = {
   config: () => request('/config'),
   inventory: (numCtx, refresh = false) => request(`/inventory?num_ctx=${numCtx}${refresh ? '&refresh=true' : ''}`),
@@ -27,7 +34,9 @@ export const api = {
   plan: (models, numCtx) => request('/plan', { method: 'POST', body: { models, num_ctx: numCtx } }),
   packs: () => request('/packs'),
 
-  listDebates: () => request('/debates'),
+  // Newest first; { limit, before, after, q, ids, status, exclude } page and filter on the server
+  listDebates: (params = {}) => request(`/debates${query(params)}`),
+  countDebates: (params = {}) => request(`/debates/count${query(params)}`).then((r) => r.count),
   getDebate: (id) => request(`/debates/${id}`),
   createDebate: (body) => request('/debates', { method: 'POST', body }),
   deleteDebate: (id) => request(`/debates/${id}`, { method: 'DELETE' }),
