@@ -132,66 +132,210 @@ function matches(q, ...fields) {
   return !needle || fields.some((f) => (f || '').toLowerCase().includes(needle))
 }
 
+const GB = 1024 ** 3 // as the backend and formatGB count it
+const TIERS = [['Small', 'under 5 GB', 0, 5 * GB], ['Medium', '5 to 15 GB', 5 * GB, 15 * GB], ['Large', '15 GB and up', 15 * GB, Infinity]]
+
+function Chips({ value, onChange, options }) {
+  return (
+    <div className="chips" role="tablist" aria-label="Show">
+      {options.map(([k, label, n]) => (
+        <button key={k} role="tab" aria-selected={value === k} className={`chip ${value === k ? 'on' : ''}`} onClick={() => onChange(k)}>
+          {label} <span className="n">{n}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function InstalledRow({ m, loaded, inCouncil, onRemove }) {
+  const [tone, label] = FIT[m.fit] || FIT.unknown
+  return (
+    <div className="list-row model-row">
+      <div className="grow">
+        <b>{modelShort(m.model)}</b>
+        {m.thinking && <span className="pill think">reasons</span>}
+        {inCouncil && <span className="pill">in council</span>}
+        {!m.chat && <span className="pill">not for chat</span>}
+        <div className="sub">{[m.local ? null : m.endpoint_name, m.family, m.params, m.quant].filter(Boolean).join(' · ')}</div>
+      </div>
+      {m.local && <span className="small muted size">{formatGB(m.est_bytes)}</span>}
+      {loaded && <span className="pill ok">In memory</span>}
+      <span className={`pill ${tone}`}>{label}</span>
+      {onRemove && (
+        <button className="icon-btn remove" aria-label={`Remove ${m.model}`} title="Remove from this Mac" onClick={() => onRemove(m)}>
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.7 10a1.5 1.5 0 0 0 1.5 1.4h4.6a1.5 1.5 0 0 0 1.5-1.4l.7-10" /></svg>
+        </button>
+      )}
+    </div>
+  )
+}
+
+// Any model in Ollama's library by exact name: its size and fit before downloading
+function GetByName({ endpoints, reload, query }) {
+  const [name, setName] = useState('')
+  const [found, setFound] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const check = async () => {
+    if (!name.trim()) return
+    setBusy(true); setError(null); setFound(null)
+    try { setFound(await api.lookupModel(name.trim())) } catch (e) { setError(e.message) }
+    setBusy(false)
+  }
+  const [tone, label] = found?.found ? (FIT[found.fit] || FIT.unknown) : []
+  const browse = `https://ollama.com/search${query.trim() ? `?q=${encodeURIComponent(query.trim())}` : ''}`
+  return (
+    <div className="get-by-name">
+      <div className="list-row">
+        <div className="grow"><b>Get any Ollama model</b><div className="sub">Type its name and tag, like <code>qwen3:30b</code>, to see its size and whether it fits.</div></div>
+        <input className="input" value={name} placeholder="model:tag" aria-label="Model name" autoComplete="off" spellCheck={false}
+          onChange={(e) => { setName(e.target.value); setFound(null) }} onKeyDown={(e) => e.key === 'Enter' && check()} />
+        <button className="btn small" disabled={busy || !name.trim()} onClick={check}>{busy ? 'Checking…' : 'Check'}</button>
+      </div>
+      {found && !found.found && <div className="list-row"><span className="muted small">No model called “{found.model}” in Ollama's library. Check the name and tag.</span></div>}
+      {found?.found && (
+        <div className="list-row">
+          <div className="grow"><b>{found.model}</b><div className="sub">{formatGB(found.size_bytes)} download</div></div>
+          <span className={`pill ${tone}`}>{label}</span>
+          {found.fit !== 'too_big' && <PullButton endpoints={endpoints} model={found.model} onDone={reload} />}
+        </div>
+      )}
+      {error && <div className="list-row"><span className="error small">{error}</span></div>}
+      <p className="small muted browse">Not sure of the name? <a href={browse} target="_blank" rel="noreferrer noopener">Browse Ollama's library{query.trim() ? ` for “${query.trim()}”` : ''} ↗</a></p>
+    </div>
+  )
+}
+
 function ModelsTab({ inv, catalog, reload }) {
+  const [view, setView] = useState('installed')
   const [q, setQ] = useState('')
-  const groups = useMemo(() => {
-    const g = {}
-    for (const m of inv.models) {
-      if (!matches(q, m.model, m.family, m.endpoint_name)) continue
-      const name = m.local ? 'On this Mac' : m.endpoint_name
-      ;(g[name] = g[name] || []).push(m)
-    }
-    return Object.entries(g).sort(([a], [b]) => (a === 'On this Mac' ? -1 : b === 'On this Mac' ? 1 : a.localeCompare(b)))
-  }, [inv.models, q])
-  const suggested = catalog.filter((c) => !c.installed && matches(q, c.model, c.family, c.strengths))
+  const [sort, setSort] = useState('size')
+  const [council, setCouncil] = useState(() => new Set())
+  const [showTooBig, setShowTooBig] = useState(false)
+  const [error, setError] = useState(null)
+  useEffect(() => {
+    api.autoCouncil(8192).then((c) => setCouncil(new Set((c.seats || []).map((s) => s.model))), () => {})
+  }, [inv])
+
+  const local = inv.models.filter((m) => m.local)
+  const cloud = inv.models.filter((m) => !m.local)
+  const suggested = catalog.filter((c) => !c.installed)
+  const byName = (a, b) => a.model.localeCompare(b.model)
+  const bySize = (a, b) => (b.est_bytes || 0) - (a.est_bytes || 0)
+  const installed = local.filter((m) => matches(q, m.model, m.family)).sort(sort === 'name' ? byName : bySize)
+  const fits = suggested.filter((c) => c.fit !== 'too_big' && matches(q, c.model, c.family, c.strengths)).sort((a, b) => a.size_bytes - b.size_bytes)
+  const tooBig = suggested.filter((c) => c.fit === 'too_big' && matches(q, c.model, c.family, c.strengths))
+  const cloudGroups = Object.entries(
+    cloud.filter((m) => matches(q, m.model, m.endpoint_name)).reduce((g, m) => ({ ...g, [m.endpoint_name]: [...(g[m.endpoint_name] || []), m] }), {}),
+  )
+  const inCouncil = local.filter((m) => council.has(m.model)).length
+
+  const remove = async (m) => {
+    if (!confirm(`Remove ${m.model} from this Mac? It frees about ${formatGB(m.size_bytes || m.est_bytes)} of disk; you can download it again later.`)) return
+    setError(null)
+    try { await api.deleteModel(m.endpoint_id, m.model); reload() } catch (e) { setError(e.message) }
+  }
+
+  const options = [['installed', 'Installed', local.length], ['get', 'Get more', suggested.length]]
+  if (cloud.length) options.push(['cloud', 'Cloud', cloud.length])
 
   return (
     <>
-      <SearchField value={q} onChange={setQ} placeholder="Search models" />
-      {groups.map(([name, ms]) => (
-        <div className="group" key={name}>
-          <h3>{name} <span className="faint">· {ms.length}</span></h3>
-          <div className="list">
-            {ms.map((m) => {
-              const loaded = inv.loaded.find((l) => l.endpoint_id === m.endpoint_id && l.model === m.model)
-              const [tone, label] = FIT[m.fit] || FIT.unknown
-              return (
-                <div className="list-row" key={m.key}>
-                  <div className="grow">
-                    <b>{modelShort(m.model)}</b> {m.thinking && <span className="pill think">reasons</span>} {!m.chat && <span className="pill">not for chat</span>}
-                    <div className="sub">{[m.local ? m.endpoint_name : null, m.family, m.params, m.quant].filter(Boolean).join(' · ')}</div>
-                  </div>
-                  {m.local && <span className="small muted">{formatGB(m.est_bytes)}</span>}
-                  {loaded && <span className="pill ok">In memory</span>}
-                  <span className={`pill ${tone}`}>{label}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-      {groups.length === 0 && !q && <p className="muted">No models yet. Get a few below, or add a cloud provider.</p>}
-      {suggested.length > 0 && (
+      <div className="models-bar">
+        <Chips value={view} onChange={setView} options={options} />
+        <SearchField value={q} onChange={setQ} placeholder={view === 'get' ? 'Filter suggestions' : 'Search models'} />
+      </div>
+      {error && <p className="error">{error}</p>}
+
+      {view === 'installed' && (
         <div className="group">
-          <h3>Get more models</h3>
-          <div className="list">
-            {suggested.map((c) => {
-              const [tone, label] = FIT[c.fit] || FIT.unknown
-              return (
-                <div className="list-row" key={c.model}>
-                  <div className="grow"><b>{c.model}</b><div className="sub">{c.strengths}</div></div>
-                  <span className="small muted">{formatGB(c.size_bytes)}</span>
-                  {c.fit === 'too_big' ? <span className={`pill ${tone}`}>{label}</span>
-                    : <PullButton endpoints={inv.endpoints} model={c.model} onDone={reload} />}
-                </div>
-              )
-            })}
+          <div className="group-head">
+            <span className="muted small">{local.length} installed · {inCouncil} in your council · {formatGB(inv.system.usable_bytes)} memory for models</span>
+            <select className="input select-sm" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort models">
+              <option value="size">Largest first</option>
+              <option value="name">Name</option>
+            </select>
           </div>
-          <p>Mixing families (Qwen, Gemma, Llama, Mistral…) makes for a more genuine debate than copies of one model.</p>
+          {installed.length > 0 ? (
+            <div className="list">
+              {installed.map((m) => (
+                <InstalledRow key={m.key} m={m} inCouncil={council.has(m.model)}
+                  loaded={inv.loaded.some((l) => l.endpoint_id === m.endpoint_id && l.model === m.model)}
+                  onRemove={inv.endpoints.find((e) => e.id === m.endpoint_id)?.kind === 'ollama' ? remove : null} />
+              ))}
+            </div>
+          ) : (
+            <p className="muted">{q ? `No installed models match “${q}”.` : 'No models yet. '}{!q && <button className="linkish" onClick={() => setView('get')}>Get a few</button>}</p>
+          )}
         </div>
       )}
-      {q && groups.length === 0 && suggested.length === 0 && <p className="muted">No models match “{q}”.</p>}
+
+      {view === 'get' && (
+        <>
+          <div className="group"><div className="list"><GetByName endpoints={inv.endpoints} reload={reload} query={q} /></div></div>
+          {TIERS.map(([tier, hint, lo, hi]) => {
+            const items = fits.filter((c) => c.size_bytes >= lo && c.size_bytes < hi)
+            if (!items.length) return null
+            return (
+              <div className="group" key={tier}>
+                <h3>{tier} <span className="faint">· {hint}</span></h3>
+                <div className="list">
+                  {items.map((c) => {
+                    const [tone, label] = FIT[c.fit] || FIT.unknown
+                    return (
+                      <div className="list-row" key={c.model}>
+                        <div className="grow"><b>{c.model}</b> <span className="faint small">{c.family}</span><div className="sub">{c.strengths}</div></div>
+                        <span className="small muted size">{formatGB(c.size_bytes)}</span>
+                        <span className={`pill ${tone}`}>{label}</span>
+                        <PullButton endpoints={inv.endpoints} model={c.model} onDone={reload} />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+          {tooBig.length > 0 && (
+            <div className="group">
+              <button className="linkish" onClick={() => setShowTooBig(!showTooBig)}>
+                {showTooBig ? 'Hide' : 'Show'} {tooBig.length} too big for this machine
+              </button>
+              {showTooBig && (
+                <div className="list" style={{ marginTop: 8 }}>
+                  {tooBig.map((c) => (
+                    <div className="list-row" key={c.model}>
+                      <div className="grow"><b>{c.model}</b><div className="sub">{c.strengths}</div></div>
+                      <span className="small muted size">{formatGB(c.size_bytes)}</span>
+                      <span className="pill bad">Too big</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {fits.length === 0 && tooBig.length === 0 && q && <p className="muted">No suggestions match “{q}”. Try a name above, or browse Ollama's library.</p>}
+          <p className="small muted">Mixing families (Qwen, Gemma, Llama, Mistral…) makes for a more genuine debate than copies of one model.</p>
+        </>
+      )}
+
+      {view === 'cloud' && cloudGroups.map(([name, ms]) => <CloudGroup key={name} name={name} models={ms} council={council} />)}
     </>
+  )
+}
+
+// A cloud provider can list hundreds of models: show 20, then more on request
+function CloudGroup({ name, models, council }) {
+  const [shown, setShown] = useState(20)
+  return (
+    <div className="group">
+      <h3>{name} <span className="faint">· {models.length}</span></h3>
+      <div className="list">
+        {models.slice(0, shown).map((m) => <InstalledRow key={m.key} m={m} inCouncil={council.has(m.model)} loaded={false} onRemove={null} />)}
+      </div>
+      {models.length > shown && (
+        <button className="more-link" onClick={() => setShown(shown + 40)}>Show more <span>· {models.length - shown} more</span></button>
+      )}
+    </div>
   )
 }
 

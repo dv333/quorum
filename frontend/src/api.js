@@ -33,6 +33,8 @@ export const api = {
   autoCouncil: (numCtx = 8192, pack = null) => request(`/auto-council?num_ctx=${numCtx}${pack ? `&pack=${encodeURIComponent(pack)}` : ''}`),
   plan: (models, numCtx) => request('/plan', { method: 'POST', body: { models, num_ctx: numCtx } }),
   packs: () => request('/packs'),
+  lookupModel: (name, numCtx = 8192) => request(`/models/lookup?name=${encodeURIComponent(name)}&num_ctx=${numCtx}`),
+  deleteModel: (endpointId, model) => request('/models/delete', { method: 'POST', body: { endpoint_id: endpointId, model } }),
 
   // Newest first; { limit, before, after, q, ids, status, exclude } page and filter on the server
   listDebates: (params = {}) => request(`/debates${query(params)}`),
