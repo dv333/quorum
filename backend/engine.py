@@ -421,6 +421,27 @@ _CALC = re.compile(
 )
 
 
+_BOTTOM = re.compile(r"^\s*[*_#]*\s*BOTTOM\s*LINE\s*[*_]*\s*[:：]\s*(.+)$", re.I | re.M)
+
+
+def check_bottom_line(text: str, limit_words: int = 55) -> List[Dict[str, str]]:
+    """A bottom line a busy reader can act on: one or two sentences, not a paragraph."""
+    m = _BOTTOM.search(text)
+    if not m:
+        return []
+    line = re.sub(r"[*_]", "", m.group(1)).strip()
+    words = len(line.split())
+    if words <= limit_words:
+        return []
+    return [
+        {
+            "text": line[:120],
+            "issue": f"the bottom line runs {words} words; make it one or two sentences (under 45 words) that lead with "
+            "the recommendation, and move the rest into the key points",
+        }
+    ]
+
+
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
     """Calculations written out in the answer ("30 × 4.5 ÷ 8 ≈ 17") whose result is off by more than 15%."""
     problems = []
@@ -1964,7 +1985,7 @@ class DebateEngine:
             }
             for s in question_specifics(question)
             if not specific_covered(s, row["content"])
-        ] + check_arithmetic(row["content"]) + [
+        ] + check_bottom_line(row["content"]) + check_arithmetic(row["content"]) + [
             {
                 "text": "",
                 "issue": f"The research found {o} as an option, but the answer doesn't mention it; compare it with the "

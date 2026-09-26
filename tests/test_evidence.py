@@ -645,3 +645,11 @@ def test_the_numbers_a_question_states_must_be_answered():
     assert question_specifics("Should I switch to induction in 2026?") == []  # years aren't specifics
     assert open_choice("Which EV under $45k is best for a family?")
     assert not open_choice(q)  # it names its options, so there's nothing to shortlist
+
+
+def test_a_long_bottom_line_is_flagged():
+    from backend.engine import check_bottom_line
+
+    assert check_bottom_line("BOTTOM LINE: **Use Cloud Run on GCP or ECS Fargate on AWS.**\n\n## Key points") == []
+    long = "BOTTOM LINE: " + " ".join(["word"] * 70)
+    assert "70 words" in check_bottom_line(long)[0]["issue"]
