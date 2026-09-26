@@ -292,6 +292,16 @@ def question_specifics(question: str) -> List[str]:
     return out
 
 
+def named_options(question: str) -> List[str]:
+    """Options the question lists itself, like "(ECS, Cloud Run, Fly.io)"."""
+    out: List[str] = []
+    for group in re.findall(r"\(([^()]{3,120})\)", question.split("?")[0]):
+        parts = [p.strip(" .") for p in re.split(r",|\bor\b|/", group)]
+        if len(parts) >= 2:
+            out += [p for p in parts if 2 <= len(p) <= 40 and p not in out]
+    return out[:6]
+
+
 def _squash(text: str) -> str:
     return re.sub(r"[\s\u00a0\u202f,\-\u2011]", "", text.lower())
 
@@ -2114,6 +2124,14 @@ class DebateEngine:
             }
             for s in question_specifics(question)
             if not specific_covered(s, row["content"])
+        ] + [
+            {
+                "text": "",
+                "issue": f"The question names {o} as an option, but the answer doesn't address it; say where it fits "
+                "(or why not) in the key points or details, using the research.",
+            }
+            for o in named_options(question)
+            if not option_mentioned(o, row["content"])
         ] + check_bottom_line(row["content"]) + check_arithmetic(row["content"]) + check_legal_names(
             row["content"], self._research_pages.get(row["topic"], [])
         ) + check_unsourced_figures(row["content"], self._source_text(row["topic"], claims, question)) + [

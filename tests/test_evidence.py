@@ -736,3 +736,11 @@ def test_a_quantity_criterion_needs_a_number():
     assert not requirement_covered("cost", "The Mac costs more upfront, but it's quieter.")
     assert requirement_covered("cost", "The 48 GB Mac costs about $2,000; a used-3090 PC about $1,600.")
     assert requirement_covered("Range", "The Model Y Standard's EPA range is 321 miles.")
+
+
+def test_options_the_question_lists_must_be_addressed():
+    from backend.engine import named_options
+
+    q = "Kubernetes or a managed container service (ECS, Cloud Run, Fly.io) for a 5-engineer team running 12 services?"
+    assert named_options(q) == ["ECS", "Cloud Run", "Fly.io"]
+    assert named_options("Which EV under $45k is best for a family?") == []
