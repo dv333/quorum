@@ -991,3 +991,18 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   .set-control { justify-content: flex-start; }
   .setup-status { flex-wrap: wrap; }
 }
+
+/* Sidebar history: collapsible day groups with counts, paged with "Show more" */
+.side-h.toggle { display: flex; align-items: center; gap: 5px; width: 100%; border: 0; background: none; text-align: left; cursor: pointer; border-radius: 6px; }
+.side-h.toggle:hover { color: var(--text-2); }
+.side-h.toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.side-h .count { margin-left: auto; font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.chev { flex: none; transition: transform 0.2s var(--ease); }
+.chev.open { transform: rotate(90deg); }
+.side-more { display: block; width: 100%; border: 0; background: none; text-align: left; padding: 6px 10px 8px; font: 500 12px var(--font); color: var(--blue); cursor: pointer; border-radius: 7px; }
+.side-more span { color: var(--text-3); font-weight: 400; }
+.side-more:hover { background: var(--fill); }
+.brand .brand-new { margin-left: auto; }
+.brand .brand-new + .collapse-btn { margin-left: 0; }
+.new-q svg { flex: none; }
+.expand-btn.new { left: 56px; }

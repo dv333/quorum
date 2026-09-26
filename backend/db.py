@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_debate ON messages(debate_id, id);
+CREATE INDEX IF NOT EXISTS idx_debates_created ON debates(created_at);
 """
 
 # Columns added after v1; applied to existing databases on connect

@@ -2,11 +2,12 @@
 
 import asyncio
 import json
+from datetime import datetime, timezone
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -277,15 +278,90 @@ async def delete_endpoint(endpoint_id: int):
 # ---------------------------------------------------------------- debates
 
 
+def _utc(stamp: Optional[str]) -> Optional[str]:
+    """A client timestamp ("2026-09-26T07:00:00.000Z") in the form debates store, so text comparison works."""
+    if not stamp:
+        return None
+    try:
+        return datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone(timezone.utc).isoformat()
+    except ValueError:
+        raise HTTPException(400, f"Not a timestamp: {stamp}")
+
+
+def _debate_filter(
+    before: Optional[str],
+    after: Optional[str],
+    q: Optional[str],
+    ids: Optional[str],
+    status: Optional[str],
+    exclude: Optional[str] = None,
+) -> Tuple[str, List[Any]]:
+    """WHERE clause for the conundrum list: a time range (newest first, `before` is exclusive), words to find in the
+    title or question, specific ids, or statuses."""
+    where: List[str] = []
+    params: List[Any] = []
+    if before:
+        where.append("d.created_at < ?")
+        params.append(_utc(before))
+    if after:
+        where.append("d.created_at >= ?")
+        params.append(_utc(after))
+    if ids:
+        wanted = [i for i in ids.split(",") if i][:200]
+        where.append(f"d.id IN ({','.join('?' * len(wanted))})" if wanted else "0")
+        params += wanted
+    if exclude:
+        skip = [i for i in exclude.split(",") if i][:200]
+        if skip:
+            where.append(f"d.id NOT IN ({','.join('?' * len(skip))})")
+            params += skip
+    if status:
+        wanted = [s for s in status.split(",") if s][:20]
+        where.append(f"d.status IN ({','.join('?' * len(wanted))})" if wanted else "0")
+        params += wanted
+    for word in (q or "").split()[:8]:
+        like = f"%{word}%"
+        where.append(
+            "(d.title LIKE ? OR EXISTS (SELECT 1 FROM messages m WHERE m.debate_id = d.id AND m.author_kind = 'user' "
+            "AND m.round = 0 AND m.content LIKE ?))"
+        )
+        params += [like, like]
+    return (" WHERE " + " AND ".join(where)) if where else "", params
+
+
 @app.get("/api/debates")
-async def list_debates():
+async def list_debates(
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    q: Optional[str] = None,
+    ids: Optional[str] = None,
+    status: Optional[str] = None,
+    exclude: Optional[str] = None,
+):
+    """Conundrums, newest first. Without parameters, all of them; the sidebar pages through them with `limit` and
+    `before` (the last item's created_at) within a day group's range."""
+    where, params = _debate_filter(before, after, q, ids, status, exclude)
     return db.query(
         "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, "
         "(SELECT COUNT(*) FROM seats s WHERE s.debate_id = d.id) AS seat_count, "
         "(SELECT content FROM messages m WHERE m.debate_id = d.id AND m.author_kind = 'user' AND m.round = 0 "
         " ORDER BY m.id LIMIT 1) AS question "
-        "FROM debates d ORDER BY d.created_at DESC"
+        f"FROM debates d{where} ORDER BY d.created_at DESC, d.id DESC" + (" LIMIT ?" if limit else ""),
+        params + ([limit] if limit else []),
     )
+
+
+@app.get("/api/debates/count")
+async def count_debates(
+    before: Optional[str] = None,
+    after: Optional[str] = None,
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    exclude: Optional[str] = None,
+):
+    where, params = _debate_filter(before, after, q, None, status, exclude)
+    return {"count": db.query_one(f"SELECT COUNT(*) AS n FROM debates d{where}", params)["n"]}
 
 
 @app.post("/api/debates")
