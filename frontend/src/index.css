@@ -877,6 +877,24 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .theme-card.on .swatch { box-shadow: 0 0 0 2.5px var(--blue); }
 .theme-card:focus-visible { outline: none; }
 .theme-card:focus-visible .swatch { box-shadow: 0 0 0 2.5px var(--blue), 0 0 0 5px color-mix(in srgb, var(--blue) 30%, transparent); }
+/* Settings → Models: chips to switch views, a search, compact rows */
+.models-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.models-bar .search-field { flex: 1; min-width: 200px; margin: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips .chip .n { color: var(--text-3); font-weight: 500; margin-left: 2px; }
+.chips .chip.on .n { color: inherit; opacity: 0.7; }
+.group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 8px; }
+.select-sm { width: auto; padding: 4px 8px; font-size: 12.5px; }
+.model-row .pill { margin-left: 6px; }
+.model-row .remove { color: var(--text-3); opacity: 0; transition: opacity 0.15s; }
+.model-row:hover .remove, .model-row .remove:focus-visible { opacity: 1; }
+.model-row .remove:hover { color: var(--danger); }
+@media (hover: none) { .model-row .remove { opacity: 1; } }
+.list-row .size { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.get-by-name .input { width: 170px; }
+.get-by-name .browse { padding: 0 14px 10px; margin: 0; }
+.more-link { border: 0; background: none; padding: 8px 2px; font: 500 12.5px var(--font); color: var(--blue); cursor: pointer; }
+.more-link span { color: var(--text-3); font-weight: 400; }
 
 /* Diagram tools: expand, copy the Mermaid source, download SVG */
 .mermaid-wrap { position: relative; }
@@ -991,22 +1009,3 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   .set-control { justify-content: flex-start; }
   .setup-status { flex-wrap: wrap; }
 }
-
-/* Settings → Models: chips to switch views, a search, compact rows */
-.models-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
-.models-bar .search-field { flex: 1; min-width: 200px; margin: 0; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chips .chip .n { color: var(--text-3); font-weight: 500; margin-left: 2px; }
-.chips .chip.on .n { color: inherit; opacity: 0.7; }
-.group-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 8px; }
-.select-sm { width: auto; padding: 4px 8px; font-size: 12.5px; }
-.model-row .pill { margin-left: 6px; }
-.model-row .remove { color: var(--text-3); opacity: 0; transition: opacity 0.15s; }
-.model-row:hover .remove, .model-row .remove:focus-visible { opacity: 1; }
-.model-row .remove:hover { color: var(--danger); }
-@media (hover: none) { .model-row .remove { opacity: 1; } }
-.list-row .size { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
-.get-by-name .input { width: 170px; }
-.get-by-name .browse { padding: 0 14px 10px; margin: 0; }
-.more-link { border: 0; background: none; padding: 8px 2px; font: 500 12.5px var(--font); color: var(--blue); cursor: pointer; }
-.more-link span { color: var(--text-3); font-weight: 400; }
