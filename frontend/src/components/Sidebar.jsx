@@ -40,7 +40,7 @@ function saveOpen(open) {
 
 // The sidebar's history, loaded from the server a page at a time: counts for every group, items only for open
 // groups (and more on "Show more"), search results, and pinned conundrums. `refreshKey` reloads what's shown.
-function useHistory({ query, pins, open, refreshKey, polling }) {
+function useHistory({ query, pins, open, refreshKey }) {
   const [groups, setGroups] = useState({})
   const [pinned, setPinned] = useState([])
   const [results, setResults] = useState(null) // { items, count } while searching
@@ -59,44 +59,30 @@ function useHistory({ query, pins, open, refreshKey, polling }) {
     return { items, count }
   }, [pinList])
 
+  // One request for everything shown: each group's count, open groups' loaded items, pins, or search results
   const refresh = useCallback(async () => {
     try {
-      if (q) {
-        const size = Math.max(PAGE * 2, loaded.current.results || 0)
-        const [items, count] = await Promise.all([api.listDebates({ q, limit: size }), api.countDebates({ q })])
-        setResults({ items, count })
-      } else {
-        setResults(null)
-        const next = {}
-        await Promise.all(defs.map(async (g) => {
-          if (open[g.key]) {
-            const { items, count } = await fetchGroup(g, Math.max(PAGE, loaded.current[g.key] || 0))
-            next[g.key] = { items, count }
-          } else {
-            next[g.key] = { items: [], count: await api.countDebates({ after: g.after, before: g.before, exclude: pinList }) }
-          }
-        }))
-        setGroups(next)
-      }
-      setPinned(pinList.length ? await api.listDebates({ ids: pinList }) : [])
+      const data = await api.sidebar({
+        groups: defs.map((g) => ({ key: g.key, after: g.after, before: g.before, limit: open[g.key] ? Math.max(PAGE, loaded.current[g.key] || 0) : 0 })),
+        pins: pinList,
+        q: q || undefined,
+        limit: Math.max(PAGE * 2, loaded.current.results || 0),
+      })
+      setResults(q ? data.results : null)
+      if (!q) setGroups(data.groups)
+      setPinned(data.pinned)
       setError(null)
     } catch (e) {
       setError(e.message)
     }
-  }, [q, defs, open, fetchGroup, pinList])
+  }, [q, defs, open, pinList])
 
-  // Search waits for a pause in typing; everything else loads at once
+  // Search waits for a pause in typing; everything else loads at once. The app bumps refreshKey when a live
+  // conundrum changes, so there's no polling here.
   useEffect(() => {
     const t = setTimeout(refresh, q ? 250 : 0)
     return () => clearTimeout(t)
   }, [refresh, q, refreshKey])
-
-  // While a debate is live, keep statuses and rounds fresh (only what's loaded)
-  useEffect(() => {
-    if (!polling) return undefined
-    const t = setInterval(refresh, 2500)
-    return () => clearInterval(t)
-  }, [polling, refresh])
 
   const more = useCallback(async (key) => {
     try {
@@ -164,7 +150,7 @@ function Chevron({ open }) {
   )
 }
 
-export default function Sidebar({ refreshKey, polling, hiddenId, currentId, view, series, attention, onSelect, onNew, onDelete, onSettings, onCollapse, onOpenResource, appName }) {
+export default function Sidebar({ refreshKey, hiddenId, currentId, view, series, attention, onSelect, onNew, onDelete, onSettings, onCollapse, onOpenResource, appName }) {
   const [query, setQuery] = useState('')
   const [pins, setPins] = useState(loadPins)
   const [open, setOpen] = useState(loadOpen)
@@ -179,7 +165,7 @@ export default function Sidebar({ refreshKey, polling, hiddenId, currentId, view
     setOpen((o) => { const n = { ...o, [key]: !o[key] }; saveOpen(n); return n })
   }
   const searchRef = useRef(null)
-  const { defs, groups, pinned, results, error, more, reset } = useHistory({ query, pins, open, refreshKey, polling })
+  const { defs, groups, pinned, results, error, more, reset } = useHistory({ query, pins, open, refreshKey })
   const visible = (items) => items.filter((d) => d.id !== hiddenId)
   const total = defs.reduce((n, g) => n + (groups[g.key]?.count || 0), 0) + pinned.length
 

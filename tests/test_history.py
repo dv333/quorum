@@ -63,3 +63,16 @@ async def test_ranges_search_ids_statuses_and_counts():
 async def test_a_bad_timestamp_is_a_client_error():
     with pytest.raises(HTTPException):
         await main.count_debates(before="yesterday", after=None, q=None, status=None, exclude=None)
+
+
+async def test_the_sidebar_loads_in_one_request():
+    groups = '[{"key": "recent", "after": "2026-09-26T03:00:00Z", "limit": 3}, {"key": "older", "before": "2026-09-26T03:00:00Z", "limit": 0}]'
+    data = await main.sidebar(groups=groups, pins="d00", q=None, limit=20)
+    assert data["groups"]["recent"]["count"] == 9  # d00 is pinned, so it's left out
+    assert [d["id"] for d in data["groups"]["recent"]["items"]] == ["d01", "d02", "d03"]
+    assert data["groups"]["older"] == {"count": 15, "items": []}
+    assert [d["id"] for d in data["pinned"]] == ["d00"]
+    found = await main.sidebar(groups="[]", pins=None, q="heat pump", limit=2)
+    assert found["results"]["count"] == 5 and len(found["results"]["items"]) == 2
+    with pytest.raises(HTTPException):
+        await main.sidebar(groups="not json", pins=None, q=None, limit=20)
