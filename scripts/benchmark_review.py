@@ -447,7 +447,9 @@ def main() -> int:
                     (out / "results.json").write_text(json.dumps(results, indent=2))
     (out / "results.json").write_text(json.dumps(results, indent=2))
     reported = [c for c in load_cases() if c["name"] in results["cases"]]
-    (out / "README.md").write_text(report(results, reported) + "\n")
+    notes = out / "notes.md"  # by-hand judgments of unmatched findings, kept across reruns
+    extra = f"\n{notes.read_text().strip()}\n" if notes.exists() else ""
+    (out / "README.md").write_text(report(results, reported) + "\n" + extra)
     print(f"wrote {out / 'README.md'}")
     return 0
 
