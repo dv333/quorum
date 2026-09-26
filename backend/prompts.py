@@ -288,6 +288,7 @@ def verdict_messages(
     custom_rubric: str,
     guidance: str = "",
     claims: Optional[List[Dict[str, Any]]] = None,
+    research: str = "",
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -296,6 +297,7 @@ def verdict_messages(
         "manual": "The user ended the debate.",
     }.get(reason, "")
     summ = f"\nSummary of earlier rounds:\n{summary}\n" if summary else ""
+    found = f"\nWhat {RESEARCHER_NAME}'s research found:\n{research}\n" if research else ""
     if claims:
         check = f"\nEvidence ledger (checked against sources; it overrides the agents):\n{ledger_text(claims)}\n\n{EVIDENCE_RULES}\n"
     elif fact_check:
@@ -311,7 +313,7 @@ def verdict_messages(
             "role": "user",
             "content": f"""Today is {today()}.
 {history_block(prior_topics)}Question: {question}
-{summ}
+{summ}{found}
 Latest discussion:
 {transcript}
 
@@ -337,7 +339,7 @@ ANSWER_FORMAT = """Use exactly this structure, with no preamble:
 BOTTOM LINE: <one sentence a busy person could act on, wrapping the key recommendation in **bold**>
 
 ## Key points
-- 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. Keep [n] citations from research where you rely on them.
+- 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. Name the key studies or sources and use their numbers (effect sizes, how many people or trials, how long, when) where the research gives them, and keep [n] citations where you rely on them.
 
 ## Diagram
 Include this section only if a picture genuinely helps (a decision, a process, a comparison or a timeline). Write one small Mermaid diagram in a ```mermaid code block: a "flowchart TD" or "flowchart LR" with at most 8 nodes and no styling, every node written as an id with a quoted label, like A["Check budget"] --> B["Buy"]. Otherwise leave this section out entirely.
@@ -492,6 +494,12 @@ Keep the same conclusions, facts and [n] citations. Keep exactly the same struct
     ]
 
 
+def source_label(src: Dict[str, Any]) -> str:
+    """How a source is marked for the researcher: its evidence level, and whether it's primary documentation."""
+    level = {3: " [systematic review / meta-analysis]", 2: " [randomized trial]"}.get(src.get("evidence", 0), "")
+    return level + (" [primary source]" if src.get("primary") else "")
+
+
 def research_plan_messages(request: str, question: str, max_queries: int) -> List[Dict[str, str]]:
     need = (
         "Find the current facts needed to answer this question well."
@@ -509,7 +517,7 @@ def research_plan_messages(request: str, question: str, max_queries: int) -> Lis
 
 {need}
 
-Write 1 to {max_queries} short web search queries (like you'd type into a search engine) that will find current, authoritative sources for this. Prefer queries that surface primary sources: official documentation, the maker's own pages, standards or filings, rather than comparison sites and blogs. Prefer one query unless the request clearly has several parts. Don't put years in queries unless the request is about a specific year; if you must, use the current year.""",
+Write 1 to {max_queries} short web search queries (like you'd type into a search engine) that will find current, authoritative sources for this. Prefer queries that surface primary sources: official documentation, the maker's own pages, standards or filings, rather than comparison sites and blogs. When the question is about scientific or medical evidence ("what does the evidence say", health, diet, treatments), make one query find the most recent systematic review or meta-analysis (words like "meta-analysis" or "Cochrane review" help, and so does the current year) and another the largest recent randomized trials. Prefer one query unless the request clearly has several parts. Don't put years in queries unless the request is about a specific year or you need the newest research; then use the current year.""",
         },
     ]
 
@@ -532,7 +540,7 @@ def claims_messages(
 {summ}Final positions:
 {pos}
 
-List up to {max_claims} factual claims the final answer will rely on. Start with one claim for each requirement stated in the question (what the debate asserts about how the options meet it), then claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write a web search query naming the specific product and feature and, when the claim is about one vendor's product, that vendor's documentation site (like "docs.oracle.com" or "help.salesforce.com").
+List up to {max_claims} factual claims the final answer will rely on. Start with the central claim: the debate's direct answer to the question, stated as a checkable fact. Then one claim for each requirement stated in the question (what the debate asserts about how the options meet it), then claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write a web search query naming the specific product and feature and, when the claim is about one vendor's product, that vendor's documentation site (like "docs.oracle.com" or "help.salesforce.com").
 
 Reply like: {{"claims": [{{"claim": "...", "query": "...", "docs_site": "..."}}]}}""",
         },
@@ -542,8 +550,7 @@ Reply like: {{"claims": [{{"claim": "...", "query": "...", "docs_site": "..."}}]
 def verify_claim_messages(claim: str, sources: List[Dict[str, str]]) -> List[Dict[str, str]]:
     """Check one claim against the pages found for it; the quote must be copied from a source."""
     blocks = "\n\n".join(
-        f"[{i + 1}] {src['title']} ({src['url']}){' [primary source]' if src.get('primary') else ''}\n{src['content']}"
-        for i, src in enumerate(sources)
+        f"[{i + 1}] {src['title']} ({src['url']}){source_label(src)}\n{src['content']}" for i, src in enumerate(sources)
     )
     return [
         {
@@ -651,11 +658,11 @@ def research_brief_messages(
     request: str, requested_by: Optional[str], sources: List[Dict[str, str]], kind: str
 ) -> List[Dict[str, str]]:
     blocks = "\n\n".join(
-        f"[{i + 1}] {src['title']} ({src['url']}){' [primary source]' if src.get('primary') else ''}\n"
-        f"{src['description']}\n{src['content']}"
+        f"[{i + 1}] {src['title']} ({src['url']}){source_label(src)}\n{src['description']}\n{src['content']}"
         for i, src in enumerate(sources)
     )
     task = """Write a brief (at most 170 words) that answers the request using only the sources. Cite every fact with [n], and for the facts that matter most, quote the exact words from the source in "double quotes". Lead with the direct answer, and when the request is about versions or releases, state the newest one explicitly. Mention dates when recency matters.
+When sources include systematic reviews, meta-analyses or randomized trials, lead with the strongest and most recent, and give their key numbers (how many trials or participants, how long, the effect size) and year; say when a finding comes from a single small or short study, or only from a narrative review.
 Report exactly what each source establishes and no more: a page that mentions a capability is not proof of a whole workflow, lower cost, faster implementation or superiority over another product. Prefer sources marked [primary source]; say when a fact comes only from a comparison site or blog. If the sources don't answer it, or contradict each other, say so plainly instead of guessing."""
     who = f" (asked by {requested_by})" if requested_by else ""
     return [

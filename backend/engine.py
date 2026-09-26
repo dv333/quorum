@@ -34,6 +34,7 @@ from .parsing import (
     parse_json_loose,
     parse_research_requests,
     parse_stance,
+    plain_answer,
     strip_thinking,
 )
 from .providers import ChatClient, Endpoint
@@ -179,15 +180,23 @@ def _parse_queries(text: str, limit: int) -> List[str]:
 
 
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
-    """Take results round-robin across queries so every query contributes, deduplicated by URL, with primary sources
-    (official documentation, standards) moved to the front."""
+    """Take results round-robin across queries so every query contributes, deduplicated by URL, with the strongest
+    evidence (systematic reviews, then randomized trials) and official documentation moved to the front."""
     seen, out = set(), []
     for i in range(max((len(r) for r in result_lists), default=0)):
         for results in result_lists:
             if i < len(results) and results[i]["url"] not in seen:
-                seen.add(results[i]["url"])
-                out.append({**results[i], "primary": firecrawl.is_primary(results[i]["url"])})
-    out.sort(key=lambda s: not s["primary"])
+                r = results[i]
+                seen.add(r["url"])
+                out.append(
+                    {
+                        **r,
+                        "primary": firecrawl.is_primary(r["url"]),
+                        "evidence": firecrawl.evidence_level(r.get("title", ""), r.get("content", "")),
+                    }
+                )
+    # Strongest evidence first (systematic reviews, then trials), then official documentation
+    out.sort(key=lambda s: -(2 * s["evidence"] + s["primary"]))
     return out[:limit]
 
 
@@ -1272,10 +1281,11 @@ class DebateEngine:
         others = [s for s in self.seats() if s["id"] != seat["id"]]
         roster = [f"{s['handle']} ({s['role']})" if s.get("role") else s["handle"] for s in others]
         messages = build(msgs)
-        # Hard cap: if still over budget (summary pending or failed), drop the oldest messages
+        # Hard cap: if still over budget (summary pending or failed), drop the oldest debate turns, keeping research
         keep_min = len(handles)
         while len(msgs) > keep_min and sum(estimate_tokens(m["content"]) for m in messages) > self._budget():
-            msgs = msgs[1:]
+            drop = next((i for i, m in enumerate(msgs) if m["author_kind"] != "researcher"), 0)
+            msgs = msgs[:drop] + msgs[drop + 1 :]
             messages = build(msgs)
         return messages
 
@@ -1540,6 +1550,29 @@ class DebateEngine:
             self.partials.pop(msg_id, None)
         return []
 
+    def _research_digest(self, topic: int, limit_words: int = 1200) -> str:
+        """Everything Beagle found for this topic (briefs and lookups, newest last), for the chair's answer. The
+        transcript window alone can miss the opening brief."""
+        rows = [
+            serialize_message(r)
+            for r in db.query(
+                "SELECT * FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'researcher' "
+                "AND status = 'done' AND research_kind IN ('brief', 'request') ORDER BY id",
+                [self.id, topic],
+            )
+        ]
+        parts, words = [], 0
+        for r in reversed(rows):  # newest first while trimming, then back in order
+            text = r["content"] + prompts.sources_block(r["sources"])
+            n = len(text.split())
+            if words + n > limit_words and parts:
+                break
+            parts.append(
+                f"{'Opening brief' if r['research_kind'] == 'brief' else 'Lookup: ' + (r['research_request'] or '')[:120]}\n{text}"
+            )
+            words += n
+        return "\n\n".join(reversed(parts))
+
     def _claims(self, topic: Optional[int] = None) -> List[Dict[str, Any]]:
         if topic is None:
             return db.query("SELECT * FROM claims WHERE debate_id = ? ORDER BY id", [self.id])
@@ -1573,7 +1606,7 @@ class DebateEngine:
             if isinstance(p, dict) and str(p.get("issue") or "").strip()
         ][:6]
         meta = {"evidence": {"checked": True, "problems": problems}}
-        content = row["content"]
+        content = plain_answer(row["content"])
         if problems:
             try:
                 revised = strip_thinking(
@@ -1587,7 +1620,7 @@ class DebateEngine:
                     )
                 ).strip()
                 if re.search(r"BOTTOM\s*LINE", revised, re.I):
-                    content = revised
+                    content = plain_answer(revised)
                     meta["evidence"]["revised"] = True
             except Exception as e:
                 log.warning("answer revision failed: %s", e)
@@ -1738,6 +1771,7 @@ class DebateEngine:
                 prior_topics=self._prior_topics(topic),
                 summary=summary["content"] if summary else None,
                 transcript=prompts.render_transcript(msgs[-len(handles) * 2 :], handles),
+                research=self._research_digest(topic),
                 positions=positions,
                 fact_check=None,
                 reason=reason,

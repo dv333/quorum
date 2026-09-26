@@ -73,6 +73,21 @@ _PRIMARY_HOST = re.compile(
 _PRIMARY_PATH = re.compile(r"/(docs|documentation|help|manual|reference|readiness|api)(/|$)", re.I)
 
 
+_REVIEW = re.compile(r"meta-?analys|systematic review|cochrane|umbrella review|pooled analysis", re.I)
+_TRIAL = re.compile(r"randomi[sz]ed|\brct\b|clinical trial|controlled trial", re.I)
+
+
+def evidence_level(title: str, text: str = "") -> int:
+    """3 for systematic reviews and meta-analyses, 2 for randomized trials, 0 otherwise (from the title, or the start
+    of the page)."""
+    head = f"{title} {text[:400]}"
+    if _REVIEW.search(head):
+        return 3
+    if _TRIAL.search(head):
+        return 2
+    return 0
+
+
 def is_primary(url: str) -> bool:
     """Official documentation, standards bodies and government sources, rather than comparison sites and blogs."""
     parts = urlsplit(url)

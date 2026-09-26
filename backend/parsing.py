@@ -131,3 +131,22 @@ def parse_json_loose(text: str) -> Dict[str, Any]:
     for key, val in re.findall(r'"(\w+)"\s*:\s*' + _STR, text):
         out.setdefault(key, val)
     return out
+
+
+_STATUS_PLAIN = [
+    (re.compile(r"\*{0,2}[\[(]\s*PARTLY SUPPORTED\s*[\])]\*{0,2}"), "(only partly confirmed by the sources)"),
+    (re.compile(r"\*{0,2}[\[(]\s*(UNVERIFIED|UNKNOWN)\s*[\])]\*{0,2}"), "(not confirmed by the sources)"),
+    (re.compile(r"\*{0,2}[\[(]\s*CONTRADICTED\s*[\])]\*{0,2}"), "(contradicted by the sources)"),
+    (re.compile(r"\s*\*{0,2}[\[(]\s*SUPPORTED\s*[\])]\*{0,2}"), ""),
+    (re.compile(r"\s*\((?:Evidence|Item|Claim|Ledger item)\s*\[?\d+\]?\)", re.I), ""),
+    (re.compile(r"\b(in|from) the (?:evidence )?ledger\b", re.I), r"\1 the sources"),
+    (re.compile(r"\bthe (?:evidence )?ledger\b", re.I), "the evidence"),
+    (re.compile(r"\bthe provided sources\b", re.I), "the sources"),
+]
+
+
+def plain_answer(text: str) -> str:
+    """Turn leftover evidence-ledger jargon in an answer into plain words (models sometimes echo the labels)."""
+    for pattern, replacement in _STATUS_PLAIN:
+        text = pattern.sub(replacement, text)
+    return re.sub(r"[ \t]{2,}", " ", text)

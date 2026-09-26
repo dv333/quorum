@@ -1,0 +1,38 @@
+{
+  "name": "Evidence: intermittent fasting vs. daily calorie restriction",
+  "why": "Quorum's first answer cited no systematic review or trial, gave no numbers, checked peripheral claims instead of the central one, and leaked evidence-ledger jargon, while the strongest evidence (a 2025 BMJ network meta-analysis of 99 trials, a 2026 Cochrane review, NEJM and JAMA trials) shows the two work about equally.",
+  "question": "Intermittent fasting vs. daily calorie restriction for weight loss: what does the evidence say?",
+  "expect": {
+    "mentions_groups": [
+      [
+        "meta-analysis",
+        "systematic review",
+        "Cochrane"
+      ],
+      [
+        "randomized",
+        "randomised",
+        "RCT"
+      ],
+      [
+        "time-restricted",
+        "16:8"
+      ],
+      [
+        "alternate-day",
+        "alternate day"
+      ],
+      [
+        "adherence",
+        "stick with",
+        "sustain"
+      ]
+    ],
+    "never_says": [
+      "intermittent fasting is superior",
+      "intermittent fasting is more effective",
+      "UNVERIFIED",
+      "ledger"
+    ]
+  }
+}

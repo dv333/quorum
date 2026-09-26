@@ -346,3 +346,59 @@ async def test_claim_searches_pass_the_claim_as_focus():
     await eng.post_user_message("Which CPQ?")
     await eng.task
     assert MIDDLEWARE in seen and COST in seen
+
+
+def test_leftover_ledger_jargon_becomes_plain_words():
+    from backend.parsing import plain_answer
+
+    text = (
+        "Adherence is **[UNVERIFIED]** (Evidence 3). Protein matters (PARTLY SUPPORTED). "
+        "Nothing in the ledger suggests harm, and the provided sources agree [SUPPORTED]."
+    )
+    assert plain_answer(text) == (
+        "Adherence is (not confirmed by the sources). Protein matters (only partly confirmed by the sources). "
+        "Nothing in the sources suggests harm, and the sources agree."
+    )
+
+
+def test_sources_are_ranked_by_strength_of_evidence():
+    from backend.engine import _interleave
+
+    ranked = _interleave(
+        [
+            [
+                {"url": "https://blog.example/if", "title": "My fasting journey", "content": ""},
+                {
+                    "url": "https://www.nejm.org/x",
+                    "title": "Calorie restriction with or without time-restricted eating: a randomized trial",
+                    "content": "",
+                },
+                {
+                    "url": "https://www.bmj.com/y",
+                    "title": "Intermittent fasting strategies: systematic review and network meta-analysis",
+                    "content": "",
+                },
+            ]
+        ],
+        3,
+    )
+    assert [s["evidence"] for s in ranked] == [3, 2, 0]
+    assert prompts.source_label(ranked[0]) == " [systematic review / meta-analysis]"
+
+
+async def test_the_chair_sees_the_opening_brief_even_after_long_debates():
+    from tests.test_engine import FakeSearch
+
+    client = FakeClient(lambda h, r, m: reply("REFINE", text="long turn " * 200))
+    eng = make_debate(client, research=True, max_rounds=3, search=FakeSearch())
+    await eng.post_user_message("Does intermittent fasting beat calorie restriction?")
+    await eng.task
+    verdict = next(m for _, m, _ in client.calls if "You turn the council's debate" in m[0]["content"])[1]["content"]
+    assert "What Beagle's research found:" in verdict and "Opening brief" in verdict and "BRIEF: fact [1]" in verdict
+
+
+def test_claims_start_with_the_central_claim_and_evidence_questions_seek_reviews():
+    claims = prompts.claims_messages("Q", [], None, 6)[1]["content"]
+    assert "Start with the central claim" in claims
+    plan = prompts.research_plan_messages("Q", "Q", 3)[1]["content"]
+    assert "systematic review or meta-analysis" in plan and "randomized trials" in plan

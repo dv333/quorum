@@ -35,8 +35,8 @@ def check(spec, answer: str, claims: list) -> list:
     results = []
     for phrase in expect.get("mentions_all", []):
         results.append((says(text, phrase), f'mentions "{phrase}"'))
-    if expect.get("mentions_any"):
-        options = expect["mentions_any"]
+    groups = expect.get("mentions_groups", []) + ([expect["mentions_any"]] if expect.get("mentions_any") else [])
+    for options in groups:
         results.append((any(says(text, o) for o in options), "mentions one of: " + ", ".join(options)))
     for phrase in expect.get("never_says", []):
         results.append((not says(answer, phrase), f'the answer never says "{phrase}"'))
