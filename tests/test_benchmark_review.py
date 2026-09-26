@@ -164,3 +164,12 @@ def test_none_under_a_severity_is_not_a_finding_nor_what_it_ruled_out():
     assert [(f["severity"], f["text"]) for f in bench.split_findings(answer)] == [
         ("low", "Rename `_flag` to `_is_true`.")
     ]
+
+
+def test_a_high_finding_on_a_clean_change_is_a_false_alarm_even_when_the_point_is_fair():
+    clean = {"clean": True, "bugs": [], "acceptable": [{"id": "debug", "match": ["debug"]}]}
+    findings = [
+        {"severity": "high", "text": "DEBUG now accepts yes"},
+        {"severity": "medium", "text": "DEBUG now accepts yes"},
+    ]
+    assert [f["severity"] for f in bench.score(clean, findings)["false_alarms"]] == ["high"]

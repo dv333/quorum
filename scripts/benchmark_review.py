@@ -20,7 +20,8 @@ Reviewers:
 Findings are the list items under High, Medium and Low headings (or starting with those words). A planted bug counts
 as found when any finding matches it, at any severity. On clean cases, every High or Medium finding that isn't an
 "acceptable" point is a false alarm. On cases with bugs, High and Medium findings that match nothing are listed as
-"unmatched" for a person to judge, since a reviewer can find real problems nobody planted. The report shows the
+"unmatched" for a person to judge, since a reviewer can find real problems nobody planted. A High finding on a clean
+change is always a false alarm: High means a must-fix bug, and there is none. The report shows the
 finding behind every match, so each one can be checked by hand.
 
 Run it where the reviewers can sign in: Claude Code and the Coder need your Claude login, so start Quorum (./start.sh)
@@ -313,7 +314,9 @@ def score(case: Dict[str, Any], findings: List[Dict[str, str]]) -> Dict[str, Any
             found.setdefault(bug, f["text"])
         if hits or f["severity"] in ("low", "summary"):
             continue
-        if not any(matches(a, f["text"]) for a in case.get("acceptable", [])):
+        # a fair point excuses a Medium finding, but on a clean change a High one claims a must-fix bug that isn't there
+        high_on_clean = case.get("clean") and f["severity"] == "high"
+        if high_on_clean or not any(matches(a, f["text"]) for a in case.get("acceptable", [])):
             unmatched.append(f)
     total = len(case["bugs"])
     return {
