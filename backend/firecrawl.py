@@ -1,5 +1,7 @@
 """Firecrawl client for the Researcher: web search with page content, self-hosted or cloud."""
 
+import asyncio
+import time
 import re
 from urllib.parse import urlsplit
 from typing import Any, Dict, List
@@ -105,8 +107,25 @@ def relevant_excerpt(markdown: str, query: str, limit: int = RESEARCH_PAGE_CHARS
     return "\n\n".join(c for _, c in sorted(picked))
 
 
+# Search engines behind self-hosted Firecrawl (DuckDuckGo by default) block bursts of automated queries, so searches
+# go out at most two at a time, spaced apart.
+_SEARCH_SLOTS = asyncio.Semaphore(2)
+_SEARCH_GAP = 1.0  # seconds between search starts
+_last_start = 0.0
+
+
 async def search(query: str, limit: int) -> List[Dict[str, str]]:
     """Search the web and return [{url, title, description, content}] with query-relevant page excerpts."""
+    global _last_start
+    async with _SEARCH_SLOTS:
+        wait = _last_start + _SEARCH_GAP - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _last_start = time.monotonic()
+        return await _search(query, limit)
+
+
+async def _search(query: str, limit: int) -> List[Dict[str, str]]:
     s = settings()
     if s["mode"] == "cloud" and not s["api_key"]:
         raise SearchError("No Firecrawl API key set")
@@ -131,8 +150,14 @@ async def search(query: str, limit: int) -> List[Dict[str, str]]:
     if r.status_code >= 400 or not data.get("success", False):
         raise SearchError(f"Firecrawl error (HTTP {r.status_code}): {data.get('error') or data}")
 
-    body = data.get("data") or {}
-    results = body.get("web", []) if isinstance(body, dict) else body  # v2 shape, or v1's flat list
+    body = data.get("data")
+    if isinstance(body, dict) and "web" not in body:
+        # A "successful" reply with no web section is what Firecrawl sends when its search engine refused the query
+        raise SearchError(
+            "the search engine returned nothing at all; it may be blocking automated searches for a while "
+            "(try again later, or use Firecrawl cloud in Settings)"
+        )
+    results = body.get("web", []) if isinstance(body, dict) else (body or [])  # v2 shape, or v1's flat list
     out = []
     for item in results:
         url = item.get("url") or (item.get("metadata") or {}).get("sourceURL")

@@ -593,7 +593,8 @@ EVIDENCE_RULES = """Rules for factual claims (they override the debate):
 - A PARTLY SUPPORTED claim must carry its caveat.
 - An UNVERIFIED claim may appear only if it is clearly marked as unverified; it can't be a deciding reason.
 - Don't present a comparative advantage (cheaper, faster to implement, better integrated, no middleware) as established unless a SUPPORTED claim says exactly that.
-- If the evidence can't establish a winner, say so: name the finalists and what would decide between them. Agreement among agents is not evidence."""
+- If the evidence can't establish a winner, say so: name the finalists and what would decide between them. Agreement among agents is not evidence.
+- Write for the user in plain words ("Oracle's documentation confirms…", "not confirmed by the sources"). Never mention the ledger, these rules, statuses in capitals or item numbers."""
 
 
 def answer_check_messages(answer: str, claims: List[Dict[str, Any]]) -> List[Dict[str, str]]:

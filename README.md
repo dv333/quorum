@@ -299,6 +299,15 @@ The app's packages are missing or were half-installed (for example, the first ru
 </details>
 
 <details>
+<summary><b>Web search says it "may be blocking automated searches"</b></summary>
+
+Self-hosted Firecrawl searches through DuckDuckGo, which blocks bursts of automated queries for a while. Quorum spaces
+its searches out and, when search is blocked, says so and keeps every claim marked unverified (it never treats a
+blocked search as "no evidence"). Wait a little and ask again, or switch to Firecrawl cloud (your own API key) in
+**Settings → Web search**.
+</details>
+
+<details>
 <summary><b>npm install fails with ENOTFOUND</b></summary>
 
 Your npm is probably set to a company registry (check with `npm config get registry`) that only works on your work

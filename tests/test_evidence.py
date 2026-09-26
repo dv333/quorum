@@ -269,3 +269,55 @@ async def test_a_quote_that_isnt_in_the_source_is_explained():
     _, eng = await run_cpq()
     cost = next(c for c in eng.snapshot()["claims"] if c["claim"] == COST)
     assert cost["status"] == "unknown" and "quote isn't in the source" in cost["caveat"]
+
+
+class FakeResponse:
+    def __init__(self, payload, status=200):
+        self.payload, self.status_code = payload, status
+
+    def json(self):
+        return self.payload
+
+
+@pytest.fixture
+def firecrawl_reply(monkeypatch):
+    import httpx
+
+    def install(payload):
+        async def post(self, url, json=None, headers=None):
+            return FakeResponse(payload)
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", post)
+        monkeypatch.setattr(firecrawl, "_SEARCH_GAP", 0)
+
+    return install
+
+
+async def test_a_blocked_search_engine_is_an_error_not_an_empty_result(firecrawl_reply):
+    firecrawl_reply({"success": True, "data": {}})  # what Firecrawl sends when DuckDuckGo refuses the query
+    with pytest.raises(firecrawl.SearchError, match="blocking automated searches"):
+        await firecrawl.search("oracle cpq", 3)
+    firecrawl_reply({"success": True, "data": {"web": []}})  # a real "nothing found"
+    assert await firecrawl.search("oracle cpq", 3) == []
+
+
+async def test_when_search_is_down_the_ledger_still_binds_the_answer():
+    async def blocked(query, limit):
+        raise firecrawl.SearchError("the search engine returned nothing at all")
+
+    client = cpq_client()
+    eng = make_debate(client, research=True, search=blocked)
+    await eng.post_user_message("Which CPQ?")
+    await eng.task
+    claims = eng.snapshot()["claims"]
+    assert [c["status"] for c in claims] == ["unknown", "unknown"]
+    assert all("Web search failed" in c["caveat"] for c in claims)
+    fact_check = db.query_one("SELECT * FROM messages WHERE research_kind = 'factcheck'")
+    assert fact_check["status"] == "done" and fact_check["content"].startswith("Web search failed")
+    verdict = next(m for _, m, _ in client.calls if "You turn the council's debate" in m[0]["content"])[1]["content"]
+    assert f"[UNVERIFIED] {MIDDLEWARE}" in verdict
+
+
+def test_the_answer_is_written_for_the_user_not_about_the_ledger():
+    rules = prompts.EVIDENCE_RULES
+    assert "Never mention the ledger" in rules and "item numbers" in rules

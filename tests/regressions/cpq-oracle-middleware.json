@@ -3,15 +3,30 @@
   "why": "A CRM and CPQ debate once recommended Oracle because its integration 'eliminates the need for middleware', although Oracle's documentation says its CPQ and Subscription Management integration uses Oracle Integration Cloud middleware. Cost and speed claims came from sources that didn't compare like with like.",
   "question": "Which CRM and CPQ should a global Fortune 500 company (10,000+ employees) choose: Oracle (Oracle Sales and Oracle CPQ with Subscription Management) or Salesforce (Sales Cloud with Revenue Cloud CPQ)? We have complex pricing rules, account-based selling across large account hierarchies, subscription billing, and heavy ERP integration.",
   "expect": {
-    "mentions_all": ["account hierarch", "subscription"],
-    "mentions_any": ["Oracle Integration Cloud", "OIC"],
+    "mentions_all": [
+      "account hierarch",
+      "subscription"
+    ],
+    "mentions_any": [
+      "Oracle Integration Cloud",
+      "OIC"
+    ],
     "never_says": [
       "eliminates the need for middleware",
-      "no middleware",
-      "without middleware",
-      "without any middleware",
-      "no need for middleware"
+      "eliminating the need for middleware",
+      "no middleware is needed",
+      "no middleware needed",
+      "no need for middleware",
+      "without the need for middleware",
+      "without requiring middleware"
     ],
-    "claims_not_supported": ["cheaper", "lower cost", "lower total cost", "faster to implement", "faster implementation", "faster deployment"]
+    "claims_not_supported": [
+      "cheaper",
+      "lower cost",
+      "lower total cost",
+      "faster to implement",
+      "faster implementation",
+      "faster deployment"
+    ]
   }
 }

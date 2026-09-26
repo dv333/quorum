@@ -1440,14 +1440,17 @@ class DebateEngine:
                 searches=len(queries),
                 pages=pages,
             )
-            if all(isinstance(r, Exception) for r in found):
-                raise found[0]
+            outage = next((r for r in found if isinstance(r, Exception)), None)
+            if outage and all(isinstance(r, Exception) for r in found):
+                self._log(msg_id, f"Web search failed: {outage}")
             think = await self._thinking_flag(ep_id, model, False)
             ledger: List[Dict[str, Any]] = []
             for it, result in zip(items, found):
                 sources = [] if isinstance(result, Exception) else _interleave([result], RESEARCH_SOURCES_PER_CLAIM + 1)
                 entry = {"claim": it["claim"], "status": "unknown", "quote": "", "caveat": "", "source": None}
-                if not sources:
+                if isinstance(result, Exception):
+                    entry["caveat"] = f"Web search failed ({result}), so this couldn't be checked."
+                elif not sources:
                     entry["caveat"] = "No sources found."
                 else:
                     try:
@@ -1505,9 +1508,14 @@ class DebateEngine:
             for e in stored:
                 if e["source_url"] and all(s["url"] != e["source_url"] for s in sources_out):
                     sources_out.append({"url": e["source_url"], "title": e["source_title"] or e["source_url"]})
+            note = (
+                f"Web search failed, so these claims stay unverified: {outage}\n\n"
+                if outage and all(isinstance(r, Exception) for r in found)
+                else ""
+            )
             self._finish_message(
                 msg_id,
-                content=_ledger_markdown(stored, sources_out),
+                content=note + _ledger_markdown(stored, sources_out),
                 sources_json=json.dumps(sources_out),
                 status="done",
             )
