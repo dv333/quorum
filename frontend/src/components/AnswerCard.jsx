@@ -274,6 +274,37 @@ function Cite({ n, claim }) {
   )
 }
 
+// The "Key studies" section ("1. **Name** (2024) · design. Finding. [Source](url)") as cards; null when it doesn't parse
+export function parseStudies(content) {
+  const items = content.split(/\n(?=\d+\.\s)/).map((s) => s.trim()).filter(Boolean)
+  const studies = items.map((line) => {
+    const m = line.match(/^\d+\.\s+\*\*(.+?)\*\*\s*(?:\((\d{4})\))?\s*(?:·\s*([^.]*(?:\.\d[^.]*)*)\.)?\s*([\s\S]*?)\s*(?:\[Source\]\((\S+?)\))?\s*$/)
+    return m && { name: m[1], year: m[2] || '', design: (m[3] || '').trim(), finding: m[4].replace(/^\.\s*/, '').trim(), url: m[5] || '' }
+  })
+  return studies.length && studies.every(Boolean) ? studies : null
+}
+
+function KeyStudies({ studies }) {
+  return (
+    <div className="studies">
+      <h3>Key studies</h3>
+      <ol>
+        {studies.map((s, i) => (
+          <li key={`${i}-${s.name}`} className="study">
+            <div className="study-head">
+              <b>{s.name}</b>
+              {s.year && <span className="study-year">{s.year}</span>}
+            </div>
+            {s.design && <div className="study-design">{s.design}</div>}
+            <div className="study-finding">{s.finding}</div>
+            {s.url && <a className="study-src" href={s.url} target="_blank" rel="noreferrer noopener">{hostOf(s.url)} ↗</a>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function EvidenceSummary({ claims, evidence }) {
   if (!claims.length) return null
   const n = (s) => claims.filter((c) => c.status === s).length
@@ -421,7 +452,9 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
           )}
           {a.sections.map((sec, i) => (
             <div key={`${i}-${sec.title}`}>
-              <div className="a-body"><Markdown>{citeLinks(sec.title ? `### ${sec.title}\n\n${sec.content}` : sec.content)}</Markdown></div>
+              {/^key studies$/i.test(sec.title || '') && parseStudies(sec.content)
+                ? <div className="a-body"><KeyStudies studies={parseStudies(sec.content)} /></div>
+                : <div className="a-body"><Markdown>{citeLinks(sec.title ? `### ${sec.title}\n\n${sec.content}` : sec.content)}</Markdown></div>}
               {/* The diagram sits right after the first section (the key points) */}
               {i === 0 && diagram}
             </div>
