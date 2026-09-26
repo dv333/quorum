@@ -76,6 +76,7 @@ RESEARCH_MAX_SOURCES = 5  # pages it reads before writing a brief
 RESEARCH_PAGE_CHARS = 3500  # characters kept from each page (longer excerpts keep caveats and context)
 RESEARCH_MAX_CLAIMS = 6  # material claims checked before the answer is written
 RESEARCH_SOURCES_PER_CLAIM = 3
+CODER_REQUESTS_PER_ROUND = 2  # questions for the Coder (Claude Code or Codex) per round; each costs cloud tokens
 RESEARCH_REQUESTS_PER_ROUND = _env_int("LLC_RESEARCH_PER_ROUND", 3)  # agent requests honored per round
 
 # Cloud providers with OpenAI-compatible chat endpoints (base URLs used as given)

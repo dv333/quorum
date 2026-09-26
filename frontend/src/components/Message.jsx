@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 // Models write "~$12k" for approximations; only ~~double~~ tildes should strike through
 const GFM = [[remarkGfm, { singleTilde: false }]]
 import { createContext, useContext, useState } from 'react'
-import { RESEARCHER, agentFor, formatTime, linkMentions, modelShort } from '../agents'
+import { CODER, RESEARCHER, agentFor, formatTime, linkMentions, modelShort } from '../agents'
 
 // Inside an answer, [n] citations render through this (see citeLinks); elsewhere they stay plain text
 export const CiteContext = createContext(null)
@@ -197,6 +197,34 @@ export function BeagleCard({ msg, model }) {
           : null}
         <SourceChips sources={msg.sources} />
         <Thinking text={msg.thinking} label="Search log" />
+      </div>
+    </div>
+  )
+}
+
+// The Coder: Claude Code or Codex reading the repository read-only, with its file:line citations checked
+export function CoderCard({ msg }) {
+  const streaming = msg.status === 'streaming'
+  const lastLog = msg.thinking?.trim().split('\n').pop()
+  const meta = msg.meta || {}
+  const refs = meta.refs || { found: [], missing: [] }
+  const info = [msg.research_kind === 'codebrief' ? 'code brief' : 'answer', `${meta.label || 'coding agent'} · read-only`]
+  if (msg.status === 'stopped') info.push('stopped')
+  return (
+    <div className="msg">
+      <Orb handle={CODER} speaking={streaming} />
+      <div className="bubble coder">
+        <div className="who">{CODER}<span>{info.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
+        {msg.requested_by && <div className="asked">Asked by {msg.requested_by}: “{msg.research_request}”</div>}
+        {msg.status === 'error' ? <span className="error">{msg.content}</span>
+          : msg.content ? <Markdown>{msg.content}</Markdown>
+          : streaming ? <div className="status-line"><Typing /> {lastLog || 'Reading the code…'}</div>
+          : null}
+        {(refs.found.length > 0 || refs.missing.length > 0) && (
+          <div className="refs-check" title={[...refs.found, ...refs.missing.map((r) => `${r} (not found)`)].join('\n')}>
+            {refs.found.length} of {refs.found.length + refs.missing.length} citations checked against the files
+          </div>
+        )}
       </div>
     </div>
   )

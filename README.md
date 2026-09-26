@@ -289,6 +289,19 @@ it live; `mode: "quick"` (one round, three models) usually answers within one ca
 machine and never modified. Keep the app running (`./start.sh`); design notes are in
 [docs/design/mcp-server.md](docs/design/mcp-server.md).
 
+
+### Code debates: the Coder and specialist reviewers
+
+Attach a repository (`quorum ask "…" --repo .`, or any MCP tool: reviews attach theirs automatically) and the
+**Coder** joins the council: Claude Code (or Codex) reading the repository **read-only**. It posts a code brief
+before round 1, and agents ask it questions mid-debate with `@Coder: where is the session validated?`. It only gets
+read and search tools, an answer is discarded if the repository changes during the call, and every `path:line` it
+cites is checked against the files. It uses your Claude Code or Codex account (sign in once in a terminal); at most
+two questions per round. Choose with `QUORUM_CODER=claude|codex|off`.
+
+Code debates also get **specialist reviewers** for what the change touches: a Security expert, a Performance &
+reliability (PSR) expert and a Test engineer always; a Database, Network, Concurrency or API & compatibility expert
+when the question or diff involves them; plus the Skeptic.
 ## Configuration
 
 Everything works out of the box. To change defaults, copy `.env.example` to `.env`:

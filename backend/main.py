@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import db, diagnostics, export, firecrawl, inventory, monitor, packs, setup
+from . import coder, db, diagnostics, export, firecrawl, inventory, monitor, packs, setup
 from .config import (
     APP_NAME,
     DEFAULT_AUTOPILOT,
@@ -81,6 +81,7 @@ class CreateDebate(BaseModel):
     research_enabled: Optional[bool] = None  # None: on when Firecrawl is available
     researcher: Optional[ModelRef] = None  # None: picked with the chair
     pack: Optional[str] = None  # topic pack id (see /api/packs)
+    repo_path: Optional[str] = None  # a local repository the Coder (Claude Code or Codex) can read
 
 
 class UpdateDebate(BaseModel):
@@ -449,6 +450,9 @@ async def create_debate(body: CreateDebate):
             researcher = ModelRef(endpoint_id=auto["researcher"]["endpoint_id"], model=auto["researcher"]["model"])
         if not seats:
             raise HTTPException(400, "No models found. Install one with Ollama (for example: ollama pull qwen3:8b).")
+    repo = coder.valid_repo(body.repo_path) if body.repo_path else None
+    if body.repo_path and not repo:
+        raise HTTPException(400, f"Not a folder: {body.repo_path}")
     if not MIN_SEATS <= len(seats) <= MAX_SEATS:
         raise HTTPException(400, f"Pick between {MIN_SEATS} and {MAX_SEATS} council members")
     refs = [*seats] + [r for r in (body.chair, researcher) if r]
@@ -485,6 +489,8 @@ async def create_debate(body: CreateDebate):
             json.dumps(pack) if pack else None,
         ],
     )
+    if body.repo_path:
+        db.update("debates", debate_id, repo_path=repo)
     for i, seat in enumerate(seats):
         db.execute(
             "INSERT INTO seats (debate_id, handle, endpoint_id, model, color, thinking_enabled, position) "

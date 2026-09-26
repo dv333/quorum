@@ -140,10 +140,18 @@ def challenge_question(claim: str, files: str) -> str:
 # ------------------------------------------------------------------ talking to the running app
 
 
-def start(question: str, mode: str = "standard", research: Optional[bool] = None, pack: Optional[str] = None) -> str:
-    """Start a conundrum and return its id."""
+def start(
+    question: str,
+    mode: str = "standard",
+    research: Optional[bool] = None,
+    pack: Optional[str] = None,
+    repo_path: Optional[str] = None,
+) -> str:
+    """Start a conundrum and return its id. With a repository, the council can ask the Coder about the code."""
     settings = MODES.get(mode, MODES["standard"])
     body: Dict[str, Any] = {"question": question}
+    if repo_path:
+        body["repo_path"] = str(Path(repo_path).expanduser().resolve())
     if pack:
         body["pack"] = pack
     if research is not None:
@@ -229,9 +237,10 @@ def ask(
     mode: str = "standard",
     research: bool = True,
     wait_seconds: int = 45,
+    repo_path: str = "",
 ) -> str:
     context = read_files(files or [], root)
-    debate_id = start(f"{question.strip()}\n\n{context}".strip(), mode, research)
+    debate_id = start(f"{question.strip()}\n\n{context}".strip(), mode, research, repo_path=repo_path or None)
     snap, done = wait(debate_id, wait_seconds)
     return respond(debate_id, snap, done)
 
@@ -250,7 +259,9 @@ def review(
     context = read_files(files or [], repo_path)
     if not diff and not context:
         return "Nothing to review: no uncommitted changes and no files given."
-    debate_id = start(review_question(diff, context, focus, task), mode, research, pack="code-review")
+    debate_id = start(
+        review_question(diff, context, focus, task), mode, research, pack="code-review", repo_path=repo_path
+    )
     snap, done = wait(debate_id, wait_seconds)
     return respond(debate_id, snap, done)
 
@@ -304,12 +315,15 @@ def build_server():
         mode: str = "standard",
         research: bool = True,
         wait_seconds: int = 45,
+        repo_path: str = "",
     ) -> str:
         """Ask Quorum's council of local models for a second opinion on a decision or question. files: paths to
-        include as context (read locally, size-capped). mode: quick (one round, three models, usually answers within
-        one call), standard or deep. research: let the council search the web and check its claims. Returns the
-        answer, or the conundrum id and a link if it isn't done within wait_seconds (then call quorum_result)."""
-        return await asyncio.to_thread(ask, question, files, os.getcwd(), mode, research, wait_seconds)
+        include as context (read locally, size-capped). repo_path: a repository the council's Coder (Claude Code or
+        Codex, read-only) can read to answer questions about the code. mode: quick (one round, three models, usually
+        answers within one call), standard or deep. research: let the council search the web and check its claims.
+        Returns the answer, or the conundrum id and a link if it isn't done within wait_seconds (then call
+        quorum_result)."""
+        return await asyncio.to_thread(ask, question, files, os.getcwd(), mode, research, wait_seconds, repo_path)
 
     @server.tool()
     async def quorum_review(
@@ -322,7 +336,9 @@ def build_server():
         wait_seconds: int = 45,
     ) -> str:
         """Have Quorum's council review a code change and list findings by severity (High, Medium, Low) with file and
-        line. By default reviews everything not yet committed in repo_path (git diff HEAD, plus new files' names);
+        line. The council gets specialists for what the change touches (security, performance, tests; database,
+        network, concurrency and API when relevant), and its Coder can read repo_path to check the surrounding code.
+        By default reviews everything not yet committed in repo_path (git diff HEAD, plus new files' names);
         base can be another ref ("main"), or "" to review only the given files. focus: all, security, tests or
         design. task: what the change was meant to do. Returns the review, or the id and a link to get it later."""
         return await asyncio.to_thread(review, repo_path, base, files, focus, task, mode, False, wait_seconds)
