@@ -615,7 +615,7 @@ def shortlist_messages(question: str, pages: List[Dict[str, Any]], max_options: 
 Pages:
 {blocks}
 
-List up to {max_options} specific options these pages name that could answer the question and fit its constraints (price limits, dates, sizes). Use the name as the page writes it, short (like "Tesla Model Y" or "ECS on Fargate"), and give one page number where it appears. Include every serious contender the pages mention, not only the one they favor; leave out options that break the question's constraints.
+List up to {max_options} specific options these pages name that could answer the question and fit its constraints (price limits, dates, sizes). Use the name as the page writes it, short (like "Tesla Model Y" or "ECS on Fargate"), and give one page number where it appears. Include every serious contender the pages mention, not only the one they favor. Each option must be the kind of thing the question asks to choose (for a car question, cars, not charging networks or brands), available where the user is (a US question means sold in the US), and within the question's constraints; leave out the rest.
 
 Then, under "also_consider", name up to 2 well-known options that people commonly weigh for this question and that may fit its constraints but that these pages don't mention; they'll be checked with a search before anyone relies on them.
 
