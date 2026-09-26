@@ -701,6 +701,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 /* Live status in the composer row */
 .live-status { display: inline-flex; align-items: center; gap: 7px; margin-right: auto; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .live-status .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); animation: pulse 1.6s ease-in-out infinite; }
+.live-status .elapsed { margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: var(--fill); color: var(--text-3); font-size: 11.5px; }
 
 /* Living answer: the chair's draft, pinned in the stage while the council debates */
 .living { max-width: 1360px; margin: 0 auto; padding: 0 32px 10px; }
