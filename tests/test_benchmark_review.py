@@ -126,3 +126,30 @@ def test_table_rows_are_findings():
     findings = bench.split_findings(TABLE)
     assert [f["severity"] for f in findings] == ["high", "high"]
     assert findings[0]["text"].startswith("`orders/db.py` · 13-18 · `WHERE customer_id")
+
+
+def test_bold_titles_with_text_on_the_same_line_are_findings():
+    answer = (
+        "## High: must fix before merge\n\n"
+        "**1. Live secret committed**: `orders/payments.py:8`\n**Fix:** Rotate it.\n\n"
+        "**2. Retries can double-charge**: `orders/payments.py:12-21`\n- no idempotency key\n- fixed 0.1s sleep\n"
+    )
+    findings = bench.split_findings(answer)
+    assert [f["severity"] for f in findings] == ["high", "high"]
+    assert "payments.py:8" in findings[0]["text"] and "Rotate it" in findings[0]["text"]
+    assert "idempotency" in findings[1]["text"] and "0.1s" in findings[1]["text"]
+
+
+def test_code_comments_are_not_headings_and_long_severity_headings_are_sections():
+    answer = (
+        "### 🔴 High Severity (Bugs, Security, or Data-Loss Risks)\n\n"
+        "1. **SQL injection**\n   - **Fix:**\n     ```python\n     # get_customer_orders\n     x = 1\n     ```\n\n"
+        "2. **Hardcoded key**\n   - over plain http\n\n"
+        "### 🟡 Medium Severity (Should Be Fixed)\n\n1. **N+1 queries**\n"
+    )
+    findings = bench.split_findings(answer)
+    assert [(f["severity"], f["text"][:20]) for f in findings] == [
+        ("high", "**SQL injection** **"),
+        ("high", "**Hardcoded key** ov"),
+        ("medium", "**N+1 queries**"),
+    ]

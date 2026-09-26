@@ -185,6 +185,8 @@ def run_quorum(case: Dict[str, Any], repo: Path, mode: str) -> Dict[str, Any]:
 # ------------------------------------------------------------------ findings and scoring
 
 _ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*)")
+_BOLD_LEAD = re.compile(r"^\s*\*\*(.{1,160}?)\*\*[:.]?\s*(\S.*)$")  # "**Title**: rest of the line"
+_LABEL = re.compile(r"\s*(fix(es)?|suggested fix|why|impact|example|note|evidence|risk|details?|how)\b", re.I)
 _ROW = re.compile(r"^\s*\|(.*)\|\s*$")
 _HEADING = re.compile(r"^\s*(?:#{1,6}\s+(.*)|\*\*(.{1,160}?)\*\*:?\s*|([A-Z][\w &/()-]{0,60}):\s*)$")
 SEVERITY = [
@@ -213,7 +215,16 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
     section: Optional[str] = None  # severity of the current section; "skip", "summary", or None if unknown
     current: Optional[Dict[str, Any]] = None
     header: Optional[List[str]] = None  # the current table's header row
+    in_code = False
     for line in answer.splitlines():
+        if line.strip().startswith("```"):
+            in_code = not in_code
+        if in_code or line.strip().startswith(
+            "```"
+        ):  # code belongs to the finding it's in; a "# comment" isn't a heading
+            if current is not None:
+                current["text"] += " " + line.strip()
+            continue
         if not line.strip():
             header = None
             if current is not None and not current["titled"]:
@@ -221,11 +232,22 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
             continue
         heading = _HEADING.match(line)
         item = _ITEM.match(line)
+        lead = None if heading or item else _BOLD_LEAD.match(line)
+        if lead and current is not None and _LABEL.match(lead.group(1)):  # "**Fix:** ..." belongs to the finding
+            current["text"] += " " + line.strip()
+            continue
+        if lead:  # a finding titled in bold, with its file or detail on the same line
+            title = re.sub(r"[*_`]", "", f"{lead.group(1)}: {lead.group(2)}").strip()
+            sev = section if section in ("high", "medium", "low") else severity_of(lead.group(1)) or section
+            current = {"severity": sev, "text": title, "titled": True}
+            items.append(current)
+            continue
         if heading and not item:
             title = re.sub(r"[*_`]", "", next(g for g in heading.groups() if g is not None)).strip()
             sev = severity_of(title)
             numbered = re.match(r"\d+[.)]\s", title)
-            if not numbered and len(title) <= 45 and (sev or NOT_FINDINGS.search(title) or SUMMARY.search(title)):
+            short = len(title) <= 45 or line.lstrip().startswith("#")  # a markdown heading can be a long section name
+            if not numbered and short and (sev or NOT_FINDINGS.search(title) or SUMMARY.search(title)):
                 section = sev or ("skip" if NOT_FINDINGS.search(title) else "summary")
                 current = None
             elif section in ("high", "medium", "low") or numbered or sev:
