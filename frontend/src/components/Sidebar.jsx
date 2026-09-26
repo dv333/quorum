@@ -122,7 +122,7 @@ export default function Sidebar({ debates, currentId, view, series, attention, o
                     </svg>
                   </button>
                   <button className="icon-btn x" aria-label="Delete"
-                    onClick={(e) => { e.stopPropagation(); if (confirm('Delete this conundrum and its debate?')) onDelete(d.id) }}>✕</button>
+                    onClick={(e) => { e.stopPropagation(); onDelete(d.id) }}>✕</button>
                 </div>
               )
             })}
