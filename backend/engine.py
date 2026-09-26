@@ -207,7 +207,9 @@ def _related_pages(
 _NUM = re.compile(r"\d+(?:\.\d+)?")
 STUDY_PAGE_CHARS = 4500  # characters of each page the key-studies step reads
 # Models describe what's missing instead of leaving it out
-_MISSING = re.compile(r"not (?:stated|specified|provided|given|reported)|unspecified|snippet|excerpt|provided text", re.I)
+_MISSING = re.compile(
+    r"not (?:stated|specified|provided|given|reported)|unspecified|snippet|excerpt|provided text", re.I
+)
 
 
 def _numbers_in(text: str, source: str) -> bool:
@@ -314,7 +316,7 @@ def specific_covered(spec: str, text: str) -> bool:
     num = re.search(r"\d+(?:\.\d+)?", s).group(0)
     if s.endswith("k") and s.startswith("$"):
         return f"${num}000" in low or f"{num}k" in low
-    unit = s[s.index(num) + len(num):]
+    unit = s[s.index(num) + len(num) :]
     return bool(re.search(rf"(?<![\d.]){re.escape(num)}(?:\.0)?{re.escape(unit)}", low))
 
 
@@ -516,7 +518,7 @@ def shorten_bottom_line(text: str, limit_words: int = 55) -> str:
     if len(short.split()) > limit_words:
         short = " ".join(sentences[:1]).strip()
     prefix = m.group(0)[: m.start(1) - m.start(0)]
-    return text[: m.start(0)] + prefix + f"**{short}**" + text[m.end(0):]
+    return text[: m.start(0)] + prefix + f"**{short}**" + text[m.end(0) :]
 
 
 _FIGURE = re.compile(
@@ -573,7 +575,10 @@ def check_arithmetic(text: str) -> List[Dict[str, str]]:
             continue
         if stated and abs(value - stated) / abs(stated) > 0.15:
             problems.append(
-                {"text": m.group(0).strip(), "issue": f"the arithmetic is wrong: it comes to about {value:.3g}, not {m.group(2)}"}
+                {
+                    "text": m.group(0).strip(),
+                    "issue": f"the arithmetic is wrong: it comes to about {value:.3g}, not {m.group(2)}",
+                }
             )
     return problems
 
@@ -1551,7 +1556,8 @@ class DebateEngine:
                 if options:
                     content += "\n\nOptions the sources name: " + ", ".join(options) + "."
             stored_sources = [
-                {"url": s["url"], "title": s["title"], "evidence": s["evidence"], "primary": s["primary"]} for s in sources
+                {"url": s["url"], "title": s["title"], "evidence": s["evidence"], "primary": s["primary"]}
+                for s in sources
             ]
             self._finish_message(
                 msg_id,
@@ -1964,7 +1970,9 @@ class DebateEngine:
             self.partials.pop(msg_id, None)
         return []
 
-    async def _make_shortlist(self, topic: int, question: str, ep_id: int, model: str, think: Optional[bool]) -> List[str]:
+    async def _make_shortlist(
+        self, topic: int, question: str, ep_id: int, model: str, think: Optional[bool]
+    ) -> List[str]:
         pages = self._research_pages.get(topic, [])[:8]
         if not pages:
             return []
@@ -2062,7 +2070,9 @@ class DebateEngine:
     def _source_text(self, topic: int, claims: List[Dict[str, Any]], question: str) -> str:
         """Everything the answer's figures can come from: the pages the research read, its briefs, the checked
         claims and their quotes, and the question."""
-        pages = " ".join(f"{p.get('title', '')} {p.get('raw') or p.get('content', '')}" for p in self._research_pages.get(topic, []))
+        pages = " ".join(
+            f"{p.get('title', '')} {p.get('raw') or p.get('content', '')}" for p in self._research_pages.get(topic, [])
+        )
         ledger = " ".join(f"{c.get('claim', '')} {c.get('quote', '')} {c.get('caveat', '')}" for c in claims)
         return " ".join([pages, self._research_digest(topic, limit_words=6000), ledger, question])
 
@@ -2108,41 +2118,48 @@ class DebateEngine:
             return
         # Checked in code: every criterion the question lists is covered, and written-out arithmetic adds up
         question = self._question(row["topic"])
-        checked = [
-            {
-                "text": "",
-                "issue": f"The question asks about {r.lower()}, but the answer doesn't address it; add what the research "
-                "shows about it (with numbers where there are any).",
-            }
-            for r in stated_requirements(question)
-            if not requirement_covered(r, row["content"])
-        ] + [
-            {
-                "text": "",
-                "issue": f"The question is specifically about {s}, but the answer doesn't address that; answer for what "
-                "the question states (other options only as an aside).",
-            }
-            for s in question_specifics(question)
-            if not specific_covered(s, row["content"])
-        ] + [
-            {
-                "text": "",
-                "issue": f"The question names {o} as an option, but the answer doesn't address it; say where it fits "
-                "(or why not) in the key points or details, using the research.",
-            }
-            for o in named_options(question)
-            if not option_mentioned(o, row["content"])
-        ] + check_bottom_line(row["content"]) + check_arithmetic(row["content"]) + check_legal_names(
-            row["content"], self._research_pages.get(row["topic"], [])
-        ) + check_unsourced_figures(row["content"], self._source_text(row["topic"], claims, question)) + [
-            {
-                "text": "",
-                "issue": f"The research found {o} as an option, but the answer doesn't mention it; add it to the comparison "
-                "in the key points or details (not the bottom line), on what the question asks, using the research.",
-            }
-            for o in self._shortlist.get(row["topic"], [])
-            if not option_mentioned(o, row["content"])
-        ]
+        checked = (
+            [
+                {
+                    "text": "",
+                    "issue": f"The question asks about {r.lower()}, but the answer doesn't address it; add what the research "
+                    "shows about it (with numbers where there are any).",
+                }
+                for r in stated_requirements(question)
+                if not requirement_covered(r, row["content"])
+            ]
+            + [
+                {
+                    "text": "",
+                    "issue": f"The question is specifically about {s}, but the answer doesn't address that; answer for what "
+                    "the question states (other options only as an aside).",
+                }
+                for s in question_specifics(question)
+                if not specific_covered(s, row["content"])
+            ]
+            + [
+                {
+                    "text": "",
+                    "issue": f"The question names {o} as an option, but the answer doesn't address it; say where it fits "
+                    "(or why not) in the key points or details, using the research.",
+                }
+                for o in named_options(question)
+                if not option_mentioned(o, row["content"])
+            ]
+            + check_bottom_line(row["content"])
+            + check_arithmetic(row["content"])
+            + check_legal_names(row["content"], self._research_pages.get(row["topic"], []))
+            + check_unsourced_figures(row["content"], self._source_text(row["topic"], claims, question))
+            + [
+                {
+                    "text": "",
+                    "issue": f"The research found {o} as an option, but the answer doesn't mention it; add it to the comparison "
+                    "in the key points or details (not the bottom line), on what the question asks, using the research.",
+                }
+                for o in self._shortlist.get(row["topic"], [])
+                if not option_mentioned(o, row["content"])
+            ]
+        )
         problems = (
             checked
             + [
@@ -2168,7 +2185,9 @@ class DebateEngine:
                     )
                 ).strip()
                 # Models sometimes echo the problem list after the answer
-                revised = re.split(r"\n[ \t*_#]*(?:an |the )?audit (?:found|flagged|identified)\b", revised, flags=re.I)[0].strip()
+                revised = re.split(
+                    r"\n[ \t*_#]*(?:an |the )?audit (?:found|flagged|identified)\b", revised, flags=re.I
+                )[0].strip()
                 # A revision has to keep the answer whole: its bottom line and its sections
                 sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
                 if (

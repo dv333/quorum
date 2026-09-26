@@ -575,7 +575,12 @@ def test_key_studies_drop_notes_about_missing_details():
         "evidence": 3,
     }
     quote = "Alternate day fasting showed a small reduction in weight compared with continuous energy restriction."
-    vague = {"name": "Review", "finding": "The provided text excerpts don't give a result.", "quote": quote, "source": 1}
+    vague = {
+        "name": "Review",
+        "finding": "The provided text excerpts don't give a result.",
+        "quote": quote,
+        "source": 1,
+    }
     study = {
         "name": "BMJ network meta-analysis",
         "participants": "Adults with obesity (specific count not stated)",
@@ -673,18 +678,33 @@ def test_running_out_of_search_credits_stops_retrying():
 async def test_shortlist_checks_well_known_options_the_pages_missed():
     eng = make_debate(cpq_client(), research=True, search=search)
     eng._research_pages[1] = [
-        {"url": "https://ranked.example/evs", "title": "Best EVs under $45k", "content": "The Hyundai Ioniq 5 leads.",
-         "evidence": 0, "primary": False}
+        {
+            "url": "https://ranked.example/evs",
+            "title": "Best EVs under $45k",
+            "content": "The Hyundai Ioniq 5 leads.",
+            "evidence": 0,
+            "primary": False,
+        }
     ]
 
     async def complete(*args, **kw):
-        return json.dumps({"options": [{"name": "Hyundai Ioniq 5", "source": 1}],
-                           "also_consider": ["Tesla Model Y", "Imaginary Car X"]})
+        return json.dumps(
+            {
+                "options": [{"name": "Hyundai Ioniq 5", "source": 1}],
+                "also_consider": ["Tesla Model Y", "Imaginary Car X"],
+            }
+        )
 
     async def lookup(query, limit, focus=""):
         if "Model Y" in query:
-            return [{"url": "https://cars.example/model-y", "title": "2026 Tesla Model Y Standard",
-                     "description": "", "content": "The Model Y Standard starts at $41,630 with 321 miles of range."}]
+            return [
+                {
+                    "url": "https://cars.example/model-y",
+                    "title": "2026 Tesla Model Y Standard",
+                    "description": "",
+                    "content": "The Model Y Standard starts at $41,630 with 321 miles of range.",
+                }
+            ]
         return []
 
     eng._complete = complete
@@ -702,14 +722,23 @@ def test_laws_need_an_official_source_and_blogs_are_not_reviews():
     ]
     flagged = check_legal_names("The Clean Cooking Act of 2026 bans sales; the Inflation Reduction Act pays.", pages)
     assert [p["text"] for p in flagged] == ["The Clean Cooking Act of 2026"]
-    assert firecrawl.evidence_level("Induction vs gas cooktops", "A meta-analysis found…", "https://blog.example/x") == 0
-    assert firecrawl.evidence_level("Gas stoves and asthma", "A meta-analysis of 41 studies", "https://x.stanford.edu/a") == 3
+    assert (
+        firecrawl.evidence_level("Induction vs gas cooktops", "A meta-analysis found…", "https://blog.example/x") == 0
+    )
+    assert (
+        firecrawl.evidence_level("Gas stoves and asthma", "A meta-analysis of 41 studies", "https://x.stanford.edu/a")
+        == 3
+    )
 
 
 def test_a_bottom_line_still_too_long_after_revision_keeps_two_sentences():
     from backend.engine import shorten_bottom_line
 
-    long = "BOTTOM LINE: **Pick A if X. Pick B if Y. " + "Others fall short for many reasons here. " * 8 + "**\n\n## Key points"
+    long = (
+        "BOTTOM LINE: **Pick A if X. Pick B if Y. "
+        + "Others fall short for many reasons here. " * 8
+        + "**\n\n## Key points"
+    )
     assert shorten_bottom_line(long).startswith("BOTTOM LINE: **Pick A if X. Pick B if Y.**\n\n## Key points")
     short = "BOTTOM LINE: **Pick A.**\n\n## Key points"
     assert shorten_bottom_line(short) == short

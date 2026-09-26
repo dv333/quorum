@@ -594,7 +594,9 @@ async def test_largest_member_picks_chair_researcher_and_title():
     assert d["chair_reason"] == "clear, careful writer" and d["title"] == "Test title"
     pick_call = [c for c in client.calls if c[1][0]["content"].startswith("You organize")][0]
     assert pick_call[0] == "model-1" and "Otter: model-0" in pick_call[1][1]["content"]
-    answer_call = [c for c in client.calls if c[1][0]["content"].startswith("You are the chair of an AI council. You turn")]
+    answer_call = [
+        c for c in client.calls if c[1][0]["content"].startswith("You are the chair of an AI council. You turn")
+    ]
     assert answer_call[-1][0] == "model-1"  # the chair writes the final answer
     audit_call = [c for c in client.calls if c[1][0]["content"].startswith("You audit")]
     assert audit_call and audit_call[-1][0] != "model-1"  # and a different model checks it
