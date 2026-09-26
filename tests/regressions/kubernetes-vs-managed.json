@@ -1,0 +1,15 @@
+{
+  "name": "Architecture: Kubernetes vs a managed container service for 5 engineers, 12 services",
+  "why": "The answer has to weigh Kubernetes' operational load (upgrades, add-ons, people time) against managed services, give real costs (EKS/GKE $0.10 per cluster-hour, extended support), say when Kubernetes would be worth it, and match the service to the team's cloud.",
+  "question": "Kubernetes or a managed container service (ECS, Cloud Run, Fly.io) for a 5-engineer team running 12 services?",
+  "expect": {
+    "mentions_groups": [
+      ["Fargate", "ECS"],
+      ["Cloud Run"],
+      ["upgrade"],
+      ["$0.10", "control plane", "control-plane"],
+      ["Autopilot", "Auto Mode"]
+    ],
+    "never_says": ["[UNVERIFIED]", "ledger"]
+  }
+}
