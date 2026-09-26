@@ -14,7 +14,9 @@ import asyncio
 import os
 import shutil
 import subprocess
+import sys
 import time
+import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -139,6 +141,53 @@ def challenge_question(claim: str, files: str) -> str:
 
 # ------------------------------------------------------------------ talking to the running app
 
+BACKEND_START_S = 45
+LOG_PATH = Path(__file__).resolve().parent.parent / "data" / "mcp-backend.log"
+
+
+def backend_up() -> bool:
+    try:
+        return cli.get("/health").get("status") == "ok"
+    except Exception:
+        return False
+
+
+def ensure_backend() -> Optional[str]:
+    """Make sure the Quorum backend is running, starting it in the background when it's a local default install that
+    isn't up yet. Returns a note for the user when it had to start it (the app itself isn't started)."""
+    if backend_up():
+        return None
+    local = cli.API_URL.startswith(("http://127.0.0.1", "http://localhost"))
+    if not local or os.getenv("QUORUM_MCP_AUTOSTART", "1") == "0":
+        raise cli.QuorumError(f"Quorum isn't running at {cli.API_URL}. Start it with ./start.sh.")
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOG_PATH, "ab") as log:
+        subprocess.Popen(
+            [sys.executable, "-m", "backend.main"],
+            cwd=str(REPO),
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,  # keeps running for other clients after this MCP session ends
+        )
+    deadline = time.monotonic() + BACKEND_START_S
+    while time.monotonic() < deadline:
+        if backend_up():
+            return (
+                "(Quorum wasn't running, so its engine was started in the background. Run ./start.sh to open the "
+                "app and watch debates live.)"
+            )
+        time.sleep(1)
+    raise cli.QuorumError(f"Quorum's engine didn't start within {BACKEND_START_S} seconds; see {LOG_PATH}")
+
+
+def app_up() -> bool:
+    try:
+        with urllib.request.urlopen(cli.APP_URL, timeout=2):
+            return True
+    except Exception:
+        return False
+
 
 def start(
     question: str,
@@ -219,10 +268,11 @@ def status_line(snap: Dict[str, Any]) -> str:
 def respond(debate_id: str, snap: Dict[str, Any], done: bool, level: str = "standard") -> str:
     """The answer when it's ready; otherwise where the debate is and how to get the answer."""
     link = f"{cli.APP_URL}/#q/{debate_id}"
+    watch = f"Watch it live: {link}" if app_up() else "Run ./start.sh to open the app and watch it live"
     if done:
         return f"{cli._result(debate_id, level, False, False).strip()}\n\nConundrum {debate_id} · {link}"
     return (
-        f"Quorum is still on it ({status_line(snap)}). Conundrum id: {debate_id}. Watch it live: {link}\n"
+        f"Quorum is still on it ({status_line(snap)}). Conundrum id: {debate_id}. {watch}.\n"
         f'Call quorum_result with conundrum_id="{debate_id}" (and wait_seconds) to get the answer when it\'s ready.'
     )
 
@@ -302,6 +352,16 @@ def recent(limit: int = 10) -> str:
     return "\n".join(lines)
 
 
+def with_backend(fn, *args):
+    """Run a tool after making sure the engine is up; errors come back as text the coding agent can act on."""
+    try:
+        note = ensure_backend()
+        out = fn(*args)
+    except cli.QuorumError as e:
+        return f"Quorum couldn't do that: {e}"
+    return f"{note}\n\n{out}" if note else out
+
+
 def build_server():
     """The MCP server with Quorum's tools (imported lazily so the rest of Quorum doesn't need the MCP SDK)."""
     from mcp.server.mcpserver import MCPServer
@@ -323,7 +383,9 @@ def build_server():
         answers within one call), standard or deep. research: let the council search the web and check its claims.
         Returns the answer, or the conundrum id and a link if it isn't done within wait_seconds (then call
         quorum_result)."""
-        return await asyncio.to_thread(ask, question, files, os.getcwd(), mode, research, wait_seconds, repo_path)
+        return await asyncio.to_thread(
+            with_backend, ask, question, files, os.getcwd(), mode, research, wait_seconds, repo_path
+        )
 
     @server.tool()
     async def quorum_review(
@@ -341,7 +403,9 @@ def build_server():
         By default reviews everything not yet committed in repo_path (git diff HEAD, plus new files' names);
         base can be another ref ("main"), or "" to review only the given files. focus: all, security, tests or
         design. task: what the change was meant to do. Returns the review, or the id and a link to get it later."""
-        return await asyncio.to_thread(review, repo_path, base, files, focus, task, mode, False, wait_seconds)
+        return await asyncio.to_thread(
+            with_backend, review, repo_path, base, files, focus, task, mode, False, wait_seconds
+        )
 
     @server.tool()
     async def quorum_challenge(
@@ -352,23 +416,23 @@ def build_server():
     ) -> str:
         """Have Quorum's council argue against a plan, claim or decision: the strongest case against it, the better
         alternative, and whether it survives. Use it before committing to a design, to avoid reflexive agreement."""
-        return await asyncio.to_thread(challenge, claim, files, os.getcwd(), mode, True, wait_seconds)
+        return await asyncio.to_thread(with_backend, challenge, claim, files, os.getcwd(), mode, True, wait_seconds)
 
     @server.tool()
     async def quorum_result(conundrum_id: str, wait_seconds: int = 45, level: str = "standard") -> str:
         """Get a Quorum answer by conundrum id, waiting up to wait_seconds if the council is still debating. level:
         simple, standard or expert (expert adds detail and a diagram)."""
-        return await asyncio.to_thread(result, conundrum_id, wait_seconds, level)
+        return await asyncio.to_thread(with_backend, result, conundrum_id, wait_seconds, level)
 
     @server.tool()
     async def quorum_followup(conundrum_id: str, message: str, wait_seconds: int = 45) -> str:
         """Ask a follow-up in an existing conundrum; the council continues with everything it already discussed."""
-        return await asyncio.to_thread(followup, conundrum_id, message, wait_seconds)
+        return await asyncio.to_thread(with_backend, followup, conundrum_id, message, wait_seconds)
 
     @server.tool()
     async def quorum_list(limit: int = 10) -> str:
         """List recent conundrums with their ids and status."""
-        return await asyncio.to_thread(recent, limit)
+        return await asyncio.to_thread(with_backend, recent, limit)
 
     return server
 
@@ -427,3 +491,73 @@ def install(client: str, apply: bool) -> str:
         path.write_text(existing.rstrip() + ("\n\n" if existing.strip() else "") + block)
         return f"Added Quorum to {path}. Start a new Codex session to use it."
     raise cli.QuorumError(f"Unknown client '{client}': use claude or codex")
+
+
+# ------------------------------------------------------------------ diagnostics
+
+
+def doctor(start: bool = False) -> Tuple[str, bool]:
+    """Check what the MCP tools need, with a fix for each problem. Returns the report and whether all is well."""
+    from . import coder
+
+    lines: List[str] = []
+    ok = True
+
+    def check(passed: bool, good: str, bad: str, fix: str = "", warn_only: bool = False) -> None:
+        nonlocal ok
+        if passed:
+            lines.append(f"✓ {good}")
+        else:
+            lines.append(f"{'!' if warn_only else '✗'} {bad}" + (f"\n    fix: {fix}" if fix else ""))
+            ok = ok and warn_only
+
+    check(bool(shutil.which("uv")), "uv is installed", "uv isn't installed (clients start Quorum with it)",
+          "curl -LsSf https://astral.sh/uv/install.sh | sh")  # fmt: skip
+    up = backend_up()
+    if not up and start:
+        try:
+            ensure_backend()
+            up = True
+        except cli.QuorumError:
+            up = False
+    check(up, f"Quorum's engine is running at {cli.API_URL}",
+          f"Quorum's engine isn't running at {cli.API_URL} (the MCP tools start it on first use)",
+          "./start.sh, or quorum mcp doctor --start", warn_only=True)  # fmt: skip
+    if up:
+        try:
+            inv = cli.get("/inventory")
+            fits = [m for m in inv.get("models", []) if m.get("local") and m.get("fit") == "fits"]
+            check(len(fits) >= 3, f"{len(fits)} local models fit in memory",
+                  f"only {len(fits)} local model(s) fit in memory; three or more make a real council",
+                  "Settings → Models → Get more, or: ollama pull qwen3:8b")  # fmt: skip
+        except cli.QuorumError as e:
+            check(False, "", f"couldn't list models: {e}", "is Ollama running? ollama serve")
+        try:
+            research = cli.get("/research/status")
+            check(bool(research.get("ready")), "web search is ready",
+                  "web search isn't available, so answers won't be checked against sources",
+                  "Settings → Web search", warn_only=True)  # fmt: skip
+        except cli.QuorumError:
+            pass
+    cli_name = coder.which()
+    check(bool(cli_name), f"the Coder can use {coder.label(cli_name)} (read-only) in code debates",
+          "no Claude Code or Codex found, so code debates won't have the Coder",
+          "install Claude Code or Codex and sign in once (run claude, then /login)", warn_only=True)  # fmt: skip
+    if shutil.which("claude"):
+        try:
+            listed = subprocess.run(["claude", "mcp", "list"], capture_output=True, text=True, timeout=30).stdout
+            check("quorum" in listed.lower(), "Claude Code has the quorum MCP server",
+                  "Claude Code doesn't have the quorum MCP server", "quorum mcp install --client claude --apply",
+                  warn_only=True)  # fmt: skip
+        except (subprocess.SubprocessError, OSError):
+            lines.append("! couldn't ask Claude Code which MCP servers it has")
+    codex_config = Path(os.getenv("CODEX_HOME", "~/.codex")).expanduser() / "config.toml"
+    if shutil.which("codex") or codex_config.exists():
+        has = codex_config.exists() and "[mcp_servers.quorum]" in codex_config.read_text()
+        check(has, "Codex has the quorum MCP server", f"Codex doesn't have the quorum MCP server ({codex_config})",
+              "quorum mcp install --client codex --apply", warn_only=True)  # fmt: skip
+    lines.append(
+        "· ChatGPT isn't supported yet: it only connects to MCP servers at a public HTTPS address, and Quorum's "
+        "server runs on your computer (stdio)."
+    )
+    return "\n".join(lines), ok

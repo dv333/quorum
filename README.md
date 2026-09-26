@@ -273,6 +273,7 @@ session:
 ```bash
 uv run quorum mcp install --client claude           # prints the `claude mcp add` command (--apply runs it)
 uv run quorum mcp install --client codex --apply    # adds [mcp_servers.quorum] to ~/.codex/config.toml
+uv run quorum mcp doctor                            # checks everything the tools need, with a fix for each problem
 ```
 
 | Tool | What it's for |
@@ -286,8 +287,14 @@ uv run quorum mcp install --client codex --apply    # adds [mcp_servers.quorum] 
 
 Debates take minutes, so tools wait up to `wait_seconds` and otherwise return the conundrum's id and a link to watch
 it live; `mode: "quick"` (one round, three models) usually answers within one call. Files and diffs are read on your
-machine and never modified. Keep the app running (`./start.sh`); design notes are in
-[docs/design/mcp-server.md](docs/design/mcp-server.md).
+machine and never modified.
+
+You don't need to keep Quorum open: when the engine isn't running, the first tool call starts it in the background
+(its log is `data/mcp-backend.log`; set `QUORUM_MCP_AUTOSTART=0` to turn this off). Run `./start.sh` when you want
+the app to watch debates live; tool results only link to it when it's open.
+
+**ChatGPT isn't supported yet.** ChatGPT connects only to MCP servers at a public HTTPS address, and Quorum's server
+runs on your computer over stdio. Design notes are in [docs/design/mcp-server.md](docs/design/mcp-server.md).
 
 
 ### Code debates: the Coder and specialist reviewers

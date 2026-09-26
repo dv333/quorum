@@ -322,6 +322,10 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     if getattr(args, "mcp_command", None) == "install":
         print(mcp_server.install(args.client, args.apply))
         return 0
+    if getattr(args, "mcp_command", None) == "doctor":
+        report, ok = mcp_server.doctor(args.start)
+        print(report)
+        return 0 if ok else 1
     mcp_server.serve()
     return 0
 
@@ -366,6 +370,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     install = mcp_sub.add_parser("install", help="set up Quorum in Claude Code or Codex")
     install.add_argument("--client", choices=["claude", "codex"], required=True)
     install.add_argument("--apply", action="store_true", help="make the change instead of printing it")
+    mdoc = mcp_sub.add_parser("doctor", help="check what the MCP tools need, with a fix for each problem")
+    mdoc.add_argument("--start", action="store_true", help="start Quorum's engine if it isn't running")
     mcp.set_defaults(func=cmd_mcp)
 
     ls = sub.add_parser("list", help="list recent conundrums")
