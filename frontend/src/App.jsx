@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Home from './components/Home'
 import Onboarding from './components/Onboarding'
 import Settings from './components/Settings'
+import ShortcutsHelp from './components/ShortcutsHelp'
 import { ResourceSheet } from './components/Resources'
 import Sidebar, { SidebarIcon } from './components/Sidebar'
 
@@ -36,6 +37,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [backendError, setBackendError] = useState(null)
   const [unseen, setUnseen] = useState(() => new Set()) // answers that arrived while you were elsewhere
+  const [help, setHelp] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(null) // { id, title, timer }: deleted after a few seconds unless undone
   const prevStatus = useRef(null)
   const routeRef = useRef(route)
@@ -133,6 +135,8 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'n') { e.preventDefault(); go('home') }
       if (e.metaKey && e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); toggleSidebar() }
       if (e.key === 'Escape') setDrawer(false)
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable
+      if (e.key === '?' && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setHelp(true) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -233,6 +237,7 @@ export default function App() {
         </ErrorBoundary>
       </main>
       {resource && <ResourceSheet series={series} focus={resource} onClose={() => setResource(null)} />}
+      {help && <ShortcutsHelp onClose={() => setHelp(false)} />}
       {pendingDelete && (
         <div className="toast" role="status">
           <span className="toast-text">Deleted “{pendingDelete.title.length > 48 ? `${pendingDelete.title.slice(0, 47)}…` : pendingDelete.title}”</span>
