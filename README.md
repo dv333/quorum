@@ -265,6 +265,30 @@ questions are asked in the terminal; `--no-questions` skips them (and they're sk
 conundrum also appears in the app, so you can open it there. To use `quorum` from anywhere:
 `uv tool install --editable .`. Point it at another port with `QUORUM_URL`.
 
+### From Claude Code, Codex and other MCP clients
+
+Quorum is also an MCP server, so a coding agent can ask the local council for a second opinion without leaving its
+session:
+
+```bash
+uv run quorum mcp install --client claude           # prints the `claude mcp add` command (--apply runs it)
+uv run quorum mcp install --client codex --apply    # adds [mcp_servers.quorum] to ~/.codex/config.toml
+```
+
+| Tool | What it's for |
+|---|---|
+| `quorum_review` | Review the uncommitted change (or `base`: a branch or commit) and list findings by severity, with file and line; focus on security, tests or design |
+| `quorum_ask` | A second opinion on a question or decision, with files as context |
+| `quorum_challenge` | The strongest case against a plan or claim, and whether it survives |
+| `quorum_result` | Pick up an answer by id when the council is still debating |
+| `quorum_followup` | Ask a follow-up in the same conundrum |
+| `quorum_list` | Recent conundrums |
+
+Debates take minutes, so tools wait up to `wait_seconds` and otherwise return the conundrum's id and a link to watch
+it live; `mode: "quick"` (one round, three models) usually answers within one call. Files and diffs are read on your
+machine and never modified. Keep the app running (`./start.sh`); design notes are in
+[docs/design/mcp-server.md](docs/design/mcp-server.md).
+
 ## Configuration
 
 Everything works out of the box. To change defaults, copy `.env.example` to `.env`:

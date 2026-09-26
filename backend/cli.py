@@ -7,6 +7,7 @@
     quorum packs
     quorum list
     quorum doctor [--ask]
+    quorum mcp [install --client claude|codex]
 
 Uses only the Python standard library.
 """
@@ -305,6 +306,16 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    from . import mcp_server  # the MCP SDK is only needed here
+
+    if getattr(args, "mcp_command", None) == "install":
+        print(mcp_server.install(args.client, args.apply))
+        return 0
+    mcp_server.serve()
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(prog="quorum", description="Ask a council of local AI models from your terminal.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -338,6 +349,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     doctor.add_argument("--json", action="store_true")
     doctor.add_argument("-q", "--quiet", action="store_true", help="no progress lines on stderr")
     doctor.set_defaults(func=cmd_doctor)
+
+    mcp = sub.add_parser("mcp", help="serve Quorum's tools to Claude Code, Codex and other MCP clients")
+    mcp_sub = mcp.add_subparsers(dest="mcp_command")
+    install = mcp_sub.add_parser("install", help="set up Quorum in Claude Code or Codex")
+    install.add_argument("--client", choices=["claude", "codex"], required=True)
+    install.add_argument("--apply", action="store_true", help="make the change instead of printing it")
+    mcp.set_defaults(func=cmd_mcp)
 
     ls = sub.add_parser("list", help="list recent conundrums")
     ls.add_argument("-n", type=int, default=15, help="how many (default 15)")
