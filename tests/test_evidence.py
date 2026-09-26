@@ -773,3 +773,34 @@ def test_options_the_question_lists_must_be_addressed():
     q = "Kubernetes or a managed container service (ECS, Cloud Run, Fly.io) for a 5-engineer team running 12 services?"
     assert named_options(q) == ["ECS", "Cloud Run", "Fly.io"]
     assert named_options("Which EV under $45k is best for a family?") == []
+
+
+async def test_checked_extras_fit_even_when_the_pages_name_many_options():
+    eng = make_debate(cpq_client(), research=True, search=search)
+    cars = ["Nissan LEAF", "Toyota bZ", "Hyundai Ioniq 5", "Chevrolet Equinox EV", "Tesla Model 3", "Toyota C-HR"]
+    eng._research_pages[1] = [
+        {
+            "url": "https://ranked.example/evs",
+            "title": "Best EVs",
+            "content": ", ".join(cars),
+            "evidence": 0,
+            "primary": False,
+        }
+    ]
+
+    async def complete(*args, **kw):
+        return json.dumps({"options": [{"name": c, "source": 1} for c in cars], "also_consider": ["Tesla Model Y"]})
+
+    async def lookup(query, limit, focus=""):
+        return [
+            {
+                "url": "https://cars.example/y",
+                "title": "2026 Tesla Model Y",
+                "description": "",
+                "content": "The Model Y Standard starts at $41,630.",
+            }
+        ]
+
+    eng._complete, eng.search_fn = complete, lookup
+    options = await eng._make_shortlist(1, "Which EV under $45k is best?", 1, "m", None)
+    assert "Tesla Model Y" in options and len(options) <= 7

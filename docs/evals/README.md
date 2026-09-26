@@ -31,6 +31,6 @@ is to find where Quorum falls short and improve it, not to rank models.
 |---|---|---|---|---|
 | [Intermittent fasting vs. calorie restriction](intermittent-fasting/) | 44 | 41 (v11; first run 19) | Yes, both judges | 10 rounds of fixes, see the folder |
 | [30B model: 48 GB Mac or 24 GB NVIDIA](local-30b-hardware/) | 41 | 36 (v4; first run 19) | First judge yes; blind judge no (accuracy 8 vs 5) | 5 rounds |
-| [Family road-trip EV under $45k](family-ev-2026/) | 42 | 34 (v3; first run 27) | Not yet: v5 picks the same car but misprices trims | 5 rounds |
+| [Family road-trip EV under $45k](family-ev-2026/) | 42 | 36 (v6; first run 27) | First judge yes (v6); blind judge not run yet | 6 rounds |
 | [Kubernetes or managed containers](kubernetes-vs-managed/) | 40 | 34 (v3; first run 30) | First judge yes; blind judge on v2 no (accuracy 9 vs 6) | 3 rounds |
 | [Gas stove to induction in California](induction-california/) | 42 | 33 (v4; first run 27) | Not yet: same bottom line, evidence 3 apart | 4 rounds |

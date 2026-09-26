@@ -1981,7 +1981,8 @@ class DebateEngine:
                 RESEARCHER_NAME, "shortlist", ep_id, model, prompts.shortlist_messages(question, pages), think
             )
             reply = parse_json_loose(text)
-            options = check_shortlist(reply.get("options") or [], pages)
+            # Room for up to two well-known options the pages miss: five from the pages at most
+            options = check_shortlist(reply.get("options") or [], pages, limit=5)
         except Exception as e:
             log.warning("shortlist failed: %s", e)
             return []
@@ -1999,7 +2000,7 @@ class DebateEngine:
                 checked = _interleave([found], 3)
                 self._research_pages.setdefault(topic, []).extend(checked)
                 options += check_shortlist([{"name": x}], checked)
-        options = options[:6]
+        options = options[:7]
         self._shortlist[topic] = options
         return options
 
