@@ -413,12 +413,13 @@ def stated_requirements(question: str) -> List[str]:
 
 def requirement_covered(requirement: str, text: str) -> bool:
     """Whether the answer talks about a criterion at all (each word's stem appears somewhere)."""
-    words = [w for w in re.findall(r"[a-z0-9]+", requirement.lower()) if len(w) > 2]
     low = text.lower()
-    if not all(w[:5] in low for w in words):
-        return False
     # "health evidence", "research": saying the word isn't enough, the answer has to point at studies
-    if re.search(r"\b(evidence|research|studies)\b", requirement, re.I):
+    evidence = re.compile(r"^(evidence|research|studies|study|data)$")
+    words = [w for w in re.findall(r"[a-z0-9]+", requirement.lower()) if len(w) > 2]
+    if not all(w[:5] in low for w in words if not evidence.match(w)):
+        return False
+    if any(evidence.match(w) for w in words):
         return bool(re.search(r"\b(stud(y|ies)|meta-?analys\w*|systematic review|trials?|cohort|survey)\b", low))
     return True
 

@@ -713,3 +713,10 @@ def test_a_bottom_line_still_too_long_after_revision_keeps_two_sentences():
     assert shorten_bottom_line(long).startswith("BOTTOM LINE: **Pick A if X. Pick B if Y.**\n\n## Key points")
     short = "BOTTOM LINE: **Pick A.**\n\n## Key points"
     assert shorten_bottom_line(short) == short
+
+
+def test_an_evidence_criterion_needs_studies_not_just_the_word():
+    from backend.engine import requirement_covered
+
+    assert not requirement_covered("health evidence", "The health benefits are real.")
+    assert requirement_covered("health evidence", "Health: a 2024 Stanford study found more NO2 exposure.")
