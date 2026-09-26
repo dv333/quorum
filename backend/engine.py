@@ -180,6 +180,28 @@ def _parse_queries(text: str, limit: int) -> List[str]:
     return queries[:limit]
 
 
+_TERM = re.compile(r"[a-z0-9]{4,}")
+
+
+def _related_pages(
+    pages: List[Dict[str, Any]], claim: str, exclude: List[Dict[str, Any]], limit: int = 2
+) -> List[Dict[str, Any]]:
+    """The pages from earlier research that best match a claim (strongest evidence first among close matches), so the
+    check can use the reviews the research already found even when the claim's own search misses them."""
+    terms = set(_TERM.findall(claim.lower()))
+    taken = {s["url"] for s in exclude}
+    scored = []
+    for p in pages:
+        if p["url"] in taken:
+            continue
+        taken.add(p["url"])
+        words = set(_TERM.findall(f"{p.get('title', '')} {p.get('content', '')}".lower()))
+        hits = len(terms & words)
+        if hits >= max(3, len(terms) // 3):
+            scored.append((hits + 2 * p.get("evidence", 0), p))
+    return [p for _, p in sorted(scored, key=lambda x: -x[0])[:limit]]
+
+
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
     """Take results round-robin across queries so every query contributes, deduplicated by URL, with the strongest
     evidence (systematic reviews, then randomized trials) and official documentation moved to the front."""
@@ -284,6 +306,7 @@ class DebateEngine:
         self.research_queue: List[Dict[str, Any]] = []
         self._requests_per_round: Dict[Tuple[int, int], int] = {}
         self._search_down: Optional[str] = None
+        self._research_pages: Dict[int, List[Dict[str, Any]]] = {}  # pages Beagle read, per topic, for the claim check
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
 
@@ -1152,6 +1175,7 @@ class DebateEngine:
             if not ok:
                 raise errors[0]
             sources = _interleave(ok, RESEARCH_MAX_SOURCES)
+            self._research_pages.setdefault(d["topic"], []).extend(_interleave(ok, 100))
             self._record(
                 RESEARCHER_NAME,
                 "firecrawl",
@@ -1183,7 +1207,9 @@ class DebateEngine:
             )
             partial = self.partials[msg_id]
             content = strip_thinking(partial["content"]).strip() or "The sources didn't answer this."
-            stored_sources = [{"url": s["url"], "title": s["title"]} for s in sources]
+            stored_sources = [
+                {"url": s["url"], "title": s["title"], "evidence": s["evidence"], "primary": s["primary"]} for s in sources
+            ]
             self._finish_message(
                 msg_id,
                 content=content,
@@ -1494,12 +1520,15 @@ class DebateEngine:
             think = await self._thinking_flag(ep_id, model, False)
             ledger: List[Dict[str, Any]] = []
             for it, result in zip(items, found):
-                sources = [] if isinstance(result, Exception) else _interleave([result], RESEARCH_SOURCES_PER_CLAIM + 1)
+                fresh = [] if isinstance(result, Exception) else _interleave([result], RESEARCH_SOURCES_PER_CLAIM + 1)
+                sources = fresh + _related_pages(self._research_pages.get(topic, []), it["claim"], fresh)
                 entry = {"claim": it["claim"], "status": "unknown", "quote": "", "caveat": "", "source": None}
-                if isinstance(result, Exception):
-                    entry["caveat"] = f"Web search failed ({result}), so this couldn't be checked."
-                elif not sources:
-                    entry["caveat"] = "No sources found."
+                if not sources:
+                    entry["caveat"] = (
+                        f"Web search failed ({result}), so this couldn't be checked."
+                        if isinstance(result, Exception)
+                        else "No sources found."
+                    )
                 else:
                     try:
                         v = parse_json_loose(
@@ -1626,7 +1655,9 @@ class DebateEngine:
                 "audit",
                 d["chair_endpoint_id"],
                 d["chair_model"],
-                prompts.answer_check_messages(row["content"], claims, self._research_digest(row["topic"])),
+                prompts.answer_check_messages(
+                    row["content"], claims, self._research_digest(row["topic"]), list(self._handles().values())
+                ),
                 think,
             )
             raw = parse_json_loose(text).get("problems") or []
@@ -1660,7 +1691,7 @@ class DebateEngine:
                     and len(revised) >= 0.6 * len(row["content"])
                 ):
                     content = plain_answer(revised)
-                    meta["evidence"]["revised"] = True
+                    meta["evidence"].update(revised=True, original=row["content"])
             except Exception as e:
                 log.warning("answer revision failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))

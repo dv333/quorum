@@ -2,7 +2,7 @@
 
 import re
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Sequence, Any, Dict, List, Optional
 
 from .config import RESEARCHER_NAME
 
@@ -116,7 +116,9 @@ def render_transcript(messages: List[Dict], handles: Dict[int, str], me: Optiona
 def sources_block(sources: List[Dict]) -> str:
     if not sources:
         return ""
-    return "\nSources: " + "; ".join(f"[{i + 1}] {src['title']} ({src['url']})" for i, src in enumerate(sources))
+    return "\nSources: " + "; ".join(
+        f"[{i + 1}] {src['title']} ({src['url']}){source_label(src)}" for i, src in enumerate(sources)
+    )
 
 
 def history_block(prior_topics: List[Dict[str, str]]) -> str:
@@ -572,7 +574,7 @@ Decide what the sources establish about the claim:
 - "partly": a source supports part of it, or supports it only with a condition or limit (give that as the caveat). A page that mentions a capability is only partial support for a broader claim about a whole workflow, cost, speed or superiority.
 - "contradicted": a source directly says otherwise (give the correct fact as the caveat).
 - "unknown": the sources don't settle it.
-Prefer sources marked [primary source]. The quote must be copied word for word from one source (one or two sentences); use an empty quote for "unknown".
+Prefer systematic reviews, meta-analyses and sources marked [primary source]. The quote must be copied word for word from one source (one or two sentences); use an empty quote for "unknown".
 
 Reply like: {{"status": "partly", "source": 1, "quote": "...", "caveat": "..."}}""",
         },
@@ -609,12 +611,17 @@ EVIDENCE_RULES = """Rules for factual claims (they override the debate):
 - Only use names, numbers and citations that appear in the ledger or the research findings; never invent study
   details. Cite checked claims with the ledger's numbers, like [2]; for other research findings, name the study or
   review (with its year and key numbers) instead of using the briefs' citation numbers.
+- When the research found systematic reviews, meta-analyses or large randomized trials, the answer leads with them,
+  named with their year and key numbers, even if the checked claims are narrower.
 - Write for the user in plain words ("Oracle's documentation confirms…", "not confirmed by the sources"). Never mention
   the ledger, these rules, statuses in capitals or item numbers, and don't explain how claims were checked."""
 
 
-def answer_check_messages(answer: str, claims: List[Dict[str, Any]], research: str = "") -> List[Dict[str, str]]:
+def answer_check_messages(
+    answer: str, claims: List[Dict[str, Any]], research: str = "", handles: Sequence[str] = ()
+) -> List[Dict[str, str]]:
     found = f"\nResearch findings (these count as sourced):\n{research}\n" if research else ""
+    agents = f" The council members' names ({', '.join(handles)}) are fine to mention." if handles else ""
     return [
         {
             "role": "system",
@@ -630,7 +637,7 @@ def answer_check_messages(answer: str, claims: List[Dict[str, Any]], research: s
 Answer to audit:
 {answer}
 
-List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; or gives names, numbers or citations found in neither. A fact the research findings state is sourced, not a problem. Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
+List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; or gives names, numbers or citations found in neither. A fact the research findings state is sourced, not a problem. Advice, recommendations and judgment calls (what to choose, how to decide, what to try first) are not factual claims; don't flag them.{agents} Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
 
 Reply like: {{"problems": [{{"text": "...", "issue": "..."}}]}}""",
         },
@@ -659,7 +666,7 @@ Your answer:
 An audit found these problems:
 {issues}
 
-Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or mark it as uncertain) and keep everything else word for word, including every section and heading. If the fixes mean no option is clearly best, say so in the bottom line. Output only the corrected answer.""",
+Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or say plainly that it's uncertain) and keep everything else word for word, including every section and heading, named studies and numbers. Write the fixes for the reader: never say "unverified", "the provided evidence", "research findings" or anything about the audit. If the fixes mean no option is clearly best, say so in the bottom line. Output only the corrected answer.""",
         },
     ]
 

@@ -141,7 +141,10 @@ _STATUS_PLAIN = [
     (re.compile(r"\s*\((?:Evidence|Item|Claim|Ledger item)\s*\[?\d+\]?\)", re.I), ""),
     (re.compile(r"\b(in|from) the (?:evidence )?ledger\b", re.I), r"\1 the sources"),
     (re.compile(r"\bthe (?:evidence )?ledger\b", re.I), "the evidence"),
+    (re.compile(r"\*{0,2}\bunverified\b\*{0,2} by the provided (?:evidence|research|sources)", re.I), "not established"),
     (re.compile(r"\bthe provided sources\b", re.I), "the sources"),
+    (re.compile(r"\bthe provided (?:evidence|research(?: findings)?)\b", re.I), "the evidence"),
+    (re.compile(r"\bthe research findings\b", re.I), "the studies"),
 ]
 
 

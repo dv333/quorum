@@ -504,3 +504,30 @@ def test_evidence_questions_get_at_least_two_rounds_and_cover_variants():
         custom_rubric="",
     )[1]["content"]
     assert "say how the main forms compare" in verdict
+
+
+def test_claim_check_reuses_matching_research_pages():
+    from backend.engine import _related_pages
+
+    bmj = {
+        "url": "https://www.bmj.com/content/389/bmj-2024-082007",
+        "title": "Intermittent fasting strategies and body weight: network meta-analysis",
+        "content": "Intermittent fasting and continuous energy restriction had similar effects on body weight.",
+        "evidence": 3,
+    }
+    blog = {
+        "url": "https://blog.example.com/fasting",
+        "title": "My fasting journey",
+        "content": "Fasting changed my life and my morning routine.",
+        "evidence": 0,
+    }
+    claim = "Intermittent fasting and continuous energy restriction produce similar body weight loss."
+    assert _related_pages([blog, bmj], claim, []) == [bmj]
+    assert _related_pages([bmj], claim, [bmj]) == []  # already among the claim's own results
+
+
+def test_audit_wording_becomes_plain_words():
+    from backend.parsing import plain_answer
+
+    text = "This is **unverified** by the provided evidence, and the research findings don't compare it."
+    assert plain_answer(text) == "This is not established, and the studies don't compare it."
