@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
 import uuid
 from contextlib import asynccontextmanager
@@ -675,7 +676,16 @@ def main():
     import uvicorn
 
     # Live-update streams never end on their own; don't wait on them at shutdown
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=PORT, reload=False, timeout_graceful_shutdown=2)
+    # The app polls a few endpoints every couple of seconds; logging each request buries warnings and errors.
+    # QUORUM_ACCESS_LOG=1 turns the per-request log back on.
+    uvicorn.run(
+        "backend.main:app",
+        host="127.0.0.1",
+        port=PORT,
+        reload=False,
+        timeout_graceful_shutdown=2,
+        access_log=os.getenv("QUORUM_ACCESS_LOG", "") == "1",
+    )
 
 
 if __name__ == "__main__":
