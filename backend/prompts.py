@@ -587,7 +587,8 @@ def ledger_text(claims: List[Dict[str, Any]]) -> str:
     lines = []
     for i, c in enumerate(claims, 1):
         line = f"{i}. [{label.get(c['status'], 'UNVERIFIED')}] {c['claim']}"
-        if c.get("caveat"):
+        # Notes about the checking itself (search outages, unmatched quotes) are for the UI, not the answer
+        if c.get("caveat") and c["status"] != "unknown":
             line += f" | Caveat: {c['caveat']}"
         if c.get("quote"):
             line += f' | Source says: "{c["quote"]}" ({c.get("source_title") or c.get("source_url")})'
@@ -598,13 +599,18 @@ def ledger_text(claims: List[Dict[str, Any]]) -> str:
 EVIDENCE_RULES = """Rules for factual claims (they override the debate):
 - Never state a CONTRADICTED claim; state the correct fact from the ledger instead.
 - A PARTLY SUPPORTED claim must carry its caveat.
-- An UNVERIFIED claim may appear only if it is clearly marked as unverified; it can't be a deciding reason.
+- An UNVERIFIED claim (the check couldn't confirm it) may be stated only when the research findings above back it,
+  citing them; otherwise present it as uncertain, and never as a deciding reason.
 - Don't present a comparative advantage (cheaper, faster to implement, better integrated, no middleware) as established unless a SUPPORTED claim says exactly that.
 - If the evidence can't establish a winner, say so: name the finalists and what would decide between them. Agreement among agents is not evidence.
-- Write for the user in plain words ("Oracle's documentation confirms…", "not confirmed by the sources"). Never mention the ledger, these rules, statuses in capitals or item numbers."""
+- Only use names, numbers and citations that appear in the ledger or the research findings; never invent study
+  details.
+- Write for the user in plain words ("Oracle's documentation confirms…", "not confirmed by the sources"). Never mention
+  the ledger, these rules, statuses in capitals or item numbers, and don't explain how claims were checked."""
 
 
-def answer_check_messages(answer: str, claims: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+def answer_check_messages(answer: str, claims: List[Dict[str, Any]], research: str = "") -> List[Dict[str, str]]:
+    found = f"\nResearch findings (these count as sourced):\n{research}\n" if research else ""
     return [
         {
             "role": "system",
@@ -614,13 +620,13 @@ def answer_check_messages(answer: str, claims: List[Dict[str, Any]]) -> List[Dic
             "role": "user",
             "content": f"""Evidence ledger:
 {ledger_text(claims)}
-
+{found}
 {EVIDENCE_RULES}
 
 Answer to audit:
 {answer}
 
-List every place where the answer breaks a rule: it states a contradicted claim, drops a caveat, presents an unverified claim as fact or as a deciding reason, or presents a comparative advantage the ledger doesn't support. Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
+List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; or gives names, numbers or citations found in neither. A fact the research findings state is sourced, not a problem. Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
 
 Reply like: {{"problems": [{{"text": "...", "issue": "..."}}]}}""",
         },
@@ -649,7 +655,7 @@ Your answer:
 An audit found these problems:
 {issues}
 
-Rewrite the answer to fix every problem. Keep everything else, including the structure and headings. If fixing them means no option is clearly best, say so in the bottom line. Output only the corrected answer.""",
+Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or mark it as uncertain) and keep everything else word for word, including every section and heading. If the fixes mean no option is clearly best, say so in the bottom line. Output only the corrected answer.""",
         },
     ]
 

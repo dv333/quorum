@@ -319,8 +319,9 @@ async def test_when_search_is_down_the_ledger_still_binds_the_answer():
 
 
 def test_the_answer_is_written_for_the_user_not_about_the_ledger():
-    rules = prompts.EVIDENCE_RULES
+    rules = " ".join(prompts.EVIDENCE_RULES.split())
     assert "Never mention the ledger" in rules and "item numbers" in rules
+    assert "don't explain how claims were checked" in rules and "never invent study details" in rules
 
 
 def test_excerpts_keep_the_passages_about_the_claim():
@@ -402,3 +403,53 @@ def test_claims_start_with_the_central_claim_and_evidence_questions_seek_reviews
     assert "Start with the central claim" in claims
     plan = prompts.research_plan_messages("Q", "Q", 3)[1]["content"]
     assert "systematic review or meta-analysis" in plan and "randomized trials" in plan
+
+
+def test_quotes_tidied_by_the_model_still_count():
+    source = (
+        "Across 99 trials, intermittent fasting diets result in similar weight loss and cardiometabolic risk factor "
+        "changes to traditional calorie-restricted diets. Alternate day fasting showed a small benefit in short trials."
+    )
+    tidied = "intermittent fasting diets result in similar weight loss… to traditional calorie restricted diets"
+    assert quote_in_source(tidied, source)
+    assert not quote_in_source(
+        "intermittent fasting diets produce much greater weight loss than calorie restriction", source
+    )
+    assert quote_in_source("similar weight loss and cardiometabolic", source)
+    assert not quote_in_source("similar weight loss and cardiac risk", source)  # short quotes must match exactly
+
+
+def test_the_audit_counts_research_as_sourced():
+    audit = prompts.answer_check_messages(
+        "BOTTOM LINE: x", [{"claim": "c", "status": "unknown"}], "Opening brief\nNEJM trial: no difference [1]"
+    )[1]["content"]
+    assert "Research findings (these count as sourced)" in audit and "NEJM trial" in audit
+    assert "names, numbers or citations found in neither" in audit
+
+
+def test_internal_check_notes_stay_out_of_the_chairs_ledger():
+    text = prompts.ledger_text(
+        [
+            {
+                "claim": "A",
+                "status": "unknown",
+                "caveat": "Judged partly, but the quote isn't in the source, so it stays unverified.",
+            },
+            {"claim": "B", "status": "partly", "caveat": "Only in the US."},
+        ]
+    )
+    assert "quote isn't in the source" not in text and "Caveat: Only in the US." in text
+
+
+async def test_a_revision_that_drops_sections_is_rejected():
+    client = cpq_client()
+    client.verdict_reply = (
+        "BOTTOM LINE: Choose Oracle.\n\n## Key points\n- Integrated.\n\n## Details\nMore detail here."
+    )
+    client.revise_reply = "BOTTOM LINE: Two finalists remain."  # lost its sections
+    eng = make_debate(client, research=True, search=search)
+    await eng.post_user_message("Which CPQ?")
+    await eng.task
+    answer = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert "## Details" in answer["content"]
+    assert json.loads(answer["meta_json"])["evidence"].get("revised") is None

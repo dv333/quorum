@@ -225,11 +225,20 @@ _NORM = re.compile(r"[^a-z0-9]+")
 
 
 def quote_in_source(quote: str, text: str) -> bool:
-    """Whether a quoted passage really appears in the source (ignoring case, spacing and punctuation)."""
+    """Whether a quoted passage really appears in the source, ignoring case, spacing and punctuation. Models tidy
+    quotes (merged sentences, "…", a dropped word), so a long quote counts when most of its four-word runs are in the
+    page; a short one has to match exactly."""
     q = _NORM.sub(" ", quote.lower()).strip()
     if len(q) < 12:
         return False
-    return q in _NORM.sub(" ", text.lower())
+    source = _NORM.sub(" ", text.lower())
+    if q in source:
+        return True
+    words = q.split()
+    if len(words) < 8:
+        return False
+    runs = [" ".join(words[i : i + 4]) for i in range(len(words) - 3)]
+    return sum(run in source for run in runs) / len(runs) >= 0.6
 
 
 CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
@@ -1593,7 +1602,7 @@ class DebateEngine:
                 "audit",
                 d["chair_endpoint_id"],
                 d["chair_model"],
-                prompts.answer_check_messages(row["content"], claims),
+                prompts.answer_check_messages(row["content"], claims, self._research_digest(row["topic"])),
                 think,
             )
             raw = parse_json_loose(text).get("problems") or []
@@ -1619,7 +1628,13 @@ class DebateEngine:
                         think,
                     )
                 ).strip()
-                if re.search(r"BOTTOM\s*LINE", revised, re.I):
+                # A revision has to keep the answer whole: its bottom line and its sections
+                sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
+                if (
+                    re.search(r"BOTTOM\s*LINE", revised, re.I)
+                    and sections(row["content"]) <= sections(revised)
+                    and len(revised) >= 0.6 * len(row["content"])
+                ):
                     content = plain_answer(revised)
                     meta["evidence"]["revised"] = True
             except Exception as e:
