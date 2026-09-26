@@ -427,6 +427,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   const stickRef = useRef(true)
   const answerRef = useRef(null)
   const [error, setError] = useState(null)
+  const [jump, setJump] = useState(null) // 'latest' while live and scrolled up, 'answer' when the answer is out of view
   const seatsById = useMemo(() => Object.fromEntries(state.seats.map((s) => [s.id, s])), [state.seats])
 
   const status = state.debate?.status
@@ -500,7 +501,19 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
         )}
       </div>
       <div className="scroller" ref={scrollRef}
-        onScroll={(e) => { const el = e.currentTarget; stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120 }}>
+        onScroll={(e) => {
+          const el = e.currentTarget
+          stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+          const card = answerRef.current?.firstElementChild
+          let next = null
+          if (live && !stickRef.current) next = 'latest'
+          else if (status === 'concluded' && card) {
+            const box = card.getBoundingClientRect()
+            const view = el.getBoundingClientRect()
+            if (box.bottom < view.top + 80 || box.top > view.bottom - 80) next = 'answer'
+          }
+          if (next !== jump) setJump(next)
+        }}>
         {live && <Stage state={state} speakingSeatIds={speakingSeatIds} beagleBusy={beagleBusy} searches={searches} />}
         <div className="thread">
           {topics.map((t) => (
@@ -513,6 +526,23 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           {error && <div className="sysrow error">{error}</div>}
         </div>
       </div>
+      {jump && (
+        <div className="jump-anchor">
+          <button className="jump-pill" onClick={() => {
+            const el = scrollRef.current
+            const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
+            if (jump === 'latest') { stickRef.current = true; el?.scrollTo({ top: el.scrollHeight, behavior }) }
+            else answerRef.current?.firstElementChild?.scrollIntoView({ behavior, block: 'start' })
+            setJump(null)
+          }}>
+            {jump === 'latest' ? '↓ Latest' : (() => {
+              const card = answerRef.current?.firstElementChild
+              const above = card && scrollRef.current && card.getBoundingClientRect().bottom < scrollRef.current.getBoundingClientRect().top
+              return above ? '↑ Answer' : '↓ Answer'
+            })()}
+          </button>
+        </div>
+      )}
       <Composer debate={debate} seats={seats} onError={setError} state={state} />
     </>
   )

@@ -900,3 +900,14 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .diagram-full-svg { width: min(1200px, 100%); max-height: 100%; overflow: auto; cursor: default; }
 .diagram-full-svg svg { width: 100%; max-width: none !important; height: auto; max-height: calc(100vh - 80px); display: block; margin: 0 auto; }
 @media print { .diagram-tools { display: none; } }
+
+/* Jump back to the answer, or to the latest turn while a debate is live */
+.jump-anchor { position: relative; height: 0; z-index: 3; }
+.jump-pill {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  border: 0; border-radius: 999px; padding: 7px 14px; font: 600 12.5px var(--font); color: var(--text); cursor: pointer;
+  background: var(--glass-strong); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline-strong); animation: toast-in 0.3s var(--spring);
+}
+.jump-pill:hover { color: var(--blue); }
+@media (prefers-reduced-motion: reduce) { .jump-pill { animation: none; } }
