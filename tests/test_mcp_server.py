@@ -60,6 +60,7 @@ def backend(monkeypatch):
     monkeypatch.setattr(cli, "get", get)
     monkeypatch.setattr(cli, "post", post)
     monkeypatch.setattr(cli, "POLL_SECONDS", 0)
+    monkeypatch.setattr(mcp_server, "app_up", lambda: True)
     return calls
 
 
@@ -180,3 +181,11 @@ def test_doctor_names_a_fix_for_each_problem(tmp_path, monkeypatch):
     assert "only 1 local model(s) fit" in report and "ollama pull" in report
     assert "! web search isn't available" in report
     assert "ChatGPT isn't supported yet" in report
+
+
+def test_without_the_app_open_the_result_says_how_to_watch(backend, monkeypatch):
+    monkeypatch.setattr(mcp_server, "app_up", lambda: False)
+    backend["snaps"] += [snapshot("running")]
+    snap, done = mcp_server.wait("abc123", 0)
+    text = mcp_server.respond("abc123", snap, done)
+    assert "/#q/" not in text and "./start.sh" in text
