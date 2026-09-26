@@ -804,3 +804,17 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .evidence a:hover { text-decoration: underline; }
 @media (max-width: 640px) { .evidence li { grid-template-columns: 1fr; gap: 4px; } .ev-summary { padding-left: 18px; padding-right: 18px; } .evidence { margin: 0 18px 12px; } }
 .ev-chip .ev-n { font-weight: 700; margin-right: 2px; }
+
+/* Toast: a short confirmation with an undo, bottom center of the window */
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60;
+  display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px);
+  padding: 10px 10px 10px 16px; border-radius: 14px; font: 13.5px var(--font);
+  background: var(--glass-strong); backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow-lg), 0 0 0 0.5px var(--hairline-strong); animation: toast-in 0.35s var(--spring);
+}
+.toast-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast-action { border: 0; background: var(--fill); color: var(--blue); font: 600 13px var(--font); padding: 6px 12px; border-radius: 9px; cursor: pointer; }
+.toast-action:hover { background: var(--fill-2); }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

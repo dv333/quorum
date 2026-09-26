@@ -36,6 +36,7 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [backendError, setBackendError] = useState(null)
   const [unseen, setUnseen] = useState(() => new Set()) // answers that arrived while you were elsewhere
+  const [pendingDelete, setPendingDelete] = useState(null) // { id, title, timer }: deleted after a few seconds unless undone
   const prevStatus = useRef(null)
   const routeRef = useRef(route)
   routeRef.current = route
@@ -137,6 +138,40 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [go, toggleSidebar])
 
+  // Deleting hides the conundrum at once and only removes it for good after a few seconds, so it can be undone
+  const finishDelete = useCallback(async (pending) => {
+    clearTimeout(pending.timer)
+    try { await api.deleteDebate(pending.id) } catch { /* already gone */ }
+    setPendingDelete((p) => (p && p.id === pending.id ? null : p))
+    loadDebates()
+  }, [loadDebates])
+
+  const requestDelete = (id) => {
+    if (pendingDelete) finishDelete(pendingDelete) // one undo at a time
+    const d = debates.find((x) => x.id === id)
+    const pending = { id, title: d?.title || d?.question || 'Conundrum' }
+    pending.timer = setTimeout(() => finishDelete(pending), 6000)
+    setPendingDelete(pending)
+    if (id === route.id) go('home')
+  }
+
+  const undoDelete = useCallback(() => {
+    setPendingDelete((p) => { if (p) clearTimeout(p.timer); return null })
+  }, [])
+
+  useEffect(() => {
+    if (!pendingDelete) return undefined
+    // ⌘Z undoes (outside text fields); closing the page still completes the delete
+    const onKey = (e) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !e.shiftKey && !typing) { e.preventDefault(); undoDelete() }
+    }
+    const onHide = () => { fetch(`/api/debates/${pendingDelete.id}`, { method: 'DELETE', keepalive: true }).catch(() => {}) }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('pagehide', onHide)
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', onHide) }
+  }, [pendingDelete, undoDelete])
+
   if (backendError && !config) {
     return (
       <div className="empty-state">
@@ -169,7 +204,7 @@ export default function App() {
       <div className="ambient" />
       <Sidebar
         appName={config.app_name}
-        debates={debates}
+        debates={pendingDelete ? debates.filter((d) => d.id !== pendingDelete.id) : debates}
         currentId={route.id}
         view={route.view}
         series={series}
@@ -179,11 +214,7 @@ export default function App() {
         onSelect={(id) => go('debate', id)}
         onNew={() => go('home')}
         onSettings={() => go('settings')}
-        onDelete={async (id) => {
-          await api.deleteDebate(id)
-          if (id === route.id) go('home')
-          loadDebates()
-        }}
+        onDelete={requestDelete}
       />
       <div className="scrim" onClick={() => setDrawer(false)} />
       <main className={`main ${route.view === 'home' ? 'plain' : ''}`}>
@@ -202,6 +233,12 @@ export default function App() {
         </ErrorBoundary>
       </main>
       {resource && <ResourceSheet series={series} focus={resource} onClose={() => setResource(null)} />}
+      {pendingDelete && (
+        <div className="toast" role="status">
+          <span className="toast-text">Deleted “{pendingDelete.title.length > 48 ? `${pendingDelete.title.slice(0, 47)}…` : pendingDelete.title}”</span>
+          <button className="toast-action" onClick={undoDelete} title="Undo (⌘Z)">Undo</button>
+        </div>
+      )}
     </div>
   )
 }
