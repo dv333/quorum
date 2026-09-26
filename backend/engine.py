@@ -216,6 +216,15 @@ def _numbers_in(text: str, source: str) -> bool:
     return all(n in plain for n in _NUM.findall(text.replace(",", "")))
 
 
+def _clip(text: str, limit: int) -> str:
+    """Shorten to the limit at a sentence end when possible, so a finding never stops mid-number."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    end = max(cut.rfind(". "), cut.rfind("; "))
+    return cut[: end + 1] if end > limit // 2 else cut.rsplit(" ", 1)[0] + "…"
+
+
 def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, str]]:
     """Keep the studies whose quote is really on their page and whose finding's numbers are too; drop any year or size
     the page doesn't state."""
@@ -227,7 +236,10 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
             page = pages[int(s.get("source")) - 1]
         except (TypeError, ValueError, IndexError):
             continue
-        field = {k: " ".join(str(s.get(k) or "").split())[:300] for k in ("name", "year", "design", "participants", "finding", "quote")}
+        field = {
+            k: _clip(" ".join(str(s.get(k) or "").split()), 600 if k in ("finding", "quote") else 200)
+            for k in ("name", "year", "design", "participants", "finding", "quote")
+        }
         text = f"{page.get('title', '')} {page['url']} {page.get('content', '')}"
         if not field["name"] or not field["finding"] or page["url"] in seen:
             continue
