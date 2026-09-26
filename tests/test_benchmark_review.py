@@ -153,3 +153,14 @@ def test_code_comments_are_not_headings_and_long_severity_headings_are_sections(
         ("high", "**Hardcoded key** ov"),
         ("medium", "**N+1 queries**"),
     ]
+
+
+def test_none_under_a_severity_is_not_a_finding_nor_what_it_ruled_out():
+    answer = (
+        "## High\n**None.** The change is correct.\n\n"
+        "## Medium\nNone. I checked the likely problems and none hold up:\n- `os.environ` is a valid Mapping.\n\n"
+        "## Low\n- Rename `_flag` to `_is_true`.\n"
+    )
+    assert [(f["severity"], f["text"]) for f in bench.split_findings(answer)] == [
+        ("low", "Rename `_flag` to `_is_true`.")
+    ]

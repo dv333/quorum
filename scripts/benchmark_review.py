@@ -185,8 +185,12 @@ def run_quorum(case: Dict[str, Any], repo: Path, mode: str) -> Dict[str, Any]:
 # ------------------------------------------------------------------ findings and scoring
 
 _ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*)")
+_NONE = re.compile(r"\s*(none|no (issues|findings|problems|bugs)|nothing)\b", re.I)
 _BOLD_LEAD = re.compile(r"^\s*\*\*(.{1,160}?)\*\*[:.]?\s*(\S.*)$")  # "**Title**: rest of the line"
-_LABEL = re.compile(r"\s*(fix(es)?|suggested fix|why|impact|example|note|evidence|risk|details?|how)\b", re.I)
+_LABEL = re.compile(
+    r"\s*(fix(es)?|suggested fix|why|impact|example|note|evidence|risk|details?|how|issue|problem|file|files|location|lines?)\b",
+    re.I,
+)
 _ROW = re.compile(r"^\s*\|(.*)\|\s*$")
 _HEADING = re.compile(r"^\s*(?:#{1,6}\s+(.*)|\*\*(.{1,160}?)\*\*:?\s*|([A-Z][\w &/()-]{0,60}):\s*)$")
 SEVERITY = [
@@ -232,6 +236,9 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
             continue
         heading = _HEADING.match(line)
         item = _ITEM.match(line)
+        if not item and _NONE.match(re.sub(r"[*_`]", "", line)):
+            section, current = "skip", None  # "None." under a severity: what follows are concerns it ruled out
+            continue
         lead = None if heading or item else _BOLD_LEAD.match(line)
         if lead and current is not None and _LABEL.match(lead.group(1)):  # "**Fix:** ..." belongs to the finding
             current["text"] += " " + line.strip()
