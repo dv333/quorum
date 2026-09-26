@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { displayTitle } from '../agents'
 import { ResourceCards } from './Resources'
 
@@ -38,7 +39,31 @@ export function GearIcon({ size = 18 }) {
   )
 }
 
+// Every word of the query has to appear in the title or the question (any order, any case)
+function matches(d, query) {
+  const hay = `${displayTitle(d.title, d.question)} ${d.question || ''}`.toLowerCase()
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w))
+}
+
 export default function Sidebar({ debates, currentId, view, series, attention, onSelect, onNew, onDelete, onSettings, onCollapse, onOpenResource, appName }) {
+  const [query, setQuery] = useState('')
+  const searchRef = useRef(null)
+  const shown = query.trim() ? debates.filter((d) => matches(d, query)) : debates
+
+  // ⌘K (or / outside a text field) jumps to the search box
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) {
+        e.preventDefault()
+        searchRef.current?.focus()
+        searchRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <aside className="sidebar" aria-label="Conundrums">
       <div className="brand">
@@ -46,8 +71,23 @@ export default function Sidebar({ debates, currentId, view, series, attention, o
         <button className="icon-btn collapse-btn" onClick={onCollapse} aria-label="Hide sidebar" title="Hide sidebar (⌃⌘S)"><SidebarIcon /></button>
       </div>
       <button className="new-q" onClick={onNew} title="New conundrum (⌘N)"><span aria-hidden="true">✎</span> New conundrum</button>
+      {debates.length > 0 && (
+        <div className="side-search">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+            <circle cx="7" cy="7" r="4.8" /><line x1="10.6" y1="10.6" x2="14" y2="14" strokeLinecap="round" />
+          </svg>
+          <input ref={searchRef} type="search" value={query} placeholder="Search" aria-label="Search conundrums"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur() }
+              if (e.key === 'Enter' && shown.length) onSelect(shown[0].id)
+            }} />
+          {query ? <button className="clear" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus() }}>✕</button>
+            : <kbd aria-hidden="true">⌘K</kbd>}
+        </div>
+      )}
       <nav className="history">
-        {groupByDay(debates).map(([label, items]) => (
+        {groupByDay(shown).map(([label, items]) => (
           <div key={label}>
             <div className="side-h">{label}</div>
             {items.map((d) => {
@@ -66,6 +106,9 @@ export default function Sidebar({ debates, currentId, view, series, attention, o
           </div>
         ))}
         {debates.length === 0 && <div className="side-h" style={{ fontWeight: 400 }}>Your conundrums will appear here.</div>}
+        {debates.length > 0 && shown.length === 0 && (
+          <div className="side-empty">No conundrums match “{query.trim()}”.</div>
+        )}
       </nav>
       <div className="side-foot">
         <ResourceCards series={series} onOpen={onOpenResource} />

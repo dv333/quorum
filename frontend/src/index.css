@@ -222,6 +222,17 @@ textarea.input { resize: vertical; }
   border-radius: 9px; font: 500 14px var(--font); background: var(--fill); margin-bottom: 8px; transition: background 0.2s;
 }
 .new-q:hover { background: var(--fill-2); }
+.side-search {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 30px; margin-bottom: 4px;
+  border-radius: 8px; background: var(--fill); color: var(--text-3); transition: box-shadow 0.2s, background 0.2s;
+}
+.side-search:focus-within { background: var(--card); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 30%, transparent); color: var(--text-2); }
+.side-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: 13px var(--font); color: var(--text); }
+.side-search input::-webkit-search-cancel-button { display: none; }
+.side-search kbd { font: 500 10.5px var(--font); color: var(--text-3); border: 0.5px solid var(--hairline-strong); border-radius: 4px; padding: 1px 4px; }
+.side-search .clear { border: 0; background: none; color: var(--text-3); font-size: 11px; padding: 2px 4px; cursor: pointer; border-radius: 4px; }
+.side-search .clear:hover { color: var(--text); background: var(--fill); }
+.side-empty { font-size: 12.5px; color: var(--text-3); padding: 14px 10px; line-height: 1.4; }
 .history { flex: 1; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
 .side-h { font: 600 11px var(--font); color: var(--text-3); padding: 14px 10px 4px; }
 .hist {
