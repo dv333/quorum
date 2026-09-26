@@ -331,7 +331,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
 {ANSWER_FORMAT}""",
         },
@@ -621,14 +621,21 @@ Reply like: {{"studies": [{{"name": "...", "year": "...", "design": "...", "part
 
 def _people(s: Dict[str, str]) -> str:
     p = s.get("participants") or ""
+    if p and p.replace(",", "") in (s.get("design") or "").replace(",", ""):
+        return ""  # the design already gives the size
     return f"{p} participants" if re.fullmatch(r"[\d,.]+", p) else p
+
+
+def _dated(s: Dict[str, str]) -> str:
+    year = s.get("year") or ""
+    return s["name"] + (f" ({year})" if year and year not in s["name"] else "")
 
 
 def studies_text(studies: List[Dict[str, str]]) -> str:
     """The checked studies as the chair and the audit see them."""
     lines = []
     for s in studies:
-        head = s["name"] + (f" ({s['year']})" if s.get("year") else "")
+        head = _dated(s)
         detail = "; ".join(x for x in (s.get("design"), _people(s)) if x)
         lines.append(f"- {head}{': ' + detail if detail else ''}. {s['finding']}")
     return "\n".join(lines)
@@ -638,7 +645,8 @@ def studies_markdown(studies: List[Dict[str, str]]) -> str:
     """The "Key studies" section added to the answer."""
     lines = ["## Key studies", ""]
     for i, s in enumerate(studies, 1):
-        head = f"**{s['name']}**" + (f" ({s['year']})" if s.get("year") else "")
+        name = _dated(s)
+        head = f"**{s['name']}**" + name[len(s["name"]) :]
         detail = ", ".join(x for x in (s.get("design"), _people(s)) if x)
         lines.append(f"{i}. {head}{' · ' + detail if detail else ''}. {s['finding']} [Source]({s['url']})")
     return "\n".join(lines)
@@ -729,7 +737,7 @@ Your answer:
 An audit found these problems:
 {issues}
 
-Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or say plainly that it's uncertain) and keep everything else word for word, including every section and heading, named studies and numbers. Write the fixes for the reader: never say "unverified", "the provided evidence", "research findings" or anything about the audit. If the fixes mean no option is clearly best, say so in the bottom line. Output only the corrected answer.""",
+Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or say plainly that it's uncertain) and keep everything else word for word, including every section and heading, named studies and numbers. Write the fixes for the reader: never say "unverified", "the provided evidence", "research findings" or anything about the audit. If the fixes mean no option is clearly best, say so in the bottom line, keeping it to one or two sentences. Output only the corrected answer.""",
         },
     ]
 

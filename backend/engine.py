@@ -301,7 +301,11 @@ def evidence_queries(question: str) -> List[str]:
     topic = " ".join(words[:8])
     if not topic:
         return []
-    return [f"{topic} meta-analysis {date.today().year}", f"{topic} Cochrane review"]
+    return [
+        f"{topic} meta-analysis {date.today().year}",
+        f"{topic} Cochrane review",
+        f"{topic} network meta-analysis randomized trials",
+    ]
 
 
 _NORM = re.compile(r"[^a-z0-9]+")
