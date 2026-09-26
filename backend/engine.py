@@ -203,6 +203,8 @@ def _related_pages(
 
 
 _NUM = re.compile(r"\d+(?:\.\d+)?")
+# Models describe what's missing instead of leaving it out
+_MISSING = re.compile(r"not (?:stated|specified|provided|given|reported)|unspecified|snippet|excerpt|provided text", re.I)
 
 
 def _numbers_in(text: str, source: str) -> bool:
@@ -228,11 +230,15 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
             continue
         if not quote_in_source(field["quote"], page.get("content", "")) or not _numbers_in(field["finding"], text):
             continue
+        if _MISSING.search(field["finding"]):
+            continue
         if not re.fullmatch(r"(19|20)\d\d", field["year"]) or field["year"] not in text:
             field["year"] = ""
         for k in ("design", "participants"):
-            if not _numbers_in(field[k], text):
+            if not _numbers_in(field[k], text) or _MISSING.search(field[k]):
                 field[k] = ""
+        if not re.search(r"\d", field["participants"]):
+            field["participants"] = ""
         seen.add(page["url"])
         out.append({**field, "url": page["url"], "title": page.get("title", "")})
     return out[:limit]

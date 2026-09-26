@@ -331,7 +331,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
 {ANSWER_FORMAT}""",
         },
@@ -605,18 +605,23 @@ Pages:
 {blocks}
 
 List up to {max_studies} studies described in these pages that best answer the question, strongest evidence first: systematic reviews and meta-analyses, then randomized trials, then other studies. For each:
-- "name": how the page identifies it (journal, first author, or review name)
+- "name": a short name, like "BMJ network meta-analysis", "Cochrane review" or "NEJM trial (Liu et al.)"
 - "year": publication year, only if the page states it
 - "design": what kind of study and how big, e.g. "network meta-analysis of 99 randomized trials" or "12-month randomized trial"
-- "participants": how many people, only if stated
+- "participants": how many people, as a number, only if stated
 - "finding": one plain sentence with its key result and numbers, naming the specific forms compared (for example time-restricted eating or alternate-day fasting)
 - "quote": one or two sentences copied word for word from the page that back the finding
 - "source": the page's number
-Leave out any detail the page doesn't state.
+Leave out (don't describe) any detail the page doesn't state, and skip a study whose result the page doesn't give.
 
 Reply like: {{"studies": [{{"name": "...", "year": "...", "design": "...", "participants": "...", "finding": "...", "quote": "...", "source": 1}}]}}""",
         },
     ]
+
+
+def _people(s: Dict[str, str]) -> str:
+    p = s.get("participants") or ""
+    return f"{p} participants" if re.fullmatch(r"[\d,.]+", p) else p
 
 
 def studies_text(studies: List[Dict[str, str]]) -> str:
@@ -624,7 +629,7 @@ def studies_text(studies: List[Dict[str, str]]) -> str:
     lines = []
     for s in studies:
         head = s["name"] + (f" ({s['year']})" if s.get("year") else "")
-        detail = "; ".join(x for x in (s.get("design"), s.get("participants") and f"{s['participants']} participants") if x)
+        detail = "; ".join(x for x in (s.get("design"), _people(s)) if x)
         lines.append(f"- {head}{': ' + detail if detail else ''}. {s['finding']}")
     return "\n".join(lines)
 
@@ -634,7 +639,7 @@ def studies_markdown(studies: List[Dict[str, str]]) -> str:
     lines = ["## Key studies", ""]
     for i, s in enumerate(studies, 1):
         head = f"**{s['name']}**" + (f" ({s['year']})" if s.get("year") else "")
-        detail = ", ".join(x for x in (s.get("design"), s.get("participants") and f"{s['participants']} participants") if x)
+        detail = ", ".join(x for x in (s.get("design"), _people(s)) if x)
         lines.append(f"{i}. {head}{' · ' + detail if detail else ''}. {s['finding']} [Source]({s['url']})")
     return "\n".join(lines)
 
@@ -695,7 +700,7 @@ def answer_check_messages(
 Answer to audit:
 {answer}
 
-List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; or gives names, numbers or citations found in neither. A fact the research findings state is sourced, not a problem. Advice, recommendations and judgment calls (what to choose, how to decide, what to try first) are not factual claims; don't flag them.{agents} Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
+List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; gives names, numbers or citations found in neither; or favors one option more strongly than the bottom line and the evidence do (for example calling it "safer" or "more reliable" without support). A fact the research findings state is sourced, not a problem. Advice, recommendations and judgment calls (what to choose, how to decide, what to try first) are not factual claims; don't flag them.{agents} Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
 
 Reply like: {{"problems": [{{"text": "...", "issue": "..."}}]}}""",
         },

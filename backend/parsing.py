@@ -145,6 +145,8 @@ _STATUS_PLAIN = [
     (re.compile(r"\bthe provided sources\b", re.I), "the sources"),
     (re.compile(r"\bthe provided (?:evidence|research(?: findings)?)\b", re.I), "the evidence"),
     (re.compile(r"\bthe research findings\b", re.I), "the studies"),
+    (re.compile(r"\b(?:it )?remains unverified\b", re.I), lambda m: m.group(0)[: -len("remains unverified")] + "isn't established"),
+    (re.compile(r"\bunverified\b", re.I), "unconfirmed"),
 ]
 
 

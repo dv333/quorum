@@ -561,3 +561,27 @@ def test_key_studies_keep_only_what_the_page_states():
     assert studies[0]["year"] == "" and studies[0]["participants"] == "1995"
     md = studies_markdown(studies)
     assert md.startswith("## Key studies") and "22 randomized trials" in md and page["url"] in md
+
+
+def test_key_studies_drop_notes_about_missing_details():
+    from backend.engine import check_studies
+    from backend.prompts import studies_markdown
+
+    page = {
+        "url": "https://www.bmj.com/content/389/bmj-2024-082007",
+        "title": "Intermittent fasting strategies: network meta-analysis",
+        "content": "Alternate day fasting showed a small reduction in weight compared with continuous energy restriction.",
+        "evidence": 3,
+    }
+    quote = "Alternate day fasting showed a small reduction in weight compared with continuous energy restriction."
+    vague = {"name": "Review", "finding": "The provided text excerpts don't give a result.", "quote": quote, "source": 1}
+    study = {
+        "name": "BMJ network meta-analysis",
+        "participants": "Adults with obesity (specific count not stated)",
+        "finding": "Alternate-day fasting lost a little more weight than continuous restriction.",
+        "quote": quote,
+        "source": 1,
+    }
+    kept = check_studies([vague, study], [page])
+    assert [s["name"] for s in kept] == ["BMJ network meta-analysis"] and kept[0]["participants"] == ""
+    assert "participants" not in studies_markdown(kept)
