@@ -183,19 +183,24 @@ export default function Sidebar({ refreshKey, polling, hiddenId, currentId, view
   const visible = (items) => items.filter((d) => d.id !== hiddenId)
   const total = defs.reduce((n, g) => n + (groups[g.key]?.count || 0), 0) + pinned.length
 
-  // ⌘K (or / outside a text field) jumps to the search box
+  // Search is a button until it's needed: clicking it (or ⌘K, or / outside a text field) opens the search bar
+  const [searching, setSearching] = useState(false)
+  const openSearch = useCallback(() => {
+    setSearching(true)
+    setTimeout(() => { searchRef.current?.focus(); searchRef.current?.select() }, 0)
+  }, [])
+  const closeSearch = () => { setQuery(''); setSearching(false) }
   useEffect(() => {
     const onKey = (e) => {
       const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || document.activeElement?.isContentEditable
       if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) {
         e.preventDefault()
-        searchRef.current?.focus()
-        searchRef.current?.select()
+        openSearch()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [openSearch])
 
   const item = (d) => {
     const live = LIVE.includes(d.status)
@@ -227,25 +232,33 @@ export default function Sidebar({ refreshKey, polling, hiddenId, currentId, view
     <aside className="sidebar" aria-label="Conundrums">
       <div className="brand">
         <div className="mark"><span /><span /><span /></div><b>{appName}</b>
-        <button className="icon-btn collapse-btn" onClick={onCollapse} aria-label="Hide sidebar" title="Hide sidebar (⌃⌘S)"><SidebarIcon /></button>
+        <div className="brand-actions">
+          <button className={`icon-btn ${searching || query ? 'on' : ''}`} aria-label="Search conundrums" aria-expanded={searching || !!query}
+            title="Search (⌘K)" onClick={() => (searching || query ? closeSearch() : openSearch())}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <circle cx="7" cy="7" r="4.8" /><line x1="10.6" y1="10.6" x2="14" y2="14" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button className="icon-btn" onClick={onNew} aria-label="New conundrum" title="New conundrum (⌘N)"><ComposeIcon /></button>
+          <button className="icon-btn collapse-btn" onClick={onCollapse} aria-label="Hide sidebar" title="Hide sidebar (⌃⌘S)"><SidebarIcon /></button>
+        </div>
       </div>
-      {/* Search and New conundrum share the top row */}
-      <div className="side-top">
+      {(searching || query) && (
         <div className="side-search">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <circle cx="7" cy="7" r="4.8" /><line x1="10.6" y1="10.6" x2="14" y2="14" strokeLinecap="round" />
           </svg>
           <input ref={searchRef} type="search" value={query} placeholder="Search" aria-label="Search conundrums"
             onChange={(e) => setQuery(e.target.value)}
+            onBlur={() => { if (!query.trim()) setSearching(false) }}
             onKeyDown={(e) => {
-              if (e.key === 'Escape') { setQuery(''); e.currentTarget.blur() }
+              if (e.key === 'Escape') { closeSearch(); e.currentTarget.blur() }
               if (e.key === 'Enter' && results?.items.length) onSelect(results.items[0].id)
             }} />
-          {query ? <button className="clear" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus() }}>✕</button>
-            : <kbd aria-hidden="true">⌘K</kbd>}
+          {query && <button className="clear" aria-label="Clear search" onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setQuery(''); searchRef.current?.focus() }}>✕</button>}
         </div>
-        <button className="side-new" onClick={onNew} aria-label="New conundrum" title="New conundrum (⌘N)"><ComposeIcon /></button>
-      </div>
+      )}
       <nav className="history">
         {results ? (
           <div>
