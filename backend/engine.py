@@ -16,7 +16,9 @@ from urllib.parse import urlparse
 
 from . import db, firecrawl, inventory, prompts
 from .config import (
+    MAX_NUM_CTX,
     MAX_ROUNDS_LIMIT,
+    REPLY_RESERVE_TOKENS,
     CONTEXT_BUDGET_FRACTION,
     INTAKE_MAX_QUESTIONS,
     MIN_ROUNDS_FOR_CONSENSUS,
@@ -822,7 +824,7 @@ class DebateEngine:
                 self.bus.publish({"type": "message_delta", "id": msg_id, "content": content})
 
         async for chunk in self.client.stream(
-            ep, model, messages, think=think, num_ctx=self.debate()["num_ctx"], keep_alive=keep_alive
+            ep, model, messages, think=think, num_ctx=self._num_ctx(messages), keep_alive=keep_alive
         ):
             if chunk.kind == "content":
                 emit(*splitter.feed(chunk.text))
@@ -849,7 +851,7 @@ class DebateEngine:
         started = time.monotonic()
         parts, stats = [], {}
         async for chunk in self.client.stream(
-            self._endpoint(endpoint_id), model, messages, think=think, num_ctx=self.debate()["num_ctx"]
+            self._endpoint(endpoint_id), model, messages, think=think, num_ctx=self._num_ctx(messages)
         ):
             if chunk.kind == "content":
                 parts.append(chunk.text)
@@ -1342,6 +1344,15 @@ class DebateEngine:
 
     def _handles(self) -> Dict[int, str]:
         return {s["id"]: s["handle"] for s in self.seats()}
+
+    def _num_ctx(self, messages: List[Dict[str, str]]) -> int:
+        """The debate's context size, grown in 4K steps (up to MAX_NUM_CTX) when the prompt would leave too little
+        room for the reply; otherwise a long answer prompt silently cuts the answer short."""
+        base = self.debate()["num_ctx"]
+        need = sum(estimate_tokens(m["content"]) for m in messages) + REPLY_RESERVE_TOKENS
+        if need <= base:
+            return base
+        return max(base, min(MAX_NUM_CTX, -(-need // 4096) * 4096))
 
     def _budget(self) -> int:
         return int(self.debate()["num_ctx"] * CONTEXT_BUDGET_FRACTION)

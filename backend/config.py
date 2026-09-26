@@ -58,6 +58,9 @@ DEFAULT_NUM_CTX = _env_int("LLC_NUM_CTX", 8192)
 # Fraction of the smallest context window the transcript may use before older
 # rounds are compressed into the rolling summary
 CONTEXT_BUDGET_FRACTION = 0.7
+# A long prompt (the final answer with research and key studies) gets a bigger context so the reply still fits
+REPLY_RESERVE_TOKENS = 2048
+MAX_NUM_CTX = _env_int("LLC_MAX_NUM_CTX", 16384)
 
 # Per-request timeout for a single model turn (local models can be slow to load)
 REQUEST_TIMEOUT = _env_float("LLC_REQUEST_TIMEOUT", 600.0)

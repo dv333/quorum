@@ -585,3 +585,12 @@ def test_key_studies_drop_notes_about_missing_details():
     kept = check_studies([vague, study], [page])
     assert [s["name"] for s in kept] == ["BMJ network meta-analysis"] and kept[0]["participants"] == ""
     assert "participants" not in studies_markdown(kept)
+
+
+def test_long_prompts_get_room_for_the_reply():
+    eng = make_debate(cpq_client(), research=True)
+    base = eng.debate()["num_ctx"]
+    assert eng._num_ctx([{"role": "user", "content": "short"}]) == base
+    long = [{"role": "user", "content": "x" * base * 3}]  # about `base` tokens
+    grown = eng._num_ctx(long)
+    assert grown > base and grown % 4096 == 0
