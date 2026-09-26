@@ -1,0 +1,16 @@
+{
+  "name": "Home: gas stove to induction in California, 2026",
+  "why": "The answer has to cover the health evidence (NO2, benzene, the debated asthma link) with its uncertainty, the real upfront costs including the 240-volt circuit and possible panel upgrade, and the 2026 rebate picture (HEEHRA up to $840, single-family funds reserved).",
+  "question": "Should a California homeowner replace a gas stove with induction in 2026? Costs, rebates, health evidence.",
+  "expect": {
+    "mentions_groups": [
+      ["nitrogen dioxide", "NO2", "NO₂"],
+      ["asthma"],
+      ["240", "panel", "circuit"],
+      ["HEEHRA", "$840", "rebate"],
+      ["ventilat", "range hood", "hood"],
+      ["cookware", "pans", "magnetic"]
+    ],
+    "never_says": ["[UNVERIFIED]", "ledger"]
+  }
+}
