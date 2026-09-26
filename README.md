@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Many minds. One answer.</b><br>
-  A local-first second opinion for Codex and Claude Code. Quorum brings a council of AI models together to explore your question, check claims against sources, and give you a clear answer—with disagreements and uncertainty visible. It runs locally by default; web research and cloud models are optional.
+ Quorum brings a council of AI models together to explore your question, check claims against sources, and give you a clear answer—with disagreements and uncertainty visible. It runs locally by default; web research and cloud models are optional.
 </p>
 
 <p align="center">
@@ -16,12 +16,76 @@
   <img src="https://img.shields.io/badge/runs-100%25%20local-34c759.svg" alt="Runs locally">
 </p>
 
-## A second opinion for your coding agent
+<p align="center">
+  <img src="docs/images/demo.gif" width="880" alt="Quorum answering: Should I rent or buy a home in Cupertino in 2026?">
+</p>
 
-Your coding agent writes the change; a council of local models reviews it. Quorum seats specialists for what the diff
-touches (security, performance, database, concurrency, API compatibility, tests), lets them argue over several rounds,
-and asks a read-only **Coder** (Claude Code or Codex) how the code really works, checking every `file:line` it cites.
-You get findings by severity, each with a fix, plus the points the reviewers disagreed on.
+## What is Quorum?
+
+Ask one AI a hard question and you get one opinion, blind spots included. Quorum asks several AI models at once, on
+your own computer. They look up current facts, argue it out, and hand you **one clear answer**, with the points they
+disagreed on still visible.
+
+- **Private.** The models run on your machine. No account, no subscription, no data sent anywhere unless you turn on
+  web search or add a cloud model.
+- **Honest.** Facts are checked against sources with exact quotes, and when the evidence can't settle something, the
+  answer says so.
+- **For code too.** Claude Code and Codex can ask Quorum for a second opinion on their changes.
+
+## Try it in 2 minutes
+
+Watch recorded debates replay in the real app. No AI models, Docker or accounts needed, only
+[Node.js](https://nodejs.org) 20 or newer.
+
+```bash
+git clone https://github.com/dv333/quorum.git
+cd quorum
+./start.sh --demo        # Windows: .\start.ps1 -Demo
+```
+
+Then open **http://localhost:5173/#demo**. You'll see a code review of a change with planted bugs and a health question
+researched on the web, from the first message to the final answer.
+
+## Get started
+
+Pick what you want Quorum for. Both start the same way.
+
+| 🙋 **Ask anything** | 🧑‍💻 **Review my code** |
+|---|---|
+| Decisions, research, explanations: *rent or buy? which EV? is this study right?* | A second opinion on changes made by Claude Code or Codex |
+| [Three steps →](#ask-anything) | [Three steps →](#review-my-code) |
+
+### Ask anything
+
+1. **Get Quorum:** `git clone https://github.com/dv333/quorum.git && cd quorum`
+2. **Start it:** `./start.sh` (Windows: `.\start.ps1`). It checks your computer, offers to install anything missing
+   (on a Mac with [Homebrew](https://brew.sh), or winget on Windows), and tells you which models fit in its memory.
+3. **Open http://localhost:5173.** A two-minute walkthrough downloads a starter council sized for your computer. Then
+   type your question.
+
+The first answer takes a few minutes: several models are thinking and checking facts, not one.
+
+| The chair clarifies | The council debates | One clear answer |
+|:---:|:---:|:---:|
+| <img src="docs/images/demo-interview.gif" alt="The chair asks clarifying questions one at a time"> | <img src="docs/images/demo-debate.gif" alt="Agents debate in rounds while Beagle researches"> | <img src="docs/images/demo-answer.gif" alt="The final answer, metrics and the Simple reading level"> |
+| Ambiguous? The chair asks up to three questions, with tap-to-answer suggestions, then confirms its assumptions. | Every model you have joins as an agent and argues in rounds; Beagle 🐶 fetches current facts with sources when anyone asks. | A one-line bottom line, key points, where they differed, and Simple / Standard / Expert versions (Expert adds a diagram). |
+
+A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
+
+### Review my code
+
+1. **Install Quorum** with steps 1 and 2 above.
+2. **Connect your coding agent:**
+   ```bash
+   uv run quorum mcp install --client claude --apply   # or: --client codex
+   uv run quorum mcp doctor                            # checks everything, with a fix for each problem
+   ```
+3. **Ask it:** in Claude Code or Codex, say *"Have Quorum review my uncommitted change."*
+
+Quorum gives the review to specialists for what the change touches (security, performance, database, concurrency,
+API compatibility, tests). They argue over several rounds, and a read-only **Coder** (the Claude Code or Codex you
+already use) answers their questions about your repository, with every `file:line` it cites checked. You get findings
+by severity, each with a fix, and the points the reviewers disagreed on.
 
 <p align="center">
   <picture>
@@ -35,37 +99,86 @@ linter caught 19%. Claude Code reviewing alone also caught every one, in about 4
 so Quorum is a second opinion that works in the background while you keep coding, not a replacement for your agent.
 [The method, every finding and how to rerun it →](docs/benchmarks/review/)
 
-```bash
-uv run quorum mcp install --client claude --apply   # or: --client codex
-uv run quorum mcp doctor                            # checks the engine, models and client setup
+The council runs on your machine. The Coder's questions about your code go to Claude Code or Codex; set
+`QUORUM_CODER=off` to keep a review entirely local.
+
+## What your computer needs
+
+| | Works | Better |
+|---|---|---|
+| Computer | Mac (macOS 12+), Windows 10+ or Linux | A Mac with Apple Silicon, or a PC with an NVIDIA GPU |
+| Memory | 8 GB (small models, slower) | 16 GB or more; 32 GB+ for bigger, sharper models |
+| Free disk | 10 GB | 30 GB+ |
+| Web search | Optional; needs [Docker](https://www.docker.com/products/docker-desktop/) (about 4 GB on first start) | |
+
+Not sure? `./start.sh --check` tells you what your computer can run before anything big downloads. `start.sh` installs
+the rest: [Ollama](https://ollama.com) (runs the models), [uv](https://docs.astral.sh/uv/) (Python 3.10+) and
+[Node.js](https://nodejs.org) 20+.
+
+## How it works
+
+```mermaid
+flowchart LR
+  Q[Your question] --> C[Chair asks what it needs]
+  C --> R[Beagle researches]
+  R --> D[Council debates]
+  D --> F[Facts checked]
+  F --> A[One clear answer]
 ```
 
-Then ask your agent to *have Quorum review my uncommitted change*. To watch a recorded review first, run
-`./start.sh --demo`. The council runs on your machine; the Coder uses the Claude Code or Codex you already have, so
-its questions about your code go to that service. Set `QUORUM_CODER=off` to keep a review entirely local.
+The **chair** runs the debate; your largest model picks the best one for your question. The other models join as agents with animal names (🦦 Otter,
+🐼 Panda, 🐨 Koala…) and roles for your question: always a Skeptic, a Pragmatist and a User advocate, plus experts it
+needs. 🐶 **Beagle** does the web research. The models only see each other's animal names, so none of them defers to a
+famous model name. More in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DESIGN.md](docs/DESIGN.md).
 
-## A council for any question
+## Questions
 
-<p align="center">
-  <img src="docs/images/demo.gif" width="880" alt="Quorum answering: Should I rent or buy a home in Cupertino in 2026?">
-</p>
+<details>
+<summary><b>Is it free?</b></summary>
 
-Ask one model a hard question and you get one opinion, with its blind spots. Quorum puts several local models in a room
-instead. If your question is ambiguous, the chair asks you what it needs to know. Then a researcher looks up current
-facts, the council argues it out in rounds, and the chair writes one answer anyone can read, with the reasoning and
-dissent one tap away.
+Yes. Quorum is open source (MIT) and the models run on your computer, so there's nothing to pay per question. Cloud
+models and Firecrawl's cloud search are optional and use your own keys.
+</details>
 
-Everything runs on your machine with [Ollama](https://ollama.com). No account, no API key, no data leaving your
-computer (unless you choose to add web search or a cloud model).
+<details>
+<summary><b>Does my data leave my computer?</b></summary>
 
-## See it work
+Not by default. With web search on, Quorum sends search queries based on your question to the search engine and reads the
+pages it finds. In code reviews, the Coder's questions about your code go to Claude Code or Codex, which you
+can turn off with `QUORUM_CODER=off`. Cloud models are only used if you add them.
+</details>
 
-| The chair clarifies | The council debates | One clear answer |
-|:---:|:---:|:---:|
-| <img src="docs/images/demo-interview.gif" alt="The chair asks clarifying questions one at a time"> | <img src="docs/images/demo-debate.gif" alt="Agents debate in rounds while Beagle researches"> | <img src="docs/images/demo-answer.gif" alt="The final answer, metrics and the Simple reading level"> |
-| Ambiguous? The chair asks up to three questions, with tap-to-answer suggestions, then confirms its assumptions. | Every model you have joins as an agent and argues in rounds; Beagle 🐶 fetches current facts with sources when anyone asks. | A one-line bottom line, key points, where they differed, and Simple / Standard / Expert versions (Expert adds a diagram). |
+<details>
+<summary><b>How long does an answer take?</b></summary>
 
-A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
+A simple question gets a direct answer in seconds. A real debate takes a few minutes to half an hour, depending on your
+computer, the number of models and rounds, and web research. You can watch it happen, steer it, or ask for the answer
+early.
+</details>
+
+<details>
+<summary><b>Is it better than asking one AI?</b></summary>
+
+For hard questions it's more careful: several models catch each other's mistakes, claims are checked against sources,
+and disagreements stay visible. In the [code-review benchmark](docs/benchmarks/review/), eight local models together
+caught every planted bug while the best of them alone missed some. It won't beat a frontier cloud model on raw
+knowledge, and it's slower.
+</details>
+
+<details>
+<summary><b>Do I need a powerful computer?</b></summary>
+
+No. 8 GB of memory runs small models; 16 GB or more is noticeably better. Apple Silicon Macs and NVIDIA GPUs are
+fastest, and computers without a GPU work too, more slowly.
+</details>
+
+<details>
+<summary><b>Can I use ChatGPT, Claude or Gemini models?</b></summary>
+
+Yes, as council members: add OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, Together, DeepSeek or any
+OpenAI-compatible API in *Settings* with your own key. Cloud models are never picked automatically. (ChatGPT itself
+can't call Quorum as a tool yet: it only connects to servers at a public web address.)
+</details>
 
 ## Features
 
@@ -105,7 +218,8 @@ A full-length recording is in [docs/images/demo.mp4](docs/images/demo.mp4).
   any OpenAI-compatible API with your own key. Cloud models are never picked automatically.
 - **A native-feeling app.** Light and dark mode, glass materials, and layouts from phone to ultrawide.
 
-## Tour
+<details>
+<summary><b>Take the tour: screenshots of every step</b></summary>
 
 > Every feature, with screenshots: **[docs/FEATURES.md](docs/FEATURES.md)**
 
@@ -164,99 +278,14 @@ MacBook Pro. Click any image to see it full size.
 </tr>
 </table>
 
-## Look before you install
-
-```bash
-git clone https://github.com/dv333/quorum.git
-cd quorum
-./start.sh --demo        # Windows: .\start.ps1 -Demo
-```
-
-Open **http://localhost:5173/#demo** to watch recorded conundrums replay in the real app: a code review of a change
-with planted bugs (with the Coder reading the repository), and a health question researched on the web. It needs only
-Node.js 20+: no models, Docker, Python or API keys. Switch reading levels on the answer, change the speed, or skip to
-the answer.
-
-## Requirements
-
-| | Minimum | Recommended |
-|---|---|---|
-| OS | macOS 12+, Linux or Windows 10+ | macOS on Apple Silicon |
-| Memory | 8 GB | 16 GB+ (32 GB+ for 14B-class councils) |
-| Disk | 10 GB free for models | 30 GB+ |
-| [Ollama](https://ollama.com/download) | 0.5+ | latest |
-| [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python 3.10+) | required | |
-| [Node.js](https://nodejs.org) | 20+ | 22 LTS |
-| [Docker](https://www.docker.com/products/docker-desktop/) (Compose 2.24+) | required for web search | Docker Desktop, 8 GB for its VM |
-
-GPU acceleration comes from Ollama: Apple Silicon (Metal), NVIDIA (CUDA) and AMD (ROCm) all work. CPU-only machines
-work too, just slower.
-
-`./start.sh --check` tells you what your machine can run before anything downloads: which model sizes fit in its
-memory, whether there's disk space for the starter council (about 8, 11 or 22 GB depending on memory) and web search
-(about 4 GB, downloaded on its first start), and whether Claude Code or Codex is there for the Coder.
-
-## Quick start
-
-```bash
-git clone https://github.com/dv333/quorum.git
-cd quorum
-./start.sh
-```
-
-`start.sh` checks everything Quorum needs. On a Mac with [Homebrew](https://brew.sh) it offers to install anything
-missing (uv, Node.js, Ollama, Docker Desktop), starts Ollama and Docker if they aren't running, and installs the
-app's packages. Run `./start.sh --check` to only check and install, or `./start.sh --yes` to install without asking.
-On Windows, run `.\start.ps1` in PowerShell; it offers the same installs through winget.
-
-Prefer to install the prerequisites yourself?
-
-```bash
-brew install uv node ollama
-brew install --cask docker    # for web search
-```
-
-Open **http://localhost:5173**. `start.sh` also starts private web search in the background when Docker is running
-(the first time downloads about 4 GB). On first launch a short walkthrough checks Ollama, downloads a starter council
-sized for your machine, and confirms web search. Then ask your first conundrum.
-
-<details>
-<summary>Prefer to set things up by hand?</summary>
-
-```bash
-# 1. Models (three families that fit in 16 GB)
-ollama pull qwen3:8b
-ollama pull gemma3:4b
-ollama pull llama3.2:3b
-
-# 2. Backend (http://localhost:8002)
-uv sync
-uv run python -m backend.main
-
-# 3. Frontend (http://localhost:5173), in a second terminal
-cd frontend
-npm install
-npm run dev
-```
-
 </details>
 
-## Web search (optional)
+## Reference
 
-Beagle needs Firecrawl to search the web. `./start.sh` starts it for you when Docker is running; you can also manage
-it yourself:
+Everything below is for when you need it.
 
-```bash
-scripts/firecrawl.sh up      # first run downloads about 4 GB of images
-scripts/firecrawl.sh down    # stop it
-```
-
-On Windows use `.\scripts\firecrawl.ps1 up`. Set `QUORUM_NO_WEB=1` to skip starting it.
-
-It listens on `127.0.0.1:3002` only and searches through DuckDuckGo. You can also click **Start** in the walkthrough,
-or pick **Firecrawl cloud** in *Settings → Web search* and paste an API key.
-
-## Using Quorum
+<details>
+<summary><b>Using the app: shortcuts and controls</b></summary>
 
 | To… | Do this |
 |---|---|
@@ -274,7 +303,10 @@ or pick **Firecrawl cloud** in *Settings → Web search* and paste an API key.
 | New conundrum | ⌘N / Ctrl+N |
 | Hide the sidebar | ⌃⌘S |
 
-### Topic packs
+</details>
+
+<details>
+<summary><b>Topic packs: set up a kind of debate</b></summary>
 
 A topic pack sets up a kind of debate: a question starter, what to focus on, and guidance every agent and the
 chair follows. Quorum ships with seven (Compare options, Plan a project, Check a claim, Explain something, Review code,
@@ -293,7 +325,10 @@ Stress-test a decision, Brainstorm ideas). To add your own, drop a JSON file in 
 
 The file name is the pack's id (`pre-mortem.json`). See [docs/PACKS.md](docs/PACKS.md) for every field.
 
-### From the terminal
+</details>
+
+<details>
+<summary><b>From the terminal: the <code>quorum</code> command</b></summary>
 
 The `quorum` command asks the council from your terminal, scripts or CI, using the Quorum you already have running:
 
@@ -312,7 +347,10 @@ questions are asked in the terminal; `--no-questions` skips them (and they're sk
 conundrum also appears in the app, so you can open it there. To use `quorum` from anywhere:
 `uv tool install --editable .`. Point it at another port with `QUORUM_URL`.
 
-### From Claude Code, Codex and other MCP clients
+</details>
+
+<details>
+<summary><b>From Claude Code, Codex and other MCP clients: all tools</b></summary>
 
 Quorum is also an MCP server, so a coding agent can ask the local council for a second opinion without leaving its
 session:
@@ -343,8 +381,10 @@ the app to watch debates live; tool results only link to it when it's open.
 **ChatGPT isn't supported yet.** ChatGPT connects only to MCP servers at a public HTTPS address, and Quorum's server
 runs on your computer over stdio. Design notes are in [docs/design/mcp-server.md](docs/design/mcp-server.md).
 
+</details>
 
-### Code debates: the Coder and specialist reviewers
+<details>
+<summary><b>Code debates: the Coder and specialist reviewers</b></summary>
 
 Attach a repository (`quorum ask "…" --repo .`, or any MCP tool: reviews attach theirs automatically) and the
 **Coder** joins the council: Claude Code (or Codex) reading the repository **read-only**. It posts a code brief
@@ -356,7 +396,50 @@ two questions per round. Choose with `QUORUM_CODER=claude|codex|off`.
 Code debates also get **specialist reviewers** for what the change touches: a Security expert, a Performance &
 reliability (PSR) expert and a Test engineer always; a Database, Network, Concurrency or API & compatibility expert
 when the question or diff involves them; plus the Skeptic.
-## Configuration
+
+</details>
+
+<details>
+<summary><b>Web search: running Firecrawl</b></summary>
+
+Beagle needs Firecrawl to search the web. `./start.sh` starts it for you when Docker is running; you can also manage
+it yourself:
+
+```bash
+scripts/firecrawl.sh up      # first run downloads about 4 GB of images
+scripts/firecrawl.sh down    # stop it
+```
+
+On Windows use `.\scripts\firecrawl.ps1 up`. Set `QUORUM_NO_WEB=1` to skip starting it.
+
+It listens on `127.0.0.1:3002` only and searches through DuckDuckGo. You can also click **Start** in the walkthrough,
+or pick **Firecrawl cloud** in *Settings → Web search* and paste an API key.
+
+</details>
+
+<details>
+<summary><b>Setting up by hand</b></summary>
+
+```bash
+# 1. Models (three families that fit in 16 GB)
+ollama pull qwen3:8b
+ollama pull gemma3:4b
+ollama pull llama3.2:3b
+
+# 2. Backend (http://localhost:8002)
+uv sync
+uv run python -m backend.main
+
+# 3. Frontend (http://localhost:5173), in a second terminal
+cd frontend
+npm install
+npm run dev
+```
+
+</details>
+
+<details>
+<summary><b>Configuration</b></summary>
 
 Everything works out of the box. To change defaults, copy `.env.example` to `.env`:
 
@@ -372,7 +455,10 @@ Everything works out of the box. To change defaults, copy `.env.example` to `.en
 
 See [.env.example](.env.example) for the full list.
 
-## Troubleshooting
+</details>
+
+<details>
+<summary><b>Troubleshooting</b></summary>
 
 <details>
 <summary><b>"Can't reach Quorum's engine"</b></summary>
@@ -442,14 +528,10 @@ Answer quality is limited by the local models you run. Turn on web research so B
 largest model as chair. A bigger or more capable chair makes the biggest difference.
 </details>
 
-## How it works
+</details>
 
-A conundrum goes through **intake** (the chair clarifies), an **opening brief** (Beagle researches), **rounds** of
-debate (each agent ends with a stance: agree, refine or disagree), a **fact-check**, and the chair's **final answer**.
-Details are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and the reasoning behind the design is in
-[docs/DESIGN.md](docs/DESIGN.md).
-
-## Development
+<details>
+<summary><b>Development</b></summary>
 
 ```bash
 uv run pytest                        # backend tests, no models needed
@@ -473,6 +555,8 @@ uv run python scripts/record_replay.py <debate-id> --name code-review --label "A
 ```
 
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+</details>
 
 ## Acknowledgements
 
