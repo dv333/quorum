@@ -240,11 +240,14 @@ textarea.input { resize: vertical; }
 .mark.big.alive span { animation: breathe 5s ease-in-out infinite; }
 .mark.big.alive span:nth-child(2) { animation-delay: -1.6s; } .mark.big.alive span:nth-child(3) { animation-delay: -3.2s; }
 @keyframes breathe { 50% { transform: scale(1.08); } }
-.new-q {
-  display: flex; align-items: center; gap: 8px; width: 100%; border: 0; text-align: left; padding: 8px 10px;
-  border-radius: 9px; font: 500 14px var(--font); background: var(--fill); margin-bottom: 8px; transition: background 0.2s;
+.side-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.side-top .side-search { flex: 1; min-width: 0; margin-bottom: 0; }
+.side-new {
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; cursor: pointer;
+  background: var(--fill); color: var(--text-2); transition: background 0.2s, color 0.2s;
 }
-.new-q:hover { background: var(--fill-2); }
+.side-new:hover { background: var(--fill-2); color: var(--text); }
+.side-new:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 .side-search {
   display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 30px; margin-bottom: 4px;
   border-radius: 8px; background: var(--fill); color: var(--text-3); transition: box-shadow 0.2s, background 0.2s;
@@ -1020,7 +1023,4 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .side-more { display: block; width: 100%; border: 0; background: none; text-align: left; padding: 6px 10px 8px; font: 500 12px var(--font); color: var(--blue); cursor: pointer; border-radius: 7px; }
 .side-more span { color: var(--text-3); font-weight: 400; }
 .side-more:hover { background: var(--fill); }
-.brand .brand-new { margin-left: auto; }
-.brand .brand-new + .collapse-btn { margin-left: 0; }
-.new-q svg { flex: none; }
 .expand-btn.new { left: 56px; }
