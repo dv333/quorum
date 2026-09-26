@@ -385,6 +385,7 @@ function TopicBlock({ topic, state, seatsById, current, answerRef, onIntake }) {
   const answer = chairMsg && (
     <div ref={current ? answerRef : null} style={{ display: 'contents' }}>
       <AnswerCard debateId={debate.id} msg={chairMsg} verdict={verdict} seats={state.seats}
+        title={displayTitle(debate.title, question?.content)}
         chairHandle={debate.chair_handle || null} metrics={metrics[topic]}
         finalStances={latestStances(messages, topic, state.seats)} factChecked={factChecked}
         claims={(state.claims || []).filter((c) => c.topic === topic)}
