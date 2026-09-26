@@ -453,3 +453,54 @@ async def test_a_revision_that_drops_sections_is_rejected():
     answer = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert "## Details" in answer["content"]
     assert json.loads(answer["meta_json"])["evidence"].get("revised") is None
+
+
+def test_evidence_questions_also_search_for_the_newest_reviews():
+    from backend.engine import evidence_queries
+
+    qs = evidence_queries(
+        "Intermittent fasting vs. daily calorie restriction for weight loss: what does the evidence say?"
+    )
+    assert qs[0].startswith("intermittent fasting daily calorie restriction weight loss meta-analysis 20")
+    assert qs[1] == "intermittent fasting daily calorie restriction weight loss Cochrane review"
+    assert evidence_queries("Should I rent or buy a home in Cupertino?") == []
+
+
+async def test_the_opening_brief_runs_the_review_searches():
+    from tests.test_engine import FakeSearch
+
+    fake = FakeSearch()
+    eng = make_debate(FakeClient(lambda h, r, m: reply("AGREE")), research=True, search=fake)
+    await eng.post_user_message("Does creatine improve memory? What does the research say?")
+    await eng.task
+    assert any("meta-analysis" in q for q in fake.queries) and any("Cochrane review" in q for q in fake.queries)
+
+
+def test_reviews_and_journals_are_recognized_by_site():
+    assert firecrawl.evidence_level("Does fasting help?", "", "https://www.cochrane.org/evidence/CD015610") == 3
+    assert firecrawl.evidence_level("Calorie restriction with or without TRE", "", "https://www.nejm.org/doi/x") == 1
+    assert (
+        firecrawl.evidence_level(
+            "Fasting strategies",
+            "systematic review and network meta-analysis of 99 trials",
+            "https://www.bmj.com/content/389",
+        )
+        == 3
+    )
+    assert firecrawl.evidence_level("My fasting journey", "", "https://blog.example/fasting") == 0
+
+
+def test_evidence_questions_get_at_least_two_rounds_and_cover_variants():
+    assert "a question about what research shows" in prompts.ROUNDS_GUIDE
+    verdict = prompts.verdict_messages(
+        question="Q",
+        prior_topics=[],
+        summary=None,
+        transcript="",
+        positions=[],
+        fact_check=None,
+        reason="consensus",
+        criteria=[],
+        custom_rubric="",
+    )[1]["content"]
+    assert "say how the main forms compare" in verdict

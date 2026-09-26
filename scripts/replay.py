@@ -30,6 +30,7 @@ def says(text: str, phrase: str) -> bool:
 def check(spec, answer: str, claims: list) -> list:
     """(passed, description) for each expectation."""
     expect = spec["expect"]
+    answer = answer.split("**Evidence checked**")[0]  # an exported answer carries the evidence list; judge the answer
     ledger = " ".join(f"{c['claim']} {c.get('caveat', '')} {c.get('quote', '')}" for c in claims)
     text = f"{answer}\n{ledger}".lower()
     results = []

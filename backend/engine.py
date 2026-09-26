@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import time
+from datetime import date
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -192,7 +193,7 @@ def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Di
                     {
                         **r,
                         "primary": firecrawl.is_primary(r["url"]),
-                        "evidence": firecrawl.evidence_level(r.get("title", ""), r.get("content", "")),
+                        "evidence": firecrawl.evidence_level(r.get("title", ""), r.get("content", ""), r["url"]),
                     }
                 )
     # Strongest evidence first (systematic reviews, then trials), then official documentation
@@ -219,6 +220,24 @@ def _ledger_markdown(claims: List[Dict[str, Any]], sources: List[Dict[str, str]]
             line += f" “{c['quote']}”" + (f" [{n}]" if n else "")
         lines.append(line)
     return "\n".join(lines)
+
+
+_EVIDENCE_Q = re.compile(r"\b(evidence|studies|study|research|trials?|meta-?analys\w*|scientific|science)\b", re.I)
+_FILLER = set(
+    "what does do did the a an of for to in on and or vs versus is are be say says show shows about how which better "
+    "best evidence studies study research science scientific really actually current latest".split()
+)
+
+
+def evidence_queries(question: str) -> List[str]:
+    """Extra searches for evidence questions: the newest meta-analysis and any Cochrane review on the topic."""
+    if not _EVIDENCE_Q.search(question):
+        return []
+    words = [w for w in re.findall(r"[a-z0-9][a-z0-9-]*", question.lower()) if w not in _FILLER]
+    topic = " ".join(words[:8])
+    if not topic:
+        return []
+    return [f"{topic} meta-analysis {date.today().year}", f"{topic} Cochrane review"]
 
 
 _NORM = re.compile(r"[^a-z0-9]+")
@@ -502,7 +521,9 @@ class DebateEngine:
         # The chair sizes the debate: 1 round for simple questions, up to MAX_ROUNDS_LIMIT for hard ones
         try:
             rounds = int(choice.get("rounds"))
-            self._set(max_rounds=max(1, min(MAX_ROUNDS_LIMIT, rounds)))
+            # Questions about what the evidence says need at least one round of rebuttal
+            floor = 2 if _EVIDENCE_Q.search(self._question(d["topic"])) else 1
+            self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
         except (TypeError, ValueError):
             pass
         if action == "direct" and not asked and not summarized:
@@ -1115,6 +1136,9 @@ class DebateEngine:
             )
             if not queries:
                 queries = [item["request"][:200]]
+            if kind == "brief":
+                # For "what does the evidence say" questions, always look for the newest syntheses too
+                queries += [q for q in evidence_queries(question) if q not in queries]
 
             for q in queries:
                 self._log(msg_id, f"Searching: {q}")

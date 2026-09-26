@@ -77,15 +77,27 @@ _REVIEW = re.compile(r"meta-?analys|systematic review|cochrane|umbrella review|p
 _TRIAL = re.compile(r"randomi[sz]ed|\brct\b|clinical trial|controlled trial", re.I)
 
 
-def evidence_level(title: str, text: str = "") -> int:
-    """3 for systematic reviews and meta-analyses, 2 for randomized trials, 0 otherwise (from the title, or the start
-    of the page)."""
-    head = f"{title} {text[:400]}"
+_REVIEW_HOST = re.compile(r"(^|\.)(cochrane\.org|cochranelibrary\.com)$")
+_JOURNAL_HOST = re.compile(
+    r"(^|\.)(bmj\.com|nejm\.org|jamanetwork\.com|thelancet\.com|acpjournals\.org|nature\.com|cell\.com|"
+    r"sciencedirect\.com|springer\.com|wiley\.com|academic\.oup\.com|ahajournals\.org|ncbi\.nlm\.nih\.gov)$"
+)
+
+
+def evidence_level(title: str, text: str = "", url: str = "") -> int:
+    """3 for systematic reviews and meta-analyses, 2 for randomized trials, 1 for other journal articles, 0 otherwise
+    (from the title, the start of the page, and the site)."""
+    host = urlsplit(url).netloc.lower().removeprefix("www.") if url else ""
+    head = f"{title} {text[:1500]}"
+    if _REVIEW.search(title) or (host and _REVIEW_HOST.search(host)):
+        return 3
+    if _TRIAL.search(title):
+        return 2
     if _REVIEW.search(head):
         return 3
     if _TRIAL.search(head):
         return 2
-    return 0
+    return 1 if host and _JOURNAL_HOST.search(host) else 0
 
 
 def is_primary(url: str) -> bool:

@@ -323,7 +323,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare.
 
 {ANSWER_FORMAT}""",
         },
@@ -407,7 +407,8 @@ Reply like: {{"chair": "{members[0]["handle"]}", "researcher": "{members[-1]["ha
 
 ROUNDS_GUIDE = (
     '"rounds": how many debate rounds this deserves, 1 to 10: 1 for a straightforward question, 2-3 for a typical '
-    "decision, 4-6 for complex trade-offs, more only for hard multi-part problems"
+    "decision or a question about what research shows, 4-6 for complex trade-offs, more only for hard multi-part "
+    "problems"
 )
 
 
@@ -496,7 +497,9 @@ Keep the same conclusions, facts and [n] citations. Keep exactly the same struct
 
 def source_label(src: Dict[str, Any]) -> str:
     """How a source is marked for the researcher: its evidence level, and whether it's primary documentation."""
-    level = {3: " [systematic review / meta-analysis]", 2: " [randomized trial]"}.get(src.get("evidence", 0), "")
+    level = {3: " [systematic review / meta-analysis]", 2: " [randomized trial]", 1: " [journal article]"}.get(
+        src.get("evidence", 0), ""
+    )
     return level + (" [primary source]" if src.get("primary") else "")
 
 
