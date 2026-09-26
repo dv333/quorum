@@ -51,6 +51,13 @@ def role_line(role: Optional[Dict[str, str]]) -> str:
     return line
 
 
+CODER_HELP = """
+- The Coder, a coding agent that can read this conundrum's repository (read-only), is in the channel. Its briefs
+  cite the code as path:line. Don't guess how the code works: when it matters, put a line in your message like
+  @Coder: <one specific question about the code>
+  and the Coder will answer from the code before the next agent speaks. At most one question per message."""
+
+
 def agent_system_prompt(
     handle: str,
     others: List[str],
@@ -60,6 +67,7 @@ def agent_system_prompt(
     guidance: str = "",
     role: Optional[Dict[str, str]] = None,
     roster: Optional[List[str]] = None,
+    coder: bool = False,
 ) -> str:
     return f"""Today is {today()}. You are {handle}, one member of a council of AI agents working together to give the user the best possible answer, by debating in a group chat.{role_line(role)}
 The other agents are: {", ".join(roster or others)}. The user may also post messages; treat them as guidance from the person you all serve.
@@ -72,7 +80,7 @@ How to debate:
 - Keep it under {WORD_CAP} words. Use markdown only when it helps (short lists, code).
 - The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 - If the user addresses you by name (for example @{handle}), answer them directly first.
-- Speak only as yourself. Never write messages for other agents, the user or {RESEARCHER_NAME}.{RESEARCH_HELP if research else ""}
+- Speak only as yourself. Never write messages for other agents, the user, {RESEARCHER_NAME} or the Coder.{RESEARCH_HELP if research else ""}{CODER_HELP if coder else ""}
 
 End EVERY message with exactly these two lines:
 STANCE: AGREE | DISAGREE | REFINE
@@ -87,6 +95,8 @@ The stance is about the answer the group is converging on, not about any single 
 def _speaker(msg: Dict, handles: Dict[int, str], me: Optional[int]) -> str:
     if msg["author_kind"] == "researcher":
         asked = f", asked by {msg['requested_by']}" if msg.get("requested_by") else ""
+        if msg.get("research_kind") in ("code", "codebrief"):
+            return f"Coder (reads the repository{asked})"
         return f"{RESEARCHER_NAME} (web research{asked})"
     if msg["author_kind"] == "user":
         return "User"
@@ -147,6 +157,7 @@ def turn_messages(
     guidance: str = "",
     role: Optional[Dict[str, str]] = None,
     roster: Optional[List[str]] = None,
+    coder: bool = False,
 ) -> List[Dict[str, str]]:
     user = [history_block(prior_topics), f"THE QUESTION:\n{question}\n"]
     if summary:
@@ -170,7 +181,9 @@ def turn_messages(
     return [
         {
             "role": "system",
-            "content": agent_system_prompt(handle, others, criteria, custom_rubric, research, guidance, role, roster),
+            "content": agent_system_prompt(
+                handle, others, criteria, custom_rubric, research, guidance, role, roster, coder
+            ),
         },
         {"role": "user", "content": "".join(user)},
     ]

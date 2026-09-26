@@ -22,7 +22,7 @@
   --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.04), 0 24px 60px rgba(0, 0, 0, 0.12);
 
   --otter: #30b0c7; --panda: #5e5ce6; --koala: #34c759; --penguin: #32ade6;
-  --hedgehog: #a2845e; --beagle: #ff9f0a; --chair: #bf5af2;
+  --hedgehog: #a2845e; --beagle: #ff9f0a; --chair: #bf5af2; --coder: #636366;
   --bunny: #ff6482; --turtle: #00c7be; --dolphin: #409cff;
 
   --agree: #248a3d; --agree-bg: rgba(52, 199, 89, 0.14);
@@ -178,7 +178,7 @@ textarea.input { resize: vertical; }
   50% { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--c) 70%, transparent), 0 0 0 10px color-mix(in srgb, var(--c) 0%, transparent); }
 }
 .c-otter { --c: var(--otter); } .c-panda { --c: var(--panda); } .c-koala { --c: var(--koala); }
-.c-penguin { --c: var(--penguin); } .c-hedgehog { --c: var(--hedgehog); } .c-beagle { --c: var(--beagle); } .c-chair { --c: var(--chair); }
+.c-penguin { --c: var(--penguin); } .c-hedgehog { --c: var(--hedgehog); } .c-beagle { --c: var(--beagle); } .c-coder { --c: var(--coder); } .c-chair { --c: var(--chair); }
 .c-bunny { --c: var(--bunny); } .c-turtle { --c: var(--turtle); } .c-dolphin { --c: var(--dolphin); }
 .orb.xs { width: 17px; height: 17px; font-size: 10px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); }
 .mention { display: inline-flex; align-items: center; gap: 4px; vertical-align: -3px; padding: 1px 7px 1px 2px; margin: 0 1px; border-radius: 999px;
@@ -1035,3 +1035,8 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .side-more span { color: var(--text-3); font-weight: 400; }
 .side-more:hover { background: var(--fill); }
 .expand-btn.new { left: 56px; }
+
+/* The Coder's messages: a coding agent reading the repository */
+.bubble.coder { background: linear-gradient(180deg, color-mix(in srgb, var(--coder) 8%, var(--card)), var(--card)); box-shadow: var(--shadow), 0 0 0 0.5px color-mix(in srgb, var(--coder) 35%, transparent); }
+.bubble.coder .md code { font-size: 0.92em; }
+.refs-check { margin-top: 8px; font-size: 11.5px; color: var(--text-3); }

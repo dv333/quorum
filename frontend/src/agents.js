@@ -10,10 +10,12 @@ export const AGENTS = {
   Turtle: { emoji: '🐢', color: 'turtle' },
   Dolphin: { emoji: '🐬', color: 'dolphin' },
   Beagle: { emoji: '🐶', color: 'beagle' },
+  Coder: { emoji: '💻', color: 'coder' },
   Chair: { emoji: '★', color: 'chair' },
 }
 
 export const RESEARCHER = 'Beagle'
+export const CODER = 'Coder'
 
 export function agentFor(handle) {
   // Debates from before the animal roster used "Agent A" style handles
@@ -46,7 +48,7 @@ export function formatTime(iso) {
 }
 
 // "@Beagle", "@Otter" … (and the old "@Researcher") inside message text
-export const MENTION_NAMES = ['Otter', 'Panda', 'Koala', 'Penguin', 'Hedgehog', 'Bunny', 'Turtle', 'Dolphin', 'Beagle', 'Researcher']
+export const MENTION_NAMES = ['Otter', 'Panda', 'Koala', 'Penguin', 'Hedgehog', 'Bunny', 'Turtle', 'Dolphin', 'Beagle', 'Coder', 'Researcher']
 const MENTION_RE = new RegExp(`(^|[\\s(“"'])@(${MENTION_NAMES.join('|')})\\b`, 'g')
 
 export function linkMentions(text) {

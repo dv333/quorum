@@ -99,6 +99,11 @@ def _speaker(m: Dict[str, Any], handles: Dict[int, str], models: Dict[int, str])
         stance = f" · {m['stance']}" if m.get("stance") else ""
         role = (m.get("meta") or {}).get("role")
         return f"**{EMOJI.get(h, '')} {h}**{f', {role}' if role else ''} ({models.get(m['seat_id'], '')}){stance}"
+    if kind == "researcher" and m.get("research_kind") in ("code", "codebrief"):
+        what = "code brief" if m["research_kind"] == "codebrief" else "answer"
+        asked = f", asked by {m['requested_by']}" if m.get("requested_by") else ""
+        tool = (m.get("meta") or {}).get("label") or "coding agent"
+        return f"**💻 Coder** ({what}, {tool}, read-only{asked})"
     if kind == "researcher":
         what = {"brief": "opening brief", "factcheck": "fact-check"}.get(m.get("research_kind"), "lookup")
         asked = f", asked by {m['requested_by']}" if m.get("requested_by") else ""

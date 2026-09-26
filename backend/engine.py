@@ -14,7 +14,7 @@ from datetime import date
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from . import db, firecrawl, inventory, prompts
+from . import coder, db, firecrawl, inventory, prompts
 from .config import (
     MAX_NUM_CTX,
     MAX_ROUNDS_LIMIT,
@@ -27,14 +27,17 @@ from .config import (
     RESEARCH_MAX_QUERIES,
     RESEARCH_MAX_SOURCES,
     RESEARCH_SOURCES_PER_CLAIM,
+    CODER_REQUESTS_PER_ROUND,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
     RESEARCHER_NAME,
 )
 from .parsing import (
+    CODER_MENTION_RE,
     MENTION_RE,
     ThinkSplitter,
     parse_json_loose,
+    parse_coder_requests,
     parse_research_requests,
     parse_stance,
     plain_answer,
@@ -104,10 +107,77 @@ DEFAULT_ROLES = [
     ("Contrarian", "Tests the options nobody else is considering."),
 ]
 _ROLE_MATCH = {
+    "Security expert": re.compile(r"secur|appsec|owasp", re.I),
+    "Performance & reliability": re.compile(r"perform|psr|scal|reliab|latency", re.I),
+    "Database expert": re.compile(r"database|\bdb\b|sql|data ?store|schema", re.I),
+    "Network expert": re.compile(r"network|protocol|http|infra", re.I),
+    "Test engineer": re.compile(r"test|qa\b|quality", re.I),
+    "Concurrency expert": re.compile(r"concurren|thread|async|parallel", re.I),
+    "API & compatibility": re.compile(r"\bapi\b|compat|interface|contract", re.I),
     "Skeptic": re.compile(r"skeptic|sceptic|critic|devil|red team", re.I),
     "Pragmatist": re.compile(r"pragmat|practical|feasib|cost|operator", re.I),
     "User advocate": re.compile(r"user|customer|client|advocate for", re.I),
 }
+
+
+# Code debates get specialists for what the change touches. (name, focus, when: None = every code debate)
+CODE_ROLES = [
+    ("Security expert", "Injection, auth, secrets, unsafe input, permissions and data exposure in the change.", None),
+    (
+        "Performance & reliability",
+        "Performance, scalability and reliability: hot paths, N+1 queries, memory, "
+        "timeouts, retries and failure modes.",
+        None,
+    ),
+    (
+        "Database expert",
+        "Queries, schema and migrations, indexes, transactions, locking and data integrity.",
+        r"\b(sql|select\s|insert\s|delete\s+from|update\s+\w+\s+set|migrat\w*|schema|index(es)?|postgres\w*|mysql|"
+        r"sqlite|mongo\w*|redis|dynamo\w*|orm|sqlalchemy|prisma|typeorm|sequelize|knex|transaction|query|queries|"
+        r"cursor|database|db\.)",
+    ),
+    (
+        "Network expert",
+        "Network calls and protocols: timeouts, retries, backoff, connection reuse, TLS, payload "
+        "size and partial failures.",
+        r"\b(https?|fetch|axios|requests\.|httpx|urllib|socket|tcp|udp|grpc|websocket|dns|tls|ssl|proxy|timeout|"
+        r"retr(y|ies)|backoff|latency|endpoint url|curl|keep-?alive)\b",
+    ),
+    ("Test engineer", "What the change leaves untested, and the tests that would catch its bugs.", None),
+    (
+        "Concurrency expert",
+        "Race conditions, locks, async ordering, shared state and deadlocks.",
+        r"\b(thread\w*|mutex|lock(s|ing)?|async|await|asyncio|race|concurren\w*|goroutine|channel|atomic|"
+        r"semaphore|parallel)\b",
+    ),
+    (
+        "API & compatibility",
+        "Public interfaces, breaking changes, versioning and callers that would break.",
+        r"\b(api|endpoint|route|@app\.|router|public interface|breaking|deprecat\w*|backward|version(ing)?|"
+        r"sdk|contract|openapi|graphql)\b",
+    ),
+]
+_CODE_Q = re.compile(r"```|diff --git|^[-+]{3} [ab]/|\bcode review\b|\breview (this|the) (code|change|diff|pr)\b",
+                     re.I | re.M)  # fmt: skip
+
+
+ROLE_FOCUS = {**dict(DEFAULT_ROLES), **{name: focus for name, focus, _ in CODE_ROLES}}
+
+
+def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
+    """A debate about code: a repository is attached, the code-review pack is used, or the question holds a diff or
+    code."""
+    return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_CODE_Q.search(question))
+
+
+def code_roles(question: str, n: int) -> List[str]:
+    """The roles a code debate needs, most important first, fitted to n seats: the Skeptic, then specialists for
+    what the change touches (security, performance and tests always; database, network, concurrency and API when
+    the question or diff mentions them), then the Pragmatist."""
+    text = question.lower()
+    specialists = [name for name, _, when in CODE_ROLES if when is None or re.search(when, text, re.I)]
+    order = ["Skeptic", *specialists, "Pragmatist"]
+    return order[: max(1, n)]
 
 
 def required_roles(n: int) -> List[str]:
@@ -131,7 +201,7 @@ def settle_roles(
             roles[h] = r
             by_chair.add(h)
             used.add(r["role"].lower())
-    defaults = dict(DEFAULT_ROLES)
+    defaults = ROLE_FOCUS
 
     def covered(need: str) -> bool:
         return any(_ROLE_MATCH[need].search(r["role"]) for r in roles.values())
@@ -735,10 +805,20 @@ class DebateEngine:
         requests = parse_research_requests(content, limit=1)
         if not requests and MENTION_RE.search(content):
             requests = [MENTION_RE.sub("", content).strip()]
+        coder_requests = parse_coder_requests(content, limit=1) if self._coder() else []
+        if self._coder() and not coder_requests and CODER_MENTION_RE.search(content):
+            coder_requests = [CODER_MENTION_RE.sub("", content).strip()]
         async with self._cmd_lock:
             d = self.debate()
             status = d["status"]
             if status in ("idle", "concluded"):
+                if coder_requests and CODER_MENTION_RE.match(content) and d["topic"] > 0:
+                    # A question for the Coder between questions: no new debate round
+                    self._insert_message(topic=d["topic"], round_no=d["round"], author_kind="user", content=content)
+                    self._queue_research(coder_requests[0], "You", "code")
+                    self._set(status="researching")
+                    self._start(self._research_only(status))
+                    return
                 if requests and MENTION_RE.match(content) and d["topic"] > 0:
                     # A lookup between questions: research only, no new debate round
                     self._insert_message(topic=d["topic"], round_no=d["round"], author_kind="user", content=content)
@@ -763,6 +843,8 @@ class DebateEngine:
             self._insert_message(topic=d["topic"], round_no=d["round"], author_kind="user", content=content)
             if requests:
                 self._queue_research(requests[0], "You", "request")
+            if coder_requests:
+                self._queue_research(coder_requests[0], "You", "code")
             if status == "paused":
                 self._set(status="running")
                 self._start(self._run_rounds())
@@ -977,6 +1059,9 @@ class DebateEngine:
         d = self.debate()
         self._set(status="running")
         await self._assign_roles()
+        if self._coder():
+            # The Coder reads the repository first, so the debate starts from how the code works today
+            self._queue_research(self._question(d["topic"]), None, "codebrief")
         if d["research_enabled"]:
             self._queue_research(self._question(d["topic"]), None, "brief")
         await self._run_rounds()
@@ -1302,7 +1387,9 @@ class DebateEngine:
         seats = self.seats()
         if not seats:
             return
-        required = required_roles(len(seats))
+        question = self._question(d["topic"])
+        code = is_code_debate(question, d["pack"], d.get("repo_path"))
+        required = code_roles(question, len(seats)) if code else required_roles(len(seats))
         members, _ = await self._describe_members(seats)
         proposed: Dict[str, Dict[str, str]] = {}
         try:
@@ -1410,7 +1497,7 @@ class DebateEngine:
                 duration_ms=stats.get("duration_ms"),
                 status="done",
             )
-            if d["research_enabled"]:
+            if d["research_enabled"] or self._coder():
                 self._queue_agent_requests(seat, st.body, d["topic"], round_no)
         except asyncio.CancelledError:
             partial = self.partials.get(msg_id, {"content": "", "thinking": ""})
@@ -1439,7 +1526,24 @@ class DebateEngine:
     def _queue_research(self, request: str, requested_by: Optional[str], kind: str) -> None:
         self.research_queue.append({"request": request, "requested_by": requested_by, "kind": kind})
 
+    def _coder(self) -> Optional[str]:
+        """The coding agent for this conundrum (Claude Code or Codex), when a repository is attached."""
+        repo = self.debate().get("repo_path")
+        return coder.which() if repo and coder.valid_repo(repo) else None
+
     def _queue_agent_requests(self, seat: Dict[str, Any], body: str, topic: int, round_no: int) -> None:
+        if self._coder():
+            ckey = ("coder", topic, round_no)
+            for request in parse_coder_requests(body, limit=1):
+                if self._requests_per_round.get(ckey, 0) >= CODER_REQUESTS_PER_ROUND:
+                    self._system_message(
+                        f"{coder.CODER_NAME} limit for round {round_no} reached; skipped {seat['handle']}'s question: {request}"
+                    )
+                    continue
+                self._requests_per_round[ckey] = self._requests_per_round.get(ckey, 0) + 1
+                self._queue_research(request, seat["handle"], "code")
+        if not self.debate()["research_enabled"]:
+            return
         key = (topic, round_no)
         for request in parse_research_requests(body, limit=1):
             if self._requests_per_round.get(key, 0) >= RESEARCH_REQUESTS_PER_ROUND:
@@ -1453,7 +1557,60 @@ class DebateEngine:
     async def _drain_research(self, round_no: int) -> None:
         while self.research_queue:
             item = self.research_queue.pop(0)
-            await self._research(item, round_no)
+            if item["kind"] in ("code", "codebrief"):
+                await self._ask_coder(item, round_no)
+            else:
+                await self._research(item, round_no)
+
+    async def _ask_coder(self, item: Dict[str, Any], round_no: int) -> None:
+        """Ask the coding agent about the repository, read-only, and post its answer with its citations checked."""
+        d = self.debate()
+        cli = self._coder()
+        row = self._insert_message(
+            topic=d["topic"],
+            round_no=round_no,
+            author_kind="researcher",
+            status="streaming",
+            research_kind=item["kind"],
+            research_request=item["request"],
+            requested_by=item["requested_by"],
+        )
+        msg_id = row["id"]
+        self.partials[msg_id] = {"content": "", "thinking": ""}
+        repo = coder.valid_repo(d.get("repo_path")) or ""
+        try:
+            if not cli or not repo:
+                raise coder.CoderError("No repository or coding agent is available")
+            question = self._question(d["topic"])
+            prompt = (
+                coder.brief_prompt(question)
+                if item["kind"] == "codebrief"
+                else coder.ask_prompt(question, item["request"], item["requested_by"])
+            )
+            self._log(msg_id, f"{coder.label(cli)} is reading {repo} (read-only)…")
+            text, run = await coder.run(cli, prompt, repo)
+            refs = coder.check_refs(text, repo)
+            self._record(coder.CODER_NAME, cli, "coder", {"duration_ms": run["duration_ms"]})
+            self._finish_message(
+                msg_id,
+                content=coder.with_ref_note(text, refs) or "The coding agent had nothing to say.",
+                thinking=self.partials[msg_id]["thinking"],
+                duration_ms=run["duration_ms"],
+                meta_json=json.dumps({"agent": coder.CODER_NAME, "cli": cli, "label": coder.label(cli), "refs": refs}),
+                status="done",
+            )
+        except asyncio.CancelledError:
+            self._finish_message(msg_id, status="stopped")
+            raise
+        except Exception as e:
+            self._finish_message(
+                msg_id,
+                content=f"{coder.CODER_NAME} couldn't answer: {e}",
+                meta_json=json.dumps({"agent": coder.CODER_NAME, "cli": cli, "label": coder.label(cli)}),
+                status="error",
+            )
+        finally:
+            self.partials.pop(msg_id, None)
 
     async def _research_only(self, previous_status: str) -> None:
         try:
@@ -1692,6 +1849,7 @@ class DebateEngine:
                 research=d["research_enabled"],
                 guidance=(d["pack"] or {}).get("guidance", ""),
                 role={"role": seat["role"], "focus": seat.get("role_focus") or ""} if seat.get("role") else None,
+                coder=bool(self._coder()),
                 roster=roster,
             )
 
@@ -2047,7 +2205,7 @@ class DebateEngine:
             serialize_message(r)
             for r in db.query(
                 "SELECT * FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'researcher' "
-                "AND status = 'done' AND research_kind IN ('brief', 'request') ORDER BY id",
+                "AND status = 'done' AND research_kind IN ('brief', 'request', 'codebrief', 'code') ORDER BY id",
                 [self.id, topic],
             )
         ]
@@ -2058,7 +2216,7 @@ class DebateEngine:
             if words + n > limit_words and parts:
                 break
             parts.append(
-                f"{'Opening brief' if r['research_kind'] == 'brief' else 'Lookup: ' + (r['research_request'] or '')[:120]}\n{text}"
+                f"{ ({'brief': 'Opening brief', 'codebrief': 'The code today (from the Coder)'}.get(r['research_kind']) or ('Coder: ' if r['research_kind'] == 'code' else 'Lookup: ') + (r['research_request'] or '')[:120]) }\n{text}"
             )
             words += n
         return "\n\n".join(reversed(parts))

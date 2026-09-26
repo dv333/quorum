@@ -106,6 +106,14 @@ class Progress:
                 stance = f" {m['stance']}" if m.get("stance") else ""
                 line = (m.get("position_line") or "").strip()
                 self.say(f"  {EMOJI.get(h, '·')} {h} · round {m['round']}{stance}" + (f" — {line}" if line else ""))
+            elif (
+                kind == "researcher"
+                and m.get("research_kind") in ("code", "codebrief")
+                and m["status"] in ("done", "error")
+            ):
+                tool = (m.get("meta") or {}).get("label") or "coding agent"
+                what = "code brief" if m["research_kind"] == "codebrief" else "answer"
+                self.say(f"  💻 Coder · {what} · {tool}" + (" · failed" if m["status"] == "error" else ""))
             elif kind == "researcher" and m["status"] == "done":
                 what = {"brief": "opening brief", "factcheck": "fact-check"}.get(m.get("research_kind"), "lookup")
                 n = len(m.get("sources") or [])
@@ -233,6 +241,8 @@ def cmd_ask(args: argparse.Namespace) -> int:
     body: Dict[str, Any] = {"question": question, "pack": args.pack}
     if args.no_research:
         body["research_enabled"] = False
+    if args.repo:
+        body["repo_path"] = os.path.abspath(os.path.expanduser(args.repo))
     snap = post("/debates", body)
     debate_id = snap["debate"]["id"]
     progress = Progress(args.quiet)
@@ -330,6 +340,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     ask.add_argument("--pack", help="a topic pack id (see: quorum packs)")
     ask.add_argument("--no-questions", action="store_true", help="skip the chair's clarifying questions")
     ask.add_argument("--no-research", action="store_true", help="don't search the web")
+    ask.add_argument("--repo", help="a local repository the Coder (Claude Code or Codex) can read to answer questions")
     ask.add_argument("-q", "--quiet", action="store_true", help="no progress lines on stderr")
     answer_options(ask)
     ask.set_defaults(func=cmd_ask)

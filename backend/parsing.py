@@ -84,6 +84,11 @@ class ThinkSplitter:
 
 
 _MENTION = r"@(?:Beagle|Researcher)"
+_CODER_RE = re.compile(
+    r"(?:^|\n)[ \t>*_-]*@Coder\b[*_]*[ \t]*[:,\-–—]?[ \t]*(?P<line>[^\n]+)|@Coder[*_]*[ \t]*:[ \t]*(?P<inline>[^\n]+)",
+    re.IGNORECASE,
+)
+CODER_MENTION_RE = re.compile(r"@Coder[:,]?", re.IGNORECASE)
 _RESEARCH_RE = re.compile(
     rf"(?:^|\n)[ \t>*_-]*{_MENTION}\b[*_]*[ \t]*[:,\-–—]?[ \t]*(?P<line>[^\n]+)"  # mention starting a line
     rf"|{_MENTION}[*_]*[ \t]*:[ \t]*(?P<inline>[^\n]+)",  # or "@Beagle: ..." inline
@@ -98,6 +103,19 @@ def parse_research_requests(text: str, limit: int = 1) -> List[str]:
     text = _CODE_BLOCK_RE.sub("", text)
     out: List[str] = []
     for m in _RESEARCH_RE.finditer(text):
+        req = (m.group("line") or m.group("inline") or "").strip().strip("*_` ")
+        if len(req) >= 8 and req not in out:
+            out.append(req)
+        if len(out) >= limit:
+            break
+    return out
+
+
+def parse_coder_requests(text: str, limit: int = 1) -> List[str]:
+    """Extract '@Coder: <question about the code>' requests, outside code blocks."""
+    text = _CODE_BLOCK_RE.sub("", text)
+    out: List[str] = []
+    for m in _CODER_RE.finditer(text):
         req = (m.group("line") or m.group("inline") or "").strip().strip("*_` ")
         if len(req) >= 8 and req not in out:
             out.append(req)

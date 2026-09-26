@@ -4,7 +4,7 @@ import { RESEARCHER, displayTitle, modelShort } from '../agents'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
-import { AgentMessage, BeagleCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
+import { AgentMessage, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
 const INTAKE = ['intake', 'clarifying', 'confirming']
 const focusComposer = () => window.dispatchEvent(new Event('quorum:focus-composer'))
@@ -92,6 +92,7 @@ function Thread({ items, seatsById, debate, onIntake }) {
     // A folded round hides its turns and the lookups made during it
     if (lastRound !== null && collapsed.has(lastRound) && m.round === lastRound && ['seat', 'researcher'].includes(m.author_kind)) continue
     if (m.author_kind === 'user') out.push(<UserMessage key={m.id} msg={m} />)
+    else if (m.author_kind === 'researcher' && ['code', 'codebrief'].includes(m.research_kind)) out.push(<CoderCard key={m.id} msg={m} />)
     else if (m.author_kind === 'researcher') out.push(<BeagleCard key={m.id} msg={m} model={debate.researcher_model} />)
     else if (m.author_kind === 'system') out.push(<SystemRow key={m.id} msg={m} />)
     else if (m.author_kind === 'moderator') {
@@ -218,6 +219,7 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
 function mentionables(seats, debate) {
   const list = seats.map((s) => ({ name: s.handle, model: s.model, hint: s.role }))
   if (debate.research_enabled) list.push({ name: RESEARCHER, model: debate.researcher_model, hint: 'searches the web' })
+  if (debate.repo_path) list.push({ name: 'Coder', model: '', hint: 'reads the code (read-only)' })
   return list
 }
 

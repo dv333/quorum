@@ -154,6 +154,7 @@ MIGRATIONS = [
     ("debates", "researcher_endpoint_id", "INTEGER"),
     ("debates", "researcher_model", "TEXT"),
     ("messages", "research_kind", "TEXT"),
+    ("debates", "repo_path", "TEXT"),
     ("messages", "research_request", "TEXT"),
     ("messages", "requested_by", "TEXT"),
     ("messages", "sources_json", "TEXT NOT NULL DEFAULT '[]'"),
