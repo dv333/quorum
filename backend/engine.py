@@ -481,6 +481,20 @@ def check_legal_names(text: str, pages: List[Dict[str, Any]]) -> List[Dict[str, 
     return problems
 
 
+def shorten_bottom_line(text: str, limit_words: int = 55) -> str:
+    """A safety net after the revision: a bottom line still past the limit keeps only its first two sentences."""
+    m = _BOTTOM.search(text)
+    if not m or len(re.sub(r"[*_]", "", m.group(1)).split()) <= limit_words:
+        return text
+    plain = re.sub(r"\*\*", "", m.group(1)).strip()
+    sentences = re.split(r"(?<=[.!?])\s+(?=[A-Z])", plain)
+    short = " ".join(sentences[:2]).strip()
+    if len(short.split()) > limit_words:
+        short = " ".join(sentences[:1]).strip()
+    prefix = m.group(0)[: m.start(1) - m.start(0)]
+    return text[: m.start(0)] + prefix + f"**{short}**" + text[m.end(0):]
+
+
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
     """Calculations written out in the answer ("30 × 4.5 ÷ 8 ≈ 17") whose result is off by more than 15%."""
     problems = []
@@ -1914,6 +1928,7 @@ class DebateEngine:
                 checked = _interleave([found], 3)
                 self._research_pages.setdefault(topic, []).extend(checked)
                 options += check_shortlist([{"name": x}], checked)
+        options = options[:6]
         self._shortlist[topic] = options
         return options
 
@@ -2044,8 +2059,8 @@ class DebateEngine:
         ) + [
             {
                 "text": "",
-                "issue": f"The research found {o} as an option, but the answer doesn't mention it; compare it with the "
-                "others on what the question asks, using the research.",
+                "issue": f"The research found {o} as an option, but the answer doesn't mention it; add it to the comparison "
+                "in the key points or details (not the bottom line), on what the question asks, using the research.",
             }
             for o in self._shortlist.get(row["topic"], [])
             if not option_mentioned(o, row["content"])
@@ -2083,7 +2098,7 @@ class DebateEngine:
                     and sections(row["content"]) <= sections(revised)
                     and len(revised) >= 0.6 * len(row["content"])
                 ):
-                    content = plain_answer(revised)
+                    content = shorten_bottom_line(plain_answer(revised))
                     meta["evidence"].update(revised=True, original=row["content"])
             except Exception as e:
                 log.warning("answer revision failed: %s", e)

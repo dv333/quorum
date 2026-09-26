@@ -704,3 +704,12 @@ def test_laws_need_an_official_source_and_blogs_are_not_reviews():
     assert [p["text"] for p in flagged] == ["The Clean Cooking Act of 2026"]
     assert firecrawl.evidence_level("Induction vs gas cooktops", "A meta-analysis found…", "https://blog.example/x") == 0
     assert firecrawl.evidence_level("Gas stoves and asthma", "A meta-analysis of 41 studies", "https://x.stanford.edu/a") == 3
+
+
+def test_a_bottom_line_still_too_long_after_revision_keeps_two_sentences():
+    from backend.engine import shorten_bottom_line
+
+    long = "BOTTOM LINE: **Pick A if X. Pick B if Y. " + "Others fall short for many reasons here. " * 8 + "**\n\n## Key points"
+    assert shorten_bottom_line(long).startswith("BOTTOM LINE: **Pick A if X. Pick B if Y.**\n\n## Key points")
+    short = "BOTTOM LINE: **Pick A.**\n\n## Key points"
+    assert shorten_bottom_line(short) == short
