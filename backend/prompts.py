@@ -291,6 +291,7 @@ def verdict_messages(
     guidance: str = "",
     claims: Optional[List[Dict[str, Any]]] = None,
     research: str = "",
+    studies: str = "",
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -300,6 +301,11 @@ def verdict_messages(
     }.get(reason, "")
     summ = f"\nSummary of earlier rounds:\n{summary}\n" if summary else ""
     found = f"\nWhat {RESEARCHER_NAME}'s research found:\n{research}\n" if research else ""
+    if studies:
+        found += (
+            "\nKey studies (checked against their pages; lead with these and use their names, years and numbers "
+            f"exactly, without inventing other details):\n{studies}\n"
+        )
     if claims:
         check = f"\nEvidence ledger (checked against sources; it overrides the agents):\n{ledger_text(claims)}\n\n{EVIDENCE_RULES}\n"
     elif fact_check:
@@ -579,6 +585,58 @@ Prefer systematic reviews, meta-analyses and sources marked [primary source]. Th
 Reply like: {{"status": "partly", "source": 1, "quote": "...", "caveat": "..."}}""",
         },
     ]
+
+
+def studies_messages(question: str, pages: List[Dict[str, Any]], max_studies: int = 5) -> List[Dict[str, str]]:
+    """Pull the key studies out of the pages the research read, with only the details the pages state."""
+    blocks = "\n\n".join(
+        f"[{i + 1}] {p['title']} ({p['url']}){source_label(p)}\n{p['content']}" for i, p in enumerate(pages)
+    )
+    return [
+        {
+            "role": "system",
+            "content": f"You are {RESEARCHER_NAME}, a careful research librarian. You report only what the pages literally say. Reply with a single JSON object and nothing else.",
+        },
+        {
+            "role": "user",
+            "content": f"""Question: {question}
+
+Pages:
+{blocks}
+
+List up to {max_studies} studies described in these pages that best answer the question, strongest evidence first: systematic reviews and meta-analyses, then randomized trials, then other studies. For each:
+- "name": how the page identifies it (journal, first author, or review name)
+- "year": publication year, only if the page states it
+- "design": what kind of study and how big, e.g. "network meta-analysis of 99 randomized trials" or "12-month randomized trial"
+- "participants": how many people, only if stated
+- "finding": one plain sentence with its key result and numbers, naming the specific forms compared (for example time-restricted eating or alternate-day fasting)
+- "quote": one or two sentences copied word for word from the page that back the finding
+- "source": the page's number
+Leave out any detail the page doesn't state.
+
+Reply like: {{"studies": [{{"name": "...", "year": "...", "design": "...", "participants": "...", "finding": "...", "quote": "...", "source": 1}}]}}""",
+        },
+    ]
+
+
+def studies_text(studies: List[Dict[str, str]]) -> str:
+    """The checked studies as the chair and the audit see them."""
+    lines = []
+    for s in studies:
+        head = s["name"] + (f" ({s['year']})" if s.get("year") else "")
+        detail = "; ".join(x for x in (s.get("design"), s.get("participants") and f"{s['participants']} participants") if x)
+        lines.append(f"- {head}{': ' + detail if detail else ''}. {s['finding']}")
+    return "\n".join(lines)
+
+
+def studies_markdown(studies: List[Dict[str, str]]) -> str:
+    """The "Key studies" section added to the answer."""
+    lines = ["## Key studies", ""]
+    for i, s in enumerate(studies, 1):
+        head = f"**{s['name']}**" + (f" ({s['year']})" if s.get("year") else "")
+        detail = ", ".join(x for x in (s.get("design"), s.get("participants") and f"{s['participants']} participants") if x)
+        lines.append(f"{i}. {head}{' · ' + detail if detail else ''}. {s['finding']} [Source]({s['url']})")
+    return "\n".join(lines)
 
 
 def ledger_text(claims: List[Dict[str, Any]]) -> str:

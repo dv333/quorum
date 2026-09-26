@@ -202,6 +202,42 @@ def _related_pages(
     return [p for _, p in sorted(scored, key=lambda x: -x[0])[:limit]]
 
 
+_NUM = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _numbers_in(text: str, source: str) -> bool:
+    """Whether every number in `text` also appears in the source (thousands separators ignored)."""
+    plain = source.replace(",", "")
+    return all(n in plain for n in _NUM.findall(text.replace(",", "")))
+
+
+def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, str]]:
+    """Keep the studies whose quote is really on their page and whose finding's numbers are too; drop any year or size
+    the page doesn't state."""
+    out, seen = [], set()
+    for s in raw:
+        if not isinstance(s, dict):
+            continue
+        try:
+            page = pages[int(s.get("source")) - 1]
+        except (TypeError, ValueError, IndexError):
+            continue
+        field = {k: " ".join(str(s.get(k) or "").split())[:300] for k in ("name", "year", "design", "participants", "finding", "quote")}
+        text = f"{page.get('title', '')} {page['url']} {page.get('content', '')}"
+        if not field["name"] or not field["finding"] or page["url"] in seen:
+            continue
+        if not quote_in_source(field["quote"], page.get("content", "")) or not _numbers_in(field["finding"], text):
+            continue
+        if not re.fullmatch(r"(19|20)\d\d", field["year"]) or field["year"] not in text:
+            field["year"] = ""
+        for k in ("design", "participants"):
+            if not _numbers_in(field[k], text):
+                field[k] = ""
+        seen.add(page["url"])
+        out.append({**field, "url": page["url"], "title": page.get("title", "")})
+    return out[:limit]
+
+
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
     """Take results round-robin across queries so every query contributes, deduplicated by URL, with the strongest
     evidence (systematic reviews, then randomized trials) and official documentation moved to the front."""
@@ -1612,6 +1648,32 @@ class DebateEngine:
             self.partials.pop(msg_id, None)
         return []
 
+    async def _key_studies(self, topic: int) -> List[Dict[str, str]]:
+        """The strongest studies the research read (reviews and trials first), with details checked against their
+        pages, for the chair to lead with and for the answer's "Key studies" section."""
+        pages, seen = [], set()
+        for p in sorted(self._research_pages.get(topic, []), key=lambda p: -p.get("evidence", 0)):
+            if p.get("evidence", 0) >= 1 and p["url"] not in seen:
+                seen.add(p["url"])
+                pages.append(p)
+        pages = pages[:6]
+        if not pages:
+            return []
+        d = self.debate()
+        try:
+            text = await self._complete(
+                self._chair_label(d),
+                "studies",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.studies_messages(self._question(topic), pages),
+                await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+            )
+            return check_studies(parse_json_loose(text).get("studies") or [], pages)
+        except Exception as e:
+            log.warning("key studies failed: %s", e)
+            return []
+
     def _research_digest(self, topic: int, limit_words: int = 1200) -> str:
         """Everything Beagle found for this topic (briefs and lookups, newest last), for the chair's answer. The
         transcript window alone can miss the opening brief."""
@@ -1640,7 +1702,9 @@ class DebateEngine:
             return db.query("SELECT * FROM claims WHERE debate_id = ? ORDER BY id", [self.id])
         return db.query("SELECT * FROM claims WHERE debate_id = ? AND topic = ? ORDER BY id", [self.id, topic])
 
-    async def _audit_answer(self, msg_id: int, claims: List[Dict[str, Any]]) -> None:
+    async def _audit_answer(
+        self, msg_id: int, claims: List[Dict[str, Any]], studies: Optional[List[Dict[str, str]]] = None
+    ) -> None:
         """After the answer: check it against the ledger and, if it breaks the evidence rules, have the chair revise it
         once. The answer records that it was checked, and what was fixed."""
         row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
@@ -1656,7 +1720,11 @@ class DebateEngine:
                 d["chair_endpoint_id"],
                 d["chair_model"],
                 prompts.answer_check_messages(
-                    row["content"], claims, self._research_digest(row["topic"]), list(self._handles().values())
+                    row["content"],
+                    claims,
+                    self._research_digest(row["topic"])
+                    + (f"\n\nKey studies:\n{prompts.studies_text(studies)}" if studies else ""),
+                    list(self._handles().values()),
                 ),
                 think,
             )
@@ -1683,6 +1751,8 @@ class DebateEngine:
                         think,
                     )
                 ).strip()
+                # Models sometimes echo the problem list after the answer
+                revised = re.split(r"\n[ \t*_#]*(?:an |the )?audit (?:found|flagged|identified)\b", revised, flags=re.I)[0].strip()
                 # A revision has to keep the answer whole: its bottom line and its sections
                 sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
                 if (
@@ -1824,8 +1894,10 @@ class DebateEngine:
             # 1. Any pending lookups, then each material claim the answer will rely on, checked against sources
             await self._drain_research(d["round"])
             claims: List[Dict[str, Any]] = []
+            studies: List[Dict[str, str]] = []
             if d["research_enabled"] and positions:
                 claims = await self._check_claims(positions, d["round"])
+                studies = await self._key_studies(topic)
 
             # 2. Chair synthesizes the final answer, streamed like any other message
             summary = self._latest_summary(topic)
@@ -1849,6 +1921,7 @@ class DebateEngine:
                 custom_rubric=d["custom_rubric"],
                 guidance=(d["pack"] or {}).get("guidance", ""),
                 claims=claims,
+                studies=prompts.studies_text(studies),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:
@@ -1900,7 +1973,12 @@ class DebateEngine:
                 self._finish_message(row["id"], status="error", content=f"The chair ({d['chair_model']}) failed: {e}")
             finally:
                 self.partials.pop(row["id"], None)
-            await self._audit_answer(row["id"], claims)
+            await self._audit_answer(row["id"], claims, studies)
+            done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])
+            if studies and done and done["status"] == "done" and done["content"]:
+                self._finish_message(
+                    row["id"], content=done["content"].rstrip() + "\n\n" + prompts.studies_markdown(studies)
+                )
 
             vid = db.execute(
                 "INSERT INTO verdicts (debate_id, topic, reason, rounds, message_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",

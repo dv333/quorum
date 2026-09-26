@@ -531,3 +531,33 @@ def test_audit_wording_becomes_plain_words():
 
     text = "This is **unverified** by the provided evidence, and the research findings don't compare it."
     assert plain_answer(text) == "This is not established, and the studies don't compare it."
+
+
+def test_key_studies_keep_only_what_the_page_states():
+    from backend.engine import check_studies
+    from backend.prompts import studies_markdown
+
+    page = {
+        "url": "https://www.cochranelibrary.com/cdsr/doi/10.1002/14651858.CD015610",
+        "title": "Intermittent fasting for adults with overweight or obesity",
+        "content": "We included 22 randomized trials with 1,995 participants. Intermittent fasting probably results in "
+        "little to no difference in weight loss compared with standard dietary advice.",
+        "evidence": 3,
+    }
+    good = {
+        "name": "Cochrane review",
+        "year": "2026",  # not on the page, so it's dropped
+        "design": "systematic review of 22 randomized trials",
+        "participants": "1995",
+        "finding": "Fasting made little to no difference to weight loss versus standard advice.",
+        "quote": "Intermittent fasting probably results in little to no difference in weight loss compared with standard "
+        "dietary advice.",
+        "source": 1,
+    }
+    invented = {**good, "finding": "Fasting lost 4.2 kg more.", "source": 1}
+    fake_quote = {**good, "quote": "Fasting is clearly better than any other diet for everyone.", "source": 1}
+    studies = check_studies([invented, fake_quote, good], [page])
+    assert [s["finding"] for s in studies] == [good["finding"]]
+    assert studies[0]["year"] == "" and studies[0]["participants"] == "1995"
+    md = studies_markdown(studies)
+    assert md.startswith("## Key studies") and "22 randomized trials" in md and page["url"] in md
