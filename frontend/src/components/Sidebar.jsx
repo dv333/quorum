@@ -227,11 +227,10 @@ export default function Sidebar({ refreshKey, polling, hiddenId, currentId, view
     <aside className="sidebar" aria-label="Conundrums">
       <div className="brand">
         <div className="mark"><span /><span /><span /></div><b>{appName}</b>
-        <button className="icon-btn brand-new" onClick={onNew} aria-label="New conundrum" title="New conundrum (⌘N)"><ComposeIcon /></button>
         <button className="icon-btn collapse-btn" onClick={onCollapse} aria-label="Hide sidebar" title="Hide sidebar (⌃⌘S)"><SidebarIcon /></button>
       </div>
-      <button className="new-q" onClick={onNew} title="New conundrum (⌘N)"><ComposeIcon /> New conundrum</button>
-      {(total > 0 || query) && (
+      {/* Search and New conundrum share the top row */}
+      <div className="side-top">
         <div className="side-search">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <circle cx="7" cy="7" r="4.8" /><line x1="10.6" y1="10.6" x2="14" y2="14" strokeLinecap="round" />
@@ -245,7 +244,8 @@ export default function Sidebar({ refreshKey, polling, hiddenId, currentId, view
           {query ? <button className="clear" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus() }}>✕</button>
             : <kbd aria-hidden="true">⌘K</kbd>}
         </div>
-      )}
+        <button className="side-new" onClick={onNew} aria-label="New conundrum" title="New conundrum (⌘N)"><ComposeIcon /></button>
+      </div>
       <nav className="history">
         {results ? (
           <div>
