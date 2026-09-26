@@ -105,3 +105,24 @@ def test_titled_findings_keep_their_paragraphs_and_sub_bullets():
     assert "never awaited" in findings[0]["text"] and "use gather" in findings[0]["text"]
     assert "UnboundLocalError" in findings[1]["text"]
     assert findings[2]["text"].startswith("3. No tests") and "fails twice" in findings[2]["text"]
+
+
+TABLE = """## Details
+
+### High-severity fixes
+| File | Line | Issue | Fix |
+|------|------|-------|-----|
+| `orders/db.py` | 13-18 | `WHERE customer_id = %s` built via string interpolation | Use `?` placeholders. |
+| `orders/api.py` | 16 | Route no longer typed | Revert to `<int:customer_id>`. |
+
+### Correct aspects
+| What | Why |
+|---|---|
+| create_order | parameterized |
+"""
+
+
+def test_table_rows_are_findings():
+    findings = bench.split_findings(TABLE)
+    assert [f["severity"] for f in findings] == ["high", "high"]
+    assert findings[0]["text"].startswith("`orders/db.py` · 13-18 · `WHERE customer_id")

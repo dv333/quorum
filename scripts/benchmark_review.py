@@ -185,6 +185,7 @@ def run_quorum(case: Dict[str, Any], repo: Path, mode: str) -> Dict[str, Any]:
 # ------------------------------------------------------------------ findings and scoring
 
 _ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*)")
+_ROW = re.compile(r"^\s*\|(.*)\|\s*$")
 _HEADING = re.compile(r"^\s*(?:#{1,6}\s+(.*)|\*\*(.{1,160}?)\*\*:?\s*|([A-Z][\w &/()-]{0,60}):\s*)$")
 SEVERITY = [
     ("high", re.compile(r"\bhigh\b|must.fix|critical|blocker|severe", re.I)),
@@ -203,15 +204,18 @@ def severity_of(text: str) -> Optional[str]:
 
 
 def split_findings(answer: str) -> List[Dict[str, str]]:
-    """The answer's findings, from either layout reviewers use: list items under a High, Medium or Low heading (or
-    starting with one of those words), or a numbered or bold title per finding followed by paragraphs and sub-bullets.
+    """The answer's findings, from the layouts reviewers use: list items or table rows under a High, Medium or Low
+    heading (or starting with one of those words), or a numbered or bold title per finding followed by paragraphs and
+    sub-bullets.
     Items under 'looks correct', 'where they differed', 'next steps' and similar headings aren't findings; items under
     'key points' or 'summary' count toward finding a bug but are never counted as false alarms."""
     items: List[Dict[str, Any]] = []
     section: Optional[str] = None  # severity of the current section; "skip", "summary", or None if unknown
     current: Optional[Dict[str, Any]] = None
+    header: Optional[List[str]] = None  # the current table's header row
     for line in answer.splitlines():
         if not line.strip():
+            header = None
             if current is not None and not current["titled"]:
                 current = None
             continue
@@ -231,6 +235,20 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
             else:
                 section, current = None, None
             continue
+        row = _ROW.match(line)
+        if row:
+            cells = [c.strip() for c in row.group(1).split("|")]
+            if all(re.fullmatch(r":?-{2,}:?", c) for c in cells if c):
+                continue  # the separator under a header
+            if header is None:
+                header = cells  # the first row of a table is its header
+                continue
+            text = " · ".join(c for c in cells if c)
+            lead = next((severity_of(c) for c in cells if len(c) < 12 and severity_of(c)), None)
+            current = {"severity": lead or section, "text": text, "titled": False}
+            items.append(current)
+            continue
+        header = None
         if item:
             indented = len(line) - len(line.lstrip()) >= 2
             if current is not None and (current["titled"] or indented):
