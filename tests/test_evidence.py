@@ -720,3 +720,11 @@ def test_an_evidence_criterion_needs_studies_not_just_the_word():
 
     assert not requirement_covered("health evidence", "The health benefits are real.")
     assert requirement_covered("health evidence", "Health: a 2024 Stanford study found more NO2 exposure.")
+
+
+def test_figures_need_a_source():
+    from backend.engine import check_unsourced_figures
+
+    sources = "The Model Y Standard costs $41,630 with 321 miles of range; budget $45k; Ioniq 5 from $35,000."
+    answer = "The Model Y costs $41,630 (321 miles); the Ioniq 5 LR is about $53k. 30 × 4.5 ÷ 8 ≈ 17 GB. Under $45k."
+    assert [p["text"] for p in check_unsourced_figures(answer, sources)] == ["$53k"]

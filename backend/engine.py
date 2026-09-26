@@ -501,6 +501,45 @@ def shorten_bottom_line(text: str, limit_words: int = 55) -> str:
     return text[: m.start(0)] + prefix + f"**{short}**" + text[m.end(0):]
 
 
+_FIGURE = re.compile(
+    r"\$\d[\d,]*(?:\.\d+)?\s?[kKmM]?\b|\b\d[\d,]*(?:\.\d+)?\s?(?:%|GB\b|TB\b|W\b|kW\b|kWh\b|tok/s|tokens?/s|"
+    r"miles?\b|mi\b|mph\b|ms\b|kg\b|cu\.? ?ft)"
+)
+
+
+def _digits(s: str) -> str:
+    return re.sub(r"[^\d.]", "", s.replace(",", "")).rstrip(".")
+
+
+def check_unsourced_figures(text: str, sources: str, limit: int = 4) -> List[Dict[str, str]]:
+    """Prices, percentages, sizes and speeds in the answer that appear nowhere in what the research read, the
+    checked claims or the question (numbers in written-out arithmetic are the answer's own and are skipped)."""
+    haystack = re.sub(r"(?<=\d),(?=\d)", "", sources)
+    numbers = set(re.findall(r"\d+(?:\.\d+)?", haystack))
+    body = _CALC.sub(" ", text)
+    problems, seen = [], set()
+    for m in _FIGURE.finditer(body):
+        num = _digits(m.group(0))
+        if not num or num in seen or len(num.replace(".", "")) < 2:
+            continue
+        seen.add(num)
+        # "$45k" is 45000 in a source; "1.29" may be written "1.3"
+        variants = {num, num.rstrip("0").rstrip(".") if "." in num else num}
+        if re.search(r"[kK]\b", m.group(0)):
+            variants.add(str(int(float(num) * 1000)))
+        if not variants & numbers:
+            problems.append(
+                {
+                    "text": m.group(0).strip(),
+                    "issue": "this figure isn't in any source the research read or the checked claims; replace it with "
+                    "the sourced figure, or remove it, or call it a rough estimate",
+                }
+            )
+        if len(problems) >= limit:
+            break
+    return problems
+
+
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
     """Calculations written out in the answer ("30 × 4.5 ÷ 8 ≈ 17") whose result is off by more than 15%."""
     problems = []
@@ -2002,6 +2041,13 @@ class DebateEngine:
             return db.query("SELECT * FROM claims WHERE debate_id = ? ORDER BY id", [self.id])
         return db.query("SELECT * FROM claims WHERE debate_id = ? AND topic = ? ORDER BY id", [self.id, topic])
 
+    def _source_text(self, topic: int, claims: List[Dict[str, Any]], question: str) -> str:
+        """Everything the answer's figures can come from: the pages the research read, its briefs, the checked
+        claims and their quotes, and the question."""
+        pages = " ".join(f"{p.get('title', '')} {p.get('raw') or p.get('content', '')}" for p in self._research_pages.get(topic, []))
+        ledger = " ".join(f"{c.get('claim', '')} {c.get('quote', '')} {c.get('caveat', '')}" for c in claims)
+        return " ".join([pages, self._research_digest(topic, limit_words=6000), ledger, question])
+
     def _auditor(self, d: Dict[str, Any]) -> Tuple[str, int, str]:
         """Who checks the chair's answer: the largest council model other than the chair's, so the answer isn't
         audited by the model that wrote it (falls back to the chair when every seat runs the same model)."""
@@ -2062,7 +2108,7 @@ class DebateEngine:
             if not specific_covered(s, row["content"])
         ] + check_bottom_line(row["content"]) + check_arithmetic(row["content"]) + check_legal_names(
             row["content"], self._research_pages.get(row["topic"], [])
-        ) + [
+        ) + check_unsourced_figures(row["content"], self._source_text(row["topic"], claims, question)) + [
             {
                 "text": "",
                 "issue": f"The research found {o} as an option, but the answer doesn't mention it; add it to the comparison "
@@ -2078,7 +2124,7 @@ class DebateEngine:
                 for p in raw
                 if isinstance(p, dict) and str(p.get("issue") or "").strip()
             ]
-        )[:8]
+        )[:10]
         meta = {"evidence": {"checked": True, "problems": problems, "auditor": auditor}}
         content = plain_answer(row["content"])
         if problems:
