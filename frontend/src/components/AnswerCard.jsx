@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 const GFM = [[remarkGfm, { singleTilde: false }]]
 import { api, exportMarkdown, exportUrl } from '../api'
 import { RESEARCHER, agentFor, formatDuration, formatTime, formatTokens, modelShort } from '../agents'
-import { CopyButton, Markdown, Orb, copyText } from './Message'
+import { CiteContext, CopyButton, Markdown, MdLink, Orb, citeLinks, copyText } from './Message'
 import Mermaid from './Mermaid'
 
 const LEVELS = [['simple', 'Simple'], ['standard', 'Standard'], ['expert', 'Expert']]
@@ -232,6 +232,48 @@ function ExportMenu({ debateId, level, onPrint }) {
 // The claim ledger behind the answer: each material claim, what the sources say about it, and the exact quote
 const CLAIM_LABEL = { supported: 'Supported', partly: 'Partly supported', contradicted: 'Contradicted', unknown: 'Unverified' }
 
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' }
+}
+
+// Opens the evidence list and brings one claim into view, briefly highlighted
+function showClaim(claim) {
+  const el = document.getElementById(`evidence-${claim.id}`)
+  if (!el) return
+  const details = el.closest('details')
+  if (details) details.open = true
+  el.scrollIntoView({ behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' })
+  el.classList.remove('flash')
+  void el.offsetWidth // restart the animation
+  el.classList.add('flash')
+}
+
+// A citation like [2] in the answer: hover or focus previews the checked claim, click jumps to it
+function Cite({ n, claim }) {
+  const [align, setAlign] = useState('')
+  if (!claim) return <span className="cite-plain">[{n}]</span>
+  const label = CLAIM_LABEL[claim.status] || 'Unverified'
+  // Keep the preview inside the answer card: anchor it left or right near the card's edges
+  const place = (e) => {
+    const card = e.currentTarget.closest('.answer')?.getBoundingClientRect()
+    const r = e.currentTarget.getBoundingClientRect()
+    if (!card) return
+    const mid = r.left + r.width / 2
+    setAlign(mid - 175 < card.left + 8 ? 'start' : mid + 175 > card.right - 8 ? 'end' : '')
+  }
+  return (
+    <span className={`cite ${align}`} onMouseEnter={place} onFocus={place}>
+      <button className={`cite-n ev-${claim.status}`} onClick={() => showClaim(claim)} aria-label={`Evidence ${n}: ${label}. ${claim.claim}`}>{n}</button>
+      <span className="cite-pop" role="tooltip">
+        <span className={`ev-chip ev-${claim.status}`}>{label}</span>
+        <span className="cite-claim">{claim.claim}</span>
+        {claim.quote && <span className="cite-quote">“{claim.quote.length > 220 ? `${claim.quote.slice(0, 219)}…` : claim.quote}”</span>}
+        {claim.source_url && <span className="cite-src">{hostOf(claim.source_url)}</span>}
+      </span>
+    </span>
+  )
+}
+
 function EvidenceSummary({ claims, evidence }) {
   if (!claims.length) return null
   const n = (s) => claims.filter((c) => c.status === s).length
@@ -323,6 +365,7 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
   }
 
   const text = level === 'standard' ? msg?.content : versions[level]
+  const renderCite = (n) => <Cite key={`cite-${n}`} n={n} claim={claims[n - 1]} />
   const a = parseAnswer(text)
   const chairName = chairHandle || 'The chair'
   // Diagrams are for the Expert view; the other levels stay text-first with a way in
@@ -369,22 +412,24 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
           <div className="shimmer" style={{ width: '70%' }} />
         </div>
       ) : (
+        <CiteContext.Provider value={renderCite}>
         <div className="answer-text">
           {a.bottom && (
             <div className="bottom-line">
-              <ReactMarkdown remarkPlugins={GFM} components={{ p: ({ children }) => <p>{children}</p> }}>{a.bottom}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={GFM} components={{ p: ({ children }) => <p>{children}</p>, a: MdLink }}>{citeLinks(a.bottom)}</ReactMarkdown>
             </div>
           )}
           {a.sections.map((sec, i) => (
             <div key={`${i}-${sec.title}`}>
-              <div className="a-body"><Markdown>{sec.title ? `### ${sec.title}\n\n${sec.content}` : sec.content}</Markdown></div>
+              <div className="a-body"><Markdown>{citeLinks(sec.title ? `### ${sec.title}\n\n${sec.content}` : sec.content)}</Markdown></div>
               {/* The diagram sits right after the first section (the key points) */}
               {i === 0 && diagram}
             </div>
           ))}
           {a.sections.length === 0 && diagram}
-          {a.dissent && <div className="dissent"><b>Where they differed: </b><Markdown className="inline">{a.dissent}</Markdown></div>}
+          {a.dissent && <div className="dissent"><b>Where they differed: </b><Markdown className="inline">{citeLinks(a.dissent)}</Markdown></div>}
         </div>
+        </CiteContext.Provider>
       )}
       {verdict && <EvidenceSummary claims={claims} evidence={msg?.meta?.evidence} />}
       {verdict && <Evidence claims={claims} />}

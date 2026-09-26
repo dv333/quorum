@@ -3,10 +3,20 @@ import remarkGfm from 'remark-gfm'
 
 // Models write "~$12k" for approximations; only ~~double~~ tildes should strike through
 const GFM = [[remarkGfm, { singleTilde: false }]]
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { RESEARCHER, agentFor, formatTime, linkMentions, modelShort } from '../agents'
 
-function MdLink({ node, href, children, ...props }) {
+// Inside an answer, [n] citations render through this (see citeLinks); elsewhere they stay plain text
+export const CiteContext = createContext(null)
+
+// "[2]" (not already a link) becomes a link the answer card can render as a citation with a preview
+export function citeLinks(text) {
+  return typeof text === 'string' ? text.replace(/\[(\d{1,2})\](?!\()/g, '[\\[$1\\]](#cite-$1)') : text
+}
+
+export function MdLink({ node, href, children, ...props }) {
+  const cite = useContext(CiteContext)
+  if (cite && href?.startsWith('#cite-')) return cite(Number(href.slice(6)))
   if (href?.startsWith('#agent-')) {
     const name = href.slice(7)
     return <span className="mention"><Orb handle={name} size="xs" />{name}</span>
