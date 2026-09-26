@@ -668,3 +668,26 @@ def test_running_out_of_search_credits_stops_retrying():
     assert search_is_down(Exception("Firecrawl error (HTTP 402): Insufficient credits to perform this request"))
     assert search_is_down(Exception("Can't reach Firecrawl at http://localhost:3002"))
     assert not search_is_down(Exception("Firecrawl search timed out"))
+
+
+async def test_shortlist_checks_well_known_options_the_pages_missed():
+    eng = make_debate(cpq_client(), research=True, search=search)
+    eng._research_pages[1] = [
+        {"url": "https://ranked.example/evs", "title": "Best EVs under $45k", "content": "The Hyundai Ioniq 5 leads.",
+         "evidence": 0, "primary": False}
+    ]
+
+    async def complete(*args, **kw):
+        return json.dumps({"options": [{"name": "Hyundai Ioniq 5", "source": 1}],
+                           "also_consider": ["Tesla Model Y", "Imaginary Car X"]})
+
+    async def lookup(query, limit, focus=""):
+        if "Model Y" in query:
+            return [{"url": "https://cars.example/model-y", "title": "2026 Tesla Model Y Standard",
+                     "description": "", "content": "The Model Y Standard starts at $41,630 with 321 miles of range."}]
+        return []
+
+    eng._complete = complete
+    eng.search_fn = lookup
+    options = await eng._make_shortlist(1, "Which EV under $45k is best?", 1, "m", None)
+    assert options == ["Hyundai Ioniq 5", "Tesla Model Y"]  # the made-up one found no page, so it's left out

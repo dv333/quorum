@@ -1865,10 +1865,25 @@ class DebateEngine:
             text = await self._complete(
                 RESEARCHER_NAME, "shortlist", ep_id, model, prompts.shortlist_messages(question, pages), think
             )
-            options = check_shortlist(parse_json_loose(text).get("options") or [], pages)
+            reply = parse_json_loose(text)
+            options = check_shortlist(reply.get("options") or [], pages)
         except Exception as e:
             log.warning("shortlist failed: %s", e)
             return []
+        # Well-known options the pages missed get one search each, and count only if a page confirms them
+        extra = [str(x).strip()[:60] for x in (reply.get("also_consider") or []) if isinstance(x, str) and x.strip()]
+        extra = [x for x in extra if not any(option_mentioned(x, o) or option_mentioned(o, x) for o in options)][:2]
+        if extra:
+            results = await asyncio.gather(
+                *[self.search_fn(f"{x} {date.today().year} {_topic(question, 5)}", 3) for x in extra],
+                return_exceptions=True,
+            )
+            for x, found in zip(extra, results):
+                if isinstance(found, Exception) or not found:
+                    continue
+                checked = _interleave([found], 3)
+                self._research_pages.setdefault(topic, []).extend(checked)
+                options += check_shortlist([{"name": x}], checked)
         self._shortlist[topic] = options
         return options
 

@@ -617,7 +617,9 @@ Pages:
 
 List up to {max_options} specific options these pages name that could answer the question and fit its constraints (price limits, dates, sizes). Use the name as the page writes it, short (like "Tesla Model Y" or "ECS on Fargate"), and give one page number where it appears. Include every serious contender the pages mention, not only the one they favor; leave out options that break the question's constraints.
 
-Reply like: {{"options": [{{"name": "...", "source": 1}}]}}""",
+Then, under "also_consider", name up to 2 well-known options that people commonly weigh for this question and that may fit its constraints but that these pages don't mention; they'll be checked with a search before anyone relies on them.
+
+Reply like: {{"options": [{{"name": "...", "source": 1}}], "also_consider": ["..."]}}""",
         },
     ]
 
