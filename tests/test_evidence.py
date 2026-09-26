@@ -728,3 +728,11 @@ def test_figures_need_a_source():
     sources = "The Model Y Standard costs $41,630 with 321 miles of range; budget $45k; Ioniq 5 from $35,000."
     answer = "The Model Y costs $41,630 (321 miles); the Ioniq 5 LR is about $53k. 30 × 4.5 ÷ 8 ≈ 17 GB. Under $45k."
     assert [p["text"] for p in check_unsourced_figures(answer, sources)] == ["$53k"]
+
+
+def test_a_quantity_criterion_needs_a_number():
+    from backend.engine import requirement_covered
+
+    assert not requirement_covered("cost", "The Mac costs more upfront, but it's quieter.")
+    assert requirement_covered("cost", "The 48 GB Mac costs about $2,000; a used-3090 PC about $1,600.")
+    assert requirement_covered("Range", "The Model Y Standard's EPA range is 321 miles.")

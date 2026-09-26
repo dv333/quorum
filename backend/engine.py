@@ -411,6 +411,9 @@ def stated_requirements(question: str) -> List[str]:
     return [p for p in parts if p and len(p.split()) <= 4][:6]
 
 
+_QUANTITY = r"^(costs?|price[sd]?|pricing|budget|speed|range|latency|throughput|size|capacity|time|payback|savings)$"
+
+
 def requirement_covered(requirement: str, text: str) -> bool:
     """Whether the answer talks about a criterion at all (each word's stem appears somewhere)."""
     low = text.lower()
@@ -421,6 +424,11 @@ def requirement_covered(requirement: str, text: str) -> bool:
         return False
     if any(evidence.match(w) for w in words):
         return bool(re.search(r"\b(stud(y|ies)|meta-?analys\w*|systematic review|trials?|cohort|survey)\b", low))
+    # A quantity ("cost", "speed", "range") needs a number where the answer discusses it, not just the word
+    if any(re.match(_QUANTITY, w) for w in words):
+        stems = [w[:5] for w in words if re.match(_QUANTITY, w)]
+        sentences = re.split(r"(?<=[.!?])\s+|\n", low)
+        return any(any(s in sent for s in stems) and re.search(r"\d", sent) for sent in sentences)
     return True
 
 
