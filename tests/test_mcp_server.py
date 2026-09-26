@@ -121,3 +121,62 @@ async def test_the_server_offers_six_tools():
         "quorum_followup",
         "quorum_list",
     }
+
+
+def test_a_stopped_local_engine_is_started_in_the_background(tmp_path, monkeypatch):
+    calls = {"up": 0, "popen": []}
+
+    def up():
+        calls["up"] += 1
+        return calls["up"] > 1  # down at first, up once started
+
+    monkeypatch.setattr(mcp_server, "backend_up", up)
+    monkeypatch.setattr(mcp_server, "LOG_PATH", tmp_path / "log")
+    monkeypatch.setattr(mcp_server.subprocess, "Popen", lambda cmd, **kw: calls["popen"].append((cmd, kw)))
+    monkeypatch.setattr(cli, "API_URL", "http://127.0.0.1:8002")
+    note = mcp_server.ensure_backend()
+    assert "started in the background" in note
+    cmd, kw = calls["popen"][0]
+    assert cmd[1:] == ["-m", "backend.main"] and kw["start_new_session"]
+
+
+def test_a_remote_or_opted_out_engine_is_never_started(monkeypatch):
+    monkeypatch.setattr(mcp_server, "backend_up", lambda: False)
+    monkeypatch.setattr(mcp_server.subprocess, "Popen", lambda *a, **k: pytest.fail("started"))
+    monkeypatch.setattr(cli, "API_URL", "https://quorum.example.com")
+    with pytest.raises(cli.QuorumError, match="Start it with ./start.sh"):
+        mcp_server.ensure_backend()
+    monkeypatch.setattr(cli, "API_URL", "http://127.0.0.1:8002")
+    monkeypatch.setenv("QUORUM_MCP_AUTOSTART", "0")
+    with pytest.raises(cli.QuorumError):
+        mcp_server.ensure_backend()
+
+
+def test_tool_errors_come_back_as_text(monkeypatch):
+    monkeypatch.setattr(mcp_server, "ensure_backend", lambda: "(started)")
+    assert mcp_server.with_backend(lambda x: f"ok {x}", 1) == "(started)\n\nok 1"
+
+    def boom():
+        raise cli.QuorumError("no models")
+
+    assert mcp_server.with_backend(boom) == "Quorum couldn't do that: no models"
+
+
+def test_doctor_names_a_fix_for_each_problem(tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_server, "backend_up", lambda: True)
+    monkeypatch.setattr(mcp_server.shutil, "which", lambda name: None)
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    monkeypatch.setattr("backend.coder.which", lambda: None)
+
+    def get(path):
+        if path == "/inventory":
+            return {"models": [{"local": True, "fit": "fits"}]}
+        return {"ready": False}
+
+    monkeypatch.setattr(cli, "get", get)
+    report, ok = mcp_server.doctor()
+    assert not ok
+    assert "✗ uv isn't installed" in report
+    assert "only 1 local model(s) fit" in report and "ollama pull" in report
+    assert "! web search isn't available" in report
+    assert "ChatGPT isn't supported yet" in report
