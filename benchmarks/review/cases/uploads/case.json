@@ -1,0 +1,70 @@
+{
+  "task": "Let users keep uploads in folders and choose the thumbnail size.",
+  "bugs": [
+    {
+      "id": "traversal-save",
+      "what": "save_upload joins unsanitized folder and name (path traversal, overwrite any file)",
+      "match": [
+        "travers|\\.\\./|escape|outside|sanitiz|arbitrary (file|path)|directory",
+        "save|write|folder|name"
+      ]
+    },
+    {
+      "id": "traversal-read",
+      "what": "read_upload joins unsanitized folder and name (read any file)",
+      "match": [
+        "travers|\\.\\./|escape|outside|sanitiz|arbitrary (file|path)|absolute|/etc/passwd|directory",
+        "read"
+      ]
+    },
+    {
+      "id": "shell-injection",
+      "what": "shell=True with the user's size and path (command injection)",
+      "match": [
+        "shell=true|shell injection|command injection|S602|S604|injection",
+        "shell|size|convert|subprocess"
+      ]
+    },
+    {
+      "id": "timeout-removed",
+      "what": "the 30 s timeout on convert was removed",
+      "match": [
+        "timeout|hang"
+      ]
+    },
+    {
+      "id": "file-not-closed",
+      "what": "files are opened without being closed (handle leak, unflushed write)",
+      "match": [
+        "clos|leak|with open|context manager|SIM115|flush"
+      ]
+    }
+  ],
+  "acceptable": [
+    {
+      "id": "hidden-files",
+      "match": [
+        "dot|hidden|startswith|empty name|bad file name"
+      ]
+    },
+    {
+      "id": "size-validation",
+      "match": [
+        "size",
+        "validat|format|regex|pattern|whitelist|allow"
+      ]
+    },
+    {
+      "id": "tests",
+      "match": [
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+      ]
+    },
+    {
+      "id": "makedirs",
+      "match": [
+        "makedirs|mkdir|permission"
+      ]
+    }
+  ]
+}

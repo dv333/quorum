@@ -1,0 +1,60 @@
+{
+  "task": "Cap page size at 100 and return whether another page follows.",
+  "bugs": [
+    {
+      "id": "offset-off-by-one",
+      "what": "start = page * per_page skips the first page (pages start at 1)",
+      "match": [
+        "off.by.one|page \\* per_page|page - 1|page-1|skips? the first|first page|\\(page - 1\\)|offset"
+      ]
+    },
+    {
+      "id": "page-validation-removed",
+      "what": "the page < 1 check was removed",
+      "match": [
+        "page < 1|page <= 0|page (0|zero)|negative page|valueerror|validat"
+      ]
+    },
+    {
+      "id": "has-next-boundary",
+      "what": "has_next is true when end == len(items), with no next page",
+      "match": [
+        "end <= len|end < len|has.?next|another page|boundary|exactly"
+      ]
+    },
+    {
+      "id": "page-count-floor",
+      "what": "page_count drops the last partial page (floor division)",
+      "match": [
+        "page_count|floor|partial|ceil|round(s|ing)? down|last page"
+      ]
+    }
+  ],
+  "acceptable": [
+    {
+      "id": "per-page-validation",
+      "match": [
+        "per_page",
+        "0|zero|negative|divi|validat"
+      ]
+    },
+    {
+      "id": "return-type-change",
+      "match": [
+        "tuple|return (type|value)|callers?|breaking|compat|signature"
+      ]
+    },
+    {
+      "id": "tests",
+      "match": [
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+      ]
+    },
+    {
+      "id": "silent-cap",
+      "match": [
+        "silent|clamp|cap"
+      ]
+    }
+  ]
+}

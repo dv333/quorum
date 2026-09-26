@@ -1,0 +1,38 @@
+{
+  "task": "Add a name search for users, with a capped result limit; % and _ typed by users match literally.",
+  "clean": true,
+  "bugs": [],
+  "acceptable": [
+    {
+      "id": "leading-wildcard-scan",
+      "match": [
+        "index|full (table )?scan|leading wildcard|performance|slow"
+      ]
+    },
+    {
+      "id": "limit-type",
+      "match": [
+        "limit",
+        "int\\(|valueerror|typeerror|non.?numeric|string"
+      ]
+    },
+    {
+      "id": "unicode-case",
+      "match": [
+        "unicode|non.?ascii|collat|nocase|lower\\(|casefold"
+      ]
+    },
+    {
+      "id": "pagination",
+      "match": [
+        "pagina|offset|cursor"
+      ]
+    },
+    {
+      "id": "tests",
+      "match": [
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+      ]
+    }
+  ]
+}

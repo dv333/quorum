@@ -1,0 +1,80 @@
+"""The code-review benchmark's scoring: findings split from an answer and matched to the planted bugs."""
+
+import importlib.util
+
+import pytest
+
+spec = importlib.util.spec_from_file_location("benchmark_review", "scripts/benchmark_review.py")
+bench = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bench)
+
+ANSWER = """BOTTOM LINE: Don't merge.
+
+## Key points
+- **Errors are swallowed:** every exception is caught and None returned.
+
+## Details
+**Must fix (High):**
+1. Parameterize `db.py:15` (`customer_id`) with `?` placeholders.
+2. Restore `timeout=10` on the request.
+
+**Should fix (Medium):**
+- Cache the settings at import time.
+
+**What looks correct:**
+- `create_order` uses parameterized queries.
+"""
+
+CASE = {
+    "bugs": [
+        {"id": "sqli", "match": ["parameteri|placeholder", "db\\.py:15|customer_id"]},
+        {"id": "timeout", "match": ["timeout"]},
+        {"id": "swallowed", "match": ["swallow"]},
+        {"id": "http", "match": ["plain http"]},
+    ],
+    "acceptable": [],
+}
+
+
+def test_findings_come_from_severity_sections_and_skip_what_looks_correct():
+    findings = bench.split_findings(ANSWER)
+    by_severity = {f["severity"]: [] for f in findings}
+    for f in findings:
+        by_severity[f["severity"]].append(f["text"])
+    assert len(by_severity["high"]) == 2 and len(by_severity["medium"]) == 1
+    assert by_severity["summary"] == ["**Errors are swallowed:** every exception is caught and None returned."]
+    assert not any("create_order" in f["text"] for f in findings)
+
+
+def test_bugs_found_anywhere_count_and_unmatched_findings_are_listed():
+    s = bench.score(CASE, bench.split_findings(ANSWER))
+    assert set(s["found"]) == {"sqli", "timeout", "swallowed"} and s["missed"] == ["http"]
+    assert s["recall"] == 0.75 and s["findings"] == 3
+    assert [f["text"] for f in s["unmatched"]] == ["Cache the settings at import time."]
+
+
+def test_on_a_clean_change_high_and_medium_findings_are_false_alarms():
+    clean = {"clean": True, "bugs": [], "acceptable": [{"id": "cache", "match": ["cache"]}]}
+    findings = [
+        {"severity": "high", "text": "SQL injection in search_users"},
+        {"severity": "medium", "text": "cache the settings"},
+        {"severity": "low", "text": "rename x"},
+        {"severity": "summary", "text": "looks risky"},
+    ]
+    s = bench.score(clean, findings)
+    assert [f["text"] for f in s["false_alarms"]] == ["SQL injection in search_users"]
+    assert s["recall"] is None
+
+
+def test_answers_without_severities_count_every_list_item():
+    findings = bench.split_findings("Problems:\n- a bug\n- another bug\n")
+    assert [f["severity"] for f in findings] == ["medium", "medium"]
+
+
+@pytest.mark.parametrize("case", [c["name"] for c in bench.load_cases()])
+def test_every_case_has_a_task_and_a_base_and_change(case):
+    (c,) = bench.load_cases([case])
+    assert c["task"] and (c["folder"] / "base").is_dir() and (c["folder"] / "change").is_dir()
+    assert c.get("clean") or c["bugs"]
+    for point in c["bugs"] + c["acceptable"]:
+        assert point["match"], point["id"]

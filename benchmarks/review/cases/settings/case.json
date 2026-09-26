@@ -1,0 +1,33 @@
+{
+  "task": "Move settings into a typed, immutable dataclass, accept true/yes/on for DEBUG, and keep get_settings for existing callers.",
+  "clean": true,
+  "bugs": [],
+  "acceptable": [
+    {
+      "id": "invalid-workers",
+      "match": [
+        "workers",
+        "invalid|valueerror|non.?numeric|positive|negative|zero|validat"
+      ]
+    },
+    {
+      "id": "debug-semantics",
+      "match": [
+        "debug|true_values|_flag",
+        "behavio|semantic|previously|now (also )?accept|change"
+      ]
+    },
+    {
+      "id": "tests",
+      "match": [
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+      ]
+    },
+    {
+      "id": "caching",
+      "match": [
+        "cach|lru|every call"
+      ]
+    }
+  ]
+}
