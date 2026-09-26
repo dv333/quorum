@@ -68,10 +68,30 @@ def concat_file(timeline):
 def gif(timeline, name, width=960, fps=12):
     listing = concat_file(timeline)
     out = os.path.join(OUT, name)
-    vf = (f"fps={fps},scale={width}:-1:flags=lanczos,split[a][b];"
-          "[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle")
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", listing,
-                    "-vf", vf, "-loop", "0", out], check=True)
+    vf = (
+        f"fps={fps},scale={width}:-1:flags=lanczos,split[a][b];"
+        "[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
+    )
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            listing,
+            "-vf",
+            vf,
+            "-loop",
+            "0",
+            out,
+        ],
+        check=True,
+    )
     os.remove(listing)
     seconds = sum(d for _, d in timeline)
     print(f"{name}: {len(timeline)} frames, {seconds:.0f}s, {os.path.getsize(out) / 1e6:.1f} MB")
@@ -80,9 +100,32 @@ def gif(timeline, name, width=960, fps=12):
 def mp4(timeline, name):
     listing = concat_file(timeline)
     out = os.path.join(OUT, name)
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", listing,
-                    "-vf", "fps=30,scale=1280:-2:flags=lanczos", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                    "-crf", "23", "-movflags", "+faststart", out], check=True)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "concat",
+            "-safe",
+            "0",
+            "-i",
+            listing,
+            "-vf",
+            "fps=30,scale=1280:-2:flags=lanczos",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-crf",
+            "23",
+            "-movflags",
+            "+faststart",
+            out,
+        ],
+        check=True,
+    )
     os.remove(listing)
     print(f"{name}: {os.path.getsize(out) / 1e6:.1f} MB")
 

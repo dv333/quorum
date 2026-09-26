@@ -37,7 +37,9 @@ class Recorder:
     async def snap(self, phase):
         path = os.path.join(FRAMES, f"{len(self.frames):05d}-{int(time.time() * 1000) % 100000}.png")
         await self.page.screenshot(path=path)
-        self.frames.append({"t": round(time.monotonic() - self.start, 2), "phase": phase, "file": os.path.basename(path)})
+        self.frames.append(
+            {"t": round(time.monotonic() - self.start, 2), "phase": phase, "file": os.path.basename(path)}
+        )
 
     async def hold(self, phase, seconds, every=0.5):
         end = time.monotonic() + seconds

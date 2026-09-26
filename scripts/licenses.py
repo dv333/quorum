@@ -23,9 +23,14 @@ PERMISSIVE = re.compile(
 def python_deps():
     out = subprocess.run(
         ["uv", "export", "--no-dev", "--no-hashes", "--no-emit-project", "--format", "requirements-txt"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
-    names = sorted({line.split("==")[0].strip() for line in out.splitlines() if "==" in line and not line.startswith("#")})
+    names = sorted(
+        {line.split("==")[0].strip() for line in out.splitlines() if "==" in line and not line.startswith("#")}
+    )
     rows = []
     for name in names:
         try:
@@ -34,7 +39,9 @@ def python_deps():
             continue
         lic = md.get("License-Expression") or ""
         if not lic or len(lic) > 60:
-            classifiers = [c.split("::")[-1].strip() for c in md.get_all("Classifier") or [] if c.startswith("License ::")]
+            classifiers = [
+                c.split("::")[-1].strip() for c in md.get_all("Classifier") or [] if c.startswith("License ::")
+            ]
             lic = ", ".join(classifiers) or (md.get("License") or "").splitlines()[0][:60]
         rows.append((name, md.get("Version"), lic or "UNKNOWN", md.get("Home-page") or ""))
     return rows
@@ -65,8 +72,11 @@ def npm_deps():
 def main():
     py, js = python_deps(), npm_deps()
     weak = [(n, v, lic) for n, v, lic, _ in py + js if WEAK_COPYLEFT.search(str(lic))]
-    flagged = [(n, v, lic) for n, v, lic, _ in py + js
-               if not PERMISSIVE.search(str(lic)) and not WEAK_COPYLEFT.search(str(lic))]
+    flagged = [
+        (n, v, lic)
+        for n, v, lic, _ in py + js
+        if not PERMISSIVE.search(str(lic)) and not WEAK_COPYLEFT.search(str(lic))
+    ]
     lines = [
         "# Third-party notices",
         "",

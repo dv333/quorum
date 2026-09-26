@@ -1,0 +1,65 @@
+{
+  "task": "Retry failed fetches with exponential backoff and log how many URLs were fetched.",
+  "bugs": [
+    {
+      "id": "semaphore-dropped",
+      "what": "requests no longer go through the semaphore (unbounded concurrency)",
+      "match": [
+        "sem(aphore)?|concurren(cy|t) (limit|cap)|unbounded|rate.?limit|limit="
+      ]
+    },
+    {
+      "id": "blocking-sleep",
+      "what": "time.sleep blocks the event loop in async code",
+      "match": [
+        "time\\.sleep|block(s|ing)? the (event )?loop|asyncio\\.sleep|ASYNC251"
+      ]
+    },
+    {
+      "id": "failure-cached",
+      "what": "when every retry fails, the error response is cached and returned as success (or resp is unbound)",
+      "match": [
+        "unbound|all (retries|attempts)|exhaust|cach(e|es|ed|ing) (the )?(error|fail)|error (page|response)|after the loop|never raise|resp (is )?(not defined|undefined)|last attempt"
+      ]
+    },
+    {
+      "id": "not-awaited",
+      "what": "get_all returns un-awaited coroutines (no fetch ever runs)",
+      "match": [
+        "coroutine|not awaited|never awaited|un.?awaited|gather|never (run|execut)"
+      ]
+    }
+  ],
+  "acceptable": [
+    {
+      "id": "cache-stampede",
+      "match": [
+        "stampede|duplicate (fetch|request)|same url|dogpile|in.flight"
+      ]
+    },
+    {
+      "id": "unbounded-cache",
+      "match": [
+        "unbounded|memory|lru|evict"
+      ]
+    },
+    {
+      "id": "logging",
+      "match": [
+        "print|logg"
+      ]
+    },
+    {
+      "id": "retry-on-4xx",
+      "match": [
+        "4\\d\\d|client error|non.retryable|retryable"
+      ]
+    },
+    {
+      "id": "tests",
+      "match": [
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+      ]
+    }
+  ]
+}

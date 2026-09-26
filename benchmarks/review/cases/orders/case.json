@@ -1,0 +1,170 @@
+{
+  "task": "Add order search, response caching, background charging and payment retries.",
+  "bugs": [
+    {
+      "id": "sqli-customer",
+      "what": "customer_id is %-formatted into SQL (db.py:15)",
+      "match": [
+        "sql.?inj|parameteri|placeholder|string.?(format|interpol|based)|S608",
+        "db\\.py:1[5-9]\\b|get_customer_orders|customer_id"
+      ]
+    },
+    {
+      "id": "sqli-search",
+      "what": "the search term is f-stringed into a LIKE query (db.py:25)",
+      "match": [
+        "sql.?inj|parameteri|placeholder|f.?string|S608",
+        "db\\.py:2[45]\\b|search_orders|\\bterm\\b|LIKE|/orders/search"
+      ]
+    },
+    {
+      "id": "n-plus-one",
+      "what": "one customer query per order (N+1)",
+      "match": [
+        "n\\s*\\+\\s*1|per.order|each order|one query per|join"
+      ]
+    },
+    {
+      "id": "hardcoded-key",
+      "what": "a live API key is hardcoded",
+      "match": [
+        "live_secret|sk_live|hard.?coded|api.?key|secret|credential|S105"
+      ]
+    },
+    {
+      "id": "plain-http",
+      "what": "the payments URL is plain http",
+      "match": [
+        "\\bhttp\\b(?!s)|plain.?http|https|tls|cleartext|unencrypted"
+      ]
+    },
+    {
+      "id": "no-timeout",
+      "what": "requests.post has no timeout",
+      "match": [
+        "timeout|S113"
+      ]
+    },
+    {
+      "id": "retry-policy",
+      "what": "10 retries, fixed 0.1 s sleep, no backoff or status check",
+      "match": [
+        "retr|backoff|raise_for_status|range\\(10\\)"
+      ]
+    },
+    {
+      "id": "swallowed-errors",
+      "what": "every exception is swallowed and None returned",
+      "match": [
+        "swallow|except exception|bare except|broad except|catch(es)? (all|every)|silently|BLE001|S110"
+      ]
+    },
+    {
+      "id": "paid-without-charge",
+      "what": "the order is marked paid even when the charge failed (None)",
+      "match": [
+        "mark_paid|marked? (as )?paid|charge_id (is )?none|none charge|failed (payment|charge)"
+      ]
+    },
+    {
+      "id": "shared-connection",
+      "what": "one SQLite connection shared across threads (check_same_thread=False)",
+      "match": [
+        "check_same_thread|shared (sqlite )?conn|global conn|single (sqlite )?conn|one conn|per.request conn"
+      ]
+    },
+    {
+      "id": "unlocked-cache",
+      "what": "the global _cache is read and cleared across threads without a lock",
+      "match": [
+        "_cache|cache",
+        "lock|race|thread.?safe|concurren"
+      ]
+    },
+    {
+      "id": "background-thread",
+      "what": "charging runs in an untracked background thread (lost on crash, no result)",
+      "match": [
+        "thread",
+        "lost|crash|daemon|queue|executor|lifecycle|fire.and.forget|untracked|restart|shut ?down|join"
+      ]
+    },
+    {
+      "id": "route-converter",
+      "what": "the <int:> route converter was removed",
+      "match": [
+        "<int:|int converter|route converter|converter|customer_id.*(string|str|validat|type)"
+      ]
+    },
+    {
+      "id": "renamed-fields",
+      "what": "response fields renamed (id/total to order_id/amount), breaking clients",
+      "match": [
+        "renam|breaking|backward|compat|contract|original (response )?keys|response keys"
+      ]
+    }
+  ],
+  "acceptable": [
+    {
+      "id": "charge-id-dropped",
+      "match": [
+        "charge_id",
+        "response|return|client|removed"
+      ]
+    },
+    {
+      "id": "missing-customer",
+      "match": [
+        "fetchone|missing customer|typeerror|none\\[|nonetype"
+      ]
+    },
+    {
+      "id": "no-auth",
+      "match": [
+        "auth"
+      ]
+    },
+    {
+      "id": "no-tests",
+      "match": [
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+      ]
+    },
+    {
+      "id": "transaction",
+      "match": [
+        "transaction|with conn|atomic"
+      ]
+    },
+    {
+      "id": "money-rounding",
+      "match": [
+        "float|round|cents|decimal"
+      ]
+    },
+    {
+      "id": "input-validation",
+      "match": [
+        "validat|keyerror|get_json|body\\["
+      ]
+    },
+    {
+      "id": "idempotency",
+      "match": [
+        "idempot|double.?charg|duplicate"
+      ]
+    },
+    {
+      "id": "select-star",
+      "match": [
+        "select \\*|all columns|column"
+      ]
+    },
+    {
+      "id": "unbounded-cache",
+      "match": [
+        "unbounded|memory|lru|ttl"
+      ]
+    }
+  ]
+}
