@@ -259,6 +259,12 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
     return out[:limit]
 
 
+def search_is_down(e: Exception) -> bool:
+    """Errors that won't fix themselves within a run: no server, no key, no credits or quota left."""
+    msg = str(e).lower()
+    return any(s in msg for s in ("reach", "api key", "http 402", "credits", "quota", "http 401", "http 403"))
+
+
 _OPEN_CHOICE = re.compile(r"\b(which|best|recommend)\b", re.I)
 _NAMED = re.compile(r"\b(or|vs\.?|versus)\b", re.I)
 
@@ -333,8 +339,11 @@ def model_size(model: str) -> float:
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
     """Take results round-robin across queries so every query contributes, deduplicated by URL, with the strongest
     evidence (systematic reviews, then randomized trials) and official documentation moved to the front."""
-    # Social posts, videos and shop listings only when nothing else was found
-    useful = [[r for r in results if not firecrawl.is_low_value(r["url"])] for results in result_lists]
+    # Social posts, videos, shop listings and pages that came back empty only when nothing else was found
+    useful = [
+        [r for r in results if not firecrawl.is_low_value(r["url"]) and (r.get("content") or "").strip()]
+        for results in result_lists
+    ]
     if any(useful):
         result_lists = useful
     seen, out = set(), []
@@ -1456,7 +1465,7 @@ class DebateEngine:
             )
             raise
         except firecrawl.SearchError as e:
-            if "reach" in str(e) or "API key" in str(e):
+            if search_is_down(e):
                 self._search_down = str(e)  # don't retry every request in this run
             self._finish_message(
                 msg_id, status="error", content=f"Web search failed: {e}", thinking=self.partials[msg_id]["thinking"]
@@ -1838,7 +1847,7 @@ class DebateEngine:
             self._finish_message(msg_id, status="stopped")
             raise
         except firecrawl.SearchError as e:
-            if "reach" in str(e) or "API key" in str(e):
+            if search_is_down(e):
                 self._search_down = str(e)
             self._finish_message(msg_id, status="error", content=f"Web search failed: {e}")
         except Exception as e:
@@ -2190,6 +2199,7 @@ class DebateEngine:
                 claims=claims,
                 studies=prompts.studies_text(studies),
                 options=self._shortlist.get(topic, []),
+                search_failed=(self._search_down or "") if d["research_enabled"] else "",
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:

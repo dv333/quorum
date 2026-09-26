@@ -293,6 +293,7 @@ def verdict_messages(
     research: str = "",
     studies: str = "",
     options: Sequence[str] = (),
+    search_failed: str = "",
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -306,6 +307,12 @@ def verdict_messages(
         found += (
             "\nKey studies (checked against their pages; lead with these and use their names, years and numbers "
             f"exactly, without inventing other details):\n{studies}\n"
+        )
+    if search_failed:
+        found += (
+            "\nWeb research failed for this question, so nothing was checked against current sources. Say so plainly "
+            "in the details (the answer rests on the council's own knowledge), and don't present time-sensitive facts "
+            "(prices, rebates, model years, rules) as current.\n"
         )
     if options:
         found += (

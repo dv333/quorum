@@ -653,3 +653,18 @@ def test_a_long_bottom_line_is_flagged():
     assert check_bottom_line("BOTTOM LINE: **Use Cloud Run on GCP or ECS Fargate on AWS.**\n\n## Key points") == []
     long = "BOTTOM LINE: " + " ".join(["word"] * 70)
     assert "70 words" in check_bottom_line(long)[0]["issue"]
+
+
+def test_agent_names_are_not_cited_like_sources():
+    from backend.parsing import plain_answer
+
+    text = "Check rebates using [Beagle]'s data, and dealer capacity [Otter]."
+    assert plain_answer(text) == "Check rebates using the research, and dealer capacity."
+
+
+def test_running_out_of_search_credits_stops_retrying():
+    from backend.engine import search_is_down
+
+    assert search_is_down(Exception("Firecrawl error (HTTP 402): Insufficient credits to perform this request"))
+    assert search_is_down(Exception("Can't reach Firecrawl at http://localhost:3002"))
+    assert not search_is_down(Exception("Firecrawl search timed out"))
