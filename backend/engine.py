@@ -1358,6 +1358,9 @@ class DebateEngine:
                 # For "what does the evidence say" questions, always look for the newest syntheses too, and give each
                 # criterion the question lists ("speed, cost…") its own search
                 extra = criteria_queries(question)
+                if open_choice(question):
+                    # A ranked list surfaces the contenders one favorite-heavy page would leave out
+                    extra = [f"best {_topic(question, 8)} ranked list {date.today().year}"] + extra
                 queries += [q for q in evidence_queries(question) + extra if q not in queries]
                 limit += len(extra)
 
