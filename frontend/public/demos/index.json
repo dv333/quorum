@@ -1,0 +1,12 @@
+[
+  {
+    "name": "code-review",
+    "label": "A code review of a change with planted bugs",
+    "short": "Code review"
+  },
+  {
+    "name": "fasting",
+    "label": "A health question, researched on the web",
+    "short": "Health question"
+  }
+]

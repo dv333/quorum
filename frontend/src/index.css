@@ -1040,3 +1040,17 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .bubble.coder { background: linear-gradient(180deg, color-mix(in srgb, var(--coder) 8%, var(--card)), var(--card)); box-shadow: var(--shadow), 0 0 0 0.5px color-mix(in srgb, var(--coder) 35%, transparent); }
 .bubble.coder .md code { font-size: 0.92em; }
 .refs-check { margin-top: 8px; font-size: 11.5px; color: var(--text-3); }
+
+/* Replay demo (#demo): one column, a control bar above the recorded debate */
+.app.demo-app { grid-template-columns: minmax(0, 1fr); }
+.demo-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 20px;
+  border-bottom: 0.5px solid var(--hairline); background: var(--card); font-size: 13px; position: relative; z-index: 2;
+}
+.demo-badge {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #fff;
+  background: var(--blue); border-radius: 6px; padding: 2px 8px;
+}
+.demo-note { color: var(--text-2); flex: 1 1 260px; min-width: 0; }
+.demo-bar a.btn { text-decoration: none; }
+@media (max-width: 640px) { .demo-bar { padding: 10px 16px; } }
