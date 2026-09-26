@@ -29,4 +29,4 @@ is to find where Quorum falls short and improve it, not to rank models.
 
 | Question | Reference | Quorum | Match | Changes |
 |---|---|---|---|---|
-| [Intermittent fasting vs. calorie restriction](intermittent-fasting/) | pending | pending | pending | |
+| [Intermittent fasting vs. calorie restriction](intermittent-fasting/) | 44 | 39 (v9; first run 19) | First judge yes; blind judge not yet (evidence 6 vs 9) | 9 rounds of fixes, see the folder |
