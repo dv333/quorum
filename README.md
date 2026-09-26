@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Many minds. One answer.</b><br>
-  Many minds. A clearer answer. Quorum brings a council of AI models together to explore your question, check claims against sources, and give you a clear answer—with disagreements and uncertainty visible. It runs locally by default; web research and cloud models are optional.
+ Quorum brings a council of AI models together to explore your question, check claims against sources, and give you a clear answer—with disagreements and uncertainty visible. It runs locally by default; web research and cloud models are optional.
 </p>
 
 <p align="center">
