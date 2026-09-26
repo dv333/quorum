@@ -252,9 +252,9 @@ function Evidence({ claims }) {
     <details className="evidence">
       <summary>Evidence checked <span>· {claims.length} claim{claims.length === 1 ? '' : 's'} the answer relies on</span></summary>
       <ul>
-        {claims.map((c) => (
-          <li key={c.id}>
-            <span className={`ev-chip ev-${c.status}`}>{CLAIM_LABEL[c.status] || 'Unverified'}</span>
+        {claims.map((c, i) => (
+          <li key={c.id} id={`evidence-${c.id}`}>
+            <span className={`ev-chip ev-${c.status}`}><b className="ev-n">{i + 1}</b> {CLAIM_LABEL[c.status] || 'Unverified'}</span>
             <div>
               <div className="ev-claim">{c.claim}</div>
               {c.caveat && <div className="ev-caveat">{c.caveat}</div>}

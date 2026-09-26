@@ -176,9 +176,9 @@ async def test_export_lists_the_evidence_under_the_answer():
     _, eng = await run_cpq()
     md = export.to_markdown(eng.snapshot())
     assert "**Evidence checked**" in md
-    assert f"- **Contradicted**: {MIDDLEWARE} The integration uses Oracle Integration Cloud middleware." in md
+    assert f"1. **Contradicted**: {MIDDLEWARE} The integration uses Oracle Integration Cloud middleware." in md
     assert "(https://docs.oracle.com/en/cloud/saas/cpq/integrate-subscription-management.html)" in md
-    assert f"- **Unverified**: {COST}" in md
+    assert f"2. **Unverified**: {COST}" in md
 
 
 def test_the_replay_checks_catch_the_original_failure():

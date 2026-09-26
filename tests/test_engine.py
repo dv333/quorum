@@ -514,7 +514,7 @@ async def test_checked_claims_feed_the_verdict_as_rules():
     await eng.task
     fc = [m for m in researcher_messages() if m["research_kind"] == "factcheck"]
     assert len(fc) == 1 and fc[0]["status"] == "done"
-    assert fc[0]["content"].startswith("- **Supported**: Go compiles fast") and "[1]" in fc[0]["content"]
+    assert fc[0]["content"].startswith("1. **Supported**: Go compiles fast") and "[1]" in fc[0]["content"]
     chair_msg = db.query_one("SELECT id FROM messages WHERE author_kind = 'chair'")["id"]
     assert fc[0]["id"] < chair_msg
     prompt = verdict_prompt(client)

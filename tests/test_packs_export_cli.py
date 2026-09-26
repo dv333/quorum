@@ -95,7 +95,7 @@ async def test_export_has_answer_sources_and_optional_debate():
     assert "VERDICT TEXT" in short and "all agreed in round 2" in short
     assert (
         "**Evidence checked**" in short
-        and "- **Supported**: Go compiles fast" in short
+        and "1. **Supported**: Go compiles fast" in short
         and "(https://example.com/" in short
     )
     assert "How the council got here" not in short

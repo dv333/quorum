@@ -70,8 +70,8 @@ CLAIM_LABEL = {
 
 def _ledger(claims: List[Dict[str, Any]]) -> str:
     lines = []
-    for c in claims:
-        line = f"- **{CLAIM_LABEL.get(c['status'], 'Unverified')}**: {c['claim']}"
+    for i, c in enumerate(claims, 1):
+        line = f"{i}. **{CLAIM_LABEL.get(c['status'], 'Unverified')}**: {c['claim']}"
         if c.get("caveat"):
             line += f" {c['caveat'].rstrip('.')}."
         if c.get("quote"):

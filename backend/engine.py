@@ -211,9 +211,9 @@ _LEDGER_LABEL = {
 
 def _ledger_markdown(claims: List[Dict[str, Any]], sources: List[Dict[str, str]]) -> str:
     lines = []
-    for c in claims:
-        n = next((i for i, s in enumerate(sources, 1) if s["url"] == c.get("source_url")), None)
-        line = f"- **{_LEDGER_LABEL.get(c['status'], 'Unverified')}**: {c['claim']}"
+    for i, c in enumerate(claims, 1):
+        n = next((j for j, s in enumerate(sources, 1) if s["url"] == c.get("source_url")), None)
+        line = f"{i}. **{_LEDGER_LABEL.get(c['status'], 'Unverified')}**: {c['claim']}"
         if c.get("caveat"):
             line += f" — {c['caveat']}"
         if c.get("quote"):

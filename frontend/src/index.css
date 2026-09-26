@@ -781,3 +781,4 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .evidence a { color: var(--blue); text-decoration: none; font-size: 12.5px; }
 .evidence a:hover { text-decoration: underline; }
 @media (max-width: 640px) { .evidence li { grid-template-columns: 1fr; gap: 4px; } .ev-summary { padding-left: 18px; padding-right: 18px; } .evidence { margin: 0 18px 12px; } }
+.ev-chip .ev-n { font-weight: 700; margin-right: 2px; }
