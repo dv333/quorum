@@ -262,6 +262,10 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
 def _interleave(result_lists: List[List[Dict[str, str]]], limit: int) -> List[Dict[str, str]]:
     """Take results round-robin across queries so every query contributes, deduplicated by URL, with the strongest
     evidence (systematic reviews, then randomized trials) and official documentation moved to the front."""
+    # Social posts, videos and shop listings only when nothing else was found
+    useful = [[r for r in results if not firecrawl.is_low_value(r["url"])] for results in result_lists]
+    if any(useful):
+        result_lists = useful
     seen, out = set(), []
     for i in range(max((len(r) for r in result_lists), default=0)):
         for results in result_lists:
@@ -304,16 +308,73 @@ def _ledger_markdown(claims: List[Dict[str, Any]], sources: List[Dict[str, str]]
 _EVIDENCE_Q = re.compile(r"\b(evidence|studies|study|research|trials?|meta-?analys\w*|scientific|science)\b", re.I)
 _FILLER = set(
     "what does do did the a an of for to in on and or vs versus is are be say says show shows about how which better "
-    "best evidence studies study research science scientific really actually current latest".split()
+    "best evidence studies study research science scientific really actually current latest way run running locally "
+    "should which that with this it its we our my i".split()
 )
+
+
+def _topic(question: str, limit: int = 8) -> str:
+    """The question's subject in a few search words (the question itself, without the criteria after it)."""
+    main = question.split("?")[0]
+    return " ".join([w for w in re.findall(r"[a-z0-9][a-z0-9-]*", main.lower()) if w not in _FILLER][:limit])
+
+
+_REQ_TAIL = re.compile(r"\?\s*([^?]+?)[.!]?\s*$")
+
+
+def stated_requirements(question: str) -> List[str]:
+    """The criteria listed after the question itself, like "…? Speed, cost, quantization." """
+    m = _REQ_TAIL.search(question.strip())
+    if not m:
+        return []
+    parts = [p.strip(" .;:") for p in re.split(r",|;|\band\b", m.group(1))]
+    return [p for p in parts if p and len(p.split()) <= 4][:6]
+
+
+def requirement_covered(requirement: str, text: str) -> bool:
+    """Whether the answer talks about a criterion at all (each word's stem appears somewhere)."""
+    words = [w for w in re.findall(r"[a-z0-9]+", requirement.lower()) if len(w) > 2]
+    low = text.lower()
+    return all(w[:5] in low for w in words)
+
+
+def criteria_queries(question: str) -> List[str]:
+    """One search per stated criterion, so each gets its own sources (prices, benchmarks, reliability data)."""
+    topic = _topic(question, 9)
+    return [f"{topic} {r.lower()}" for r in stated_requirements(question)][:3] if topic else []
+
+
+_CALC = re.compile(
+    r"((?:\$?\d[\d,]*(?:\.\d+)?\s*[A-Za-z%]{0,6}\s*[×x*÷/+−-]\s*)+\$?\d[\d,]*(?:\.\d+)?)\s*[A-Za-z%]{0,6}\s*"
+    r"(?:=|≈|~|≃)\s*~?\s*\$?(\d[\d,]*(?:\.\d+)?)"
+)
+
+
+def check_arithmetic(text: str) -> List[Dict[str, str]]:
+    """Calculations written out in the answer ("30 × 4.5 ÷ 8 ≈ 17") whose result is off by more than 15%."""
+    problems = []
+    for m in _CALC.finditer(text):
+        expr = re.sub(r"[A-Za-z%$,\s]", "", m.group(1).replace("×", "*").replace("÷", "/").replace("−", "-"))
+        expr = re.sub(r"(?<=\d)x(?=\d)", "*", expr)
+        if not re.fullmatch(r"[\d.*/+-]+", expr) or not re.search(r"[*/+-]", expr):
+            continue
+        try:
+            value = eval(expr, {"__builtins__": {}})  # digits and operators only, checked above
+            stated = float(m.group(2).replace(",", ""))
+        except Exception:
+            continue
+        if stated and abs(value - stated) / abs(stated) > 0.15:
+            problems.append(
+                {"text": m.group(0).strip(), "issue": f"the arithmetic is wrong: it comes to about {value:.3g}, not {m.group(2)}"}
+            )
+    return problems
 
 
 def evidence_queries(question: str) -> List[str]:
     """Extra searches for evidence questions: the newest meta-analysis and any Cochrane review on the topic."""
     if not _EVIDENCE_Q.search(question):
         return []
-    words = [w for w in re.findall(r"[a-z0-9][a-z0-9-]*", question.lower()) if w not in _FILLER]
-    topic = " ".join(words[:8])
+    topic = _topic(question)
     if not topic:
         return []
     return [
@@ -1220,9 +1281,13 @@ class DebateEngine:
             )
             if not queries:
                 queries = [item["request"][:200]]
+            limit = RESEARCH_MAX_SOURCES
             if kind == "brief":
-                # For "what does the evidence say" questions, always look for the newest syntheses too
-                queries += [q for q in evidence_queries(question) if q not in queries]
+                # For "what does the evidence say" questions, always look for the newest syntheses too, and give each
+                # criterion the question lists ("speed, cost…") its own search
+                extra = criteria_queries(question)
+                queries += [q for q in evidence_queries(question) + extra if q not in queries]
+                limit += len(extra)
 
             for q in queries:
                 self._log(msg_id, f"Searching: {q}")
@@ -1235,7 +1300,7 @@ class DebateEngine:
             ok = [r for r in results if not isinstance(r, Exception)]
             if not ok:
                 raise errors[0]
-            sources = _interleave(ok, RESEARCH_MAX_SOURCES)
+            sources = _interleave(ok, limit)
             self._research_pages.setdefault(d["topic"], []).extend(_interleave(ok, 100))
             self._record(
                 RESEARCHER_NAME,
@@ -1776,11 +1841,25 @@ class DebateEngine:
         except Exception as e:
             log.warning("answer audit failed: %s", e)
             return
-        problems = [
-            {"text": str(p.get("text") or "").strip()[:300], "issue": str(p.get("issue") or "").strip()[:300]}
-            for p in raw
-            if isinstance(p, dict) and str(p.get("issue") or "").strip()
-        ][:6]
+        # Checked in code: every criterion the question lists is covered, and written-out arithmetic adds up
+        question = self._question(row["topic"])
+        checked = [
+            {
+                "text": "",
+                "issue": f"The question asks about {r.lower()}, but the answer doesn't address it; add what the research "
+                "shows about it (with numbers where there are any).",
+            }
+            for r in stated_requirements(question)
+            if not requirement_covered(r, row["content"])
+        ] + check_arithmetic(row["content"])
+        problems = (
+            checked
+            + [
+                {"text": str(p.get("text") or "").strip()[:300], "issue": str(p.get("issue") or "").strip()[:300]}
+                for p in raw
+                if isinstance(p, dict) and str(p.get("issue") or "").strip()
+            ]
+        )[:8]
         meta = {"evidence": {"checked": True, "problems": problems}}
         content = plain_answer(row["content"])
         if problems:
@@ -1791,7 +1870,9 @@ class DebateEngine:
                         "revise",
                         d["chair_endpoint_id"],
                         d["chair_model"],
-                        prompts.answer_revise_messages(row["content"], problems, claims),
+                        prompts.answer_revise_messages(
+                            row["content"], problems, claims, self._research_digest(row["topic"])
+                        ),
                         think,
                     )
                 ).strip()

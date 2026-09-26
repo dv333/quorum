@@ -594,3 +594,31 @@ def test_long_prompts_get_room_for_the_reply():
     long = [{"role": "user", "content": "x" * base * 3}]  # about `base` tokens
     grown = eng._num_ctx(long)
     assert grown > base and grown % 4096 == 0
+
+
+def test_listed_criteria_are_found_searched_and_checked():
+    from backend.engine import criteria_queries, requirement_covered, stated_requirements
+
+    q = "Which EV under $45k is best for a US family that road-trips, in 2026? Range, charging network, reliability."
+    assert stated_requirements(q) == ["Range", "charging network", "reliability"]
+    assert all(c.endswith(r.lower()) for c, r in zip(criteria_queries(q), stated_requirements(q)))
+    assert stated_requirements("Kubernetes or ECS for 5 engineers?") == []
+    assert requirement_covered("charging network", "Tesla's Supercharger network makes charging easy")
+    assert not requirement_covered("reliability", "Great range and fast charging.")
+
+
+def test_written_out_arithmetic_is_checked():
+    from backend.engine import check_arithmetic
+
+    assert check_arithmetic("30B × 4.5 bits ÷ 8 ≈ 17 GB, and $900 + $1,200 = $2,100.") == []
+    wrong = check_arithmetic("At 8 bits, 30 × 8 ÷ 8 = 60 GB.")
+    assert len(wrong) == 1 and "30" in wrong[0]["issue"]
+
+
+def test_listings_and_social_posts_are_skipped_when_there_is_better():
+    from backend.firecrawl import is_low_value
+
+    assert is_low_value("https://www.amazon.com/s?k=gpu+24gb")
+    assert is_low_value("https://www.facebook.com/groups/runlocalai/posts/1")
+    assert not is_low_value("https://www.amazon.com/some-product/dp/B0C1")
+    assert not is_low_value("https://www.macworld.com/article/2964754/mac-mini.html")

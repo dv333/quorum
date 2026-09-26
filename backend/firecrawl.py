@@ -100,6 +100,21 @@ def evidence_level(title: str, text: str = "", url: str = "") -> int:
     return 1 if host and _JOURNAL_HOST.search(host) else 0
 
 
+_LOW_VALUE_HOST = re.compile(
+    r"(^|\.)(facebook\.com|instagram\.com|pinterest\.[a-z.]+|tiktok\.com|x\.com|twitter\.com|youtube\.com|youtu\.be)$"
+)
+_LISTING = re.compile(r"(^|\.)(amazon|ebay|walmart|aliexpress|etsy)\.[a-z.]+$")
+
+
+def is_low_value(url: str) -> bool:
+    """Social posts, videos and shop listings: pages whose text says little a researcher can use."""
+    parts = urlsplit(url)
+    host = parts.netloc.lower().removeprefix("www.")
+    if _LOW_VALUE_HOST.search(host):
+        return True
+    return bool(_LISTING.search(host) and re.match(r"/(s|itm|sch|b|search)\b", parts.path))
+
+
 def is_primary(url: str) -> bool:
     """Official documentation, standards bodies and government sources, rather than comparison sites and blogs."""
     parts = urlsplit(url)

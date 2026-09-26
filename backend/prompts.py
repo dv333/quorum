@@ -331,7 +331,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
 {ANSWER_FORMAT}""",
         },
@@ -528,7 +528,7 @@ def research_plan_messages(request: str, question: str, max_queries: int) -> Lis
 
 {need}
 
-Write 1 to {max_queries} short web search queries (like you'd type into a search engine) that will find current, authoritative sources for this. Prefer queries that surface primary sources: official documentation, the maker's own pages, standards or filings, rather than comparison sites and blogs. When the question is about scientific or medical evidence ("what does the evidence say", health, diet, treatments), make one query find the most recent systematic review or meta-analysis (words like "meta-analysis" or "Cochrane review" help, and so does the current year) and another the largest recent randomized trials. Prefer one query unless the request clearly has several parts. Don't put years in queries unless the request is about a specific year or you need the newest research; then use the current year.""",
+Write 1 to {max_queries} short web search queries (like you'd type into a search engine) that will find current, authoritative sources for this. Prefer queries that surface primary sources: official documentation, the maker's own pages, standards or filings, rather than comparison sites and blogs. When the question is about scientific or medical evidence ("what does the evidence say", health, diet, treatments), make one query find the most recent systematic review or meta-analysis (words like "meta-analysis" or "Cochrane review" help, and so does the current year) and another the largest recent randomized trials. When the question compares products or options, search for measured numbers (benchmarks, prices, specifications, reliability data) rather than opinions. Prefer one query unless the request clearly has several parts. Don't put years in queries unless the request is about a specific year or you need the newest research; then use the current year.""",
         },
     ]
 
@@ -680,7 +680,8 @@ EVIDENCE_RULES = """Rules for factual claims (they override the debate):
 - Don't present a comparative advantage (cheaper, faster to implement, better integrated, no middleware) as established unless a SUPPORTED claim says exactly that.
 - If the evidence can't establish a winner, say so: name the finalists and what would decide between them. Agreement among agents is not evidence.
 - Only use names, numbers and citations that appear in the ledger or the research findings; never invent study
-  details. Cite checked claims with the ledger's numbers, like [2]; for other research findings, name the study or
+  details. You may calculate numbers from those figures or from standard facts (bytes per parameter, units, prices
+  times quantities) when you show the arithmetic, like "30B × 4.5 bits ÷ 8 ≈ 17 GB". Cite checked claims with the ledger's numbers, like [2]; for other research findings, name the study or
   review (with its year and key numbers) instead of using the briefs' citation numbers.
 - When the research found systematic reviews, meta-analyses or large randomized trials, the answer leads with them,
   named with their year and key numbers, even if the checked claims are narrower.
@@ -708,7 +709,7 @@ def answer_check_messages(
 Answer to audit:
 {answer}
 
-List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; gives names, numbers or citations found in neither; or favors one option more strongly than the bottom line and the evidence do (for example calling it "safer" or "more reliable" without support). A fact the research findings state is sourced, not a problem. Advice, recommendations and judgment calls (what to choose, how to decide, what to try first) are not factual claims; don't flag them.{agents} Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
+List every place where the answer breaks a rule: it states a contradicted claim; drops a caveat; rests a decision on an unverified claim the research findings don't back; presents a comparative advantage neither the ledger nor the research supports; gives names, numbers or citations found in neither; or favors one option more strongly than the bottom line and the evidence do (for example calling it "safer" or "more reliable" without support). A fact the research findings state is sourced, not a problem, and so is a number the answer calculates with its arithmetic shown, if the inputs and arithmetic are right. Advice, recommendations and judgment calls (what to choose, how to decide, what to try first) are not factual claims; don't flag them.{agents} Quote the answer's words exactly. If nothing breaks a rule, return an empty list.
 
 Reply like: {{"problems": [{{"text": "...", "issue": "..."}}]}}""",
         },
@@ -716,9 +717,10 @@ Reply like: {{"problems": [{{"text": "...", "issue": "..."}}]}}""",
 
 
 def answer_revise_messages(
-    answer: str, problems: List[Dict[str, str]], claims: List[Dict[str, Any]]
+    answer: str, problems: List[Dict[str, str]], claims: List[Dict[str, Any]], research: str = ""
 ) -> List[Dict[str, str]]:
-    issues = "\n".join(f'- "{p["text"]}": {p["issue"]}' for p in problems)
+    issues = "\n".join(f'- "{p["text"]}": {p["issue"]}' if p["text"] else f"- {p['issue']}" for p in problems)
+    found = f"\nResearch findings you can draw on:\n{research}\n" if research else ""
     return [
         {
             "role": "system",
@@ -728,7 +730,7 @@ def answer_revise_messages(
             "role": "user",
             "content": f"""Evidence ledger:
 {ledger_text(claims)}
-
+{found}
 {EVIDENCE_RULES}
 
 Your answer:
@@ -737,7 +739,7 @@ Your answer:
 An audit found these problems:
 {issues}
 
-Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or say plainly that it's uncertain) and keep everything else word for word, including every section and heading, named studies and numbers. Write the fixes for the reader: never say "unverified", "the provided evidence", "research findings" or anything about the audit. If the fixes mean no option is clearly best, say so in the bottom line, keeping it to one or two sentences. Output only the corrected answer.""",
+Where a problem says the answer skips something the question asks about, add a key point (or a sentence in the right section) covering it from the research. Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or say plainly that it's uncertain) and keep everything else word for word, including every section and heading, named studies and numbers. Write the fixes for the reader: never say "unverified", "the provided evidence", "research findings" or anything about the audit. If the fixes mean no option is clearly best, say so in the bottom line, keeping it to one or two sentences. Output only the corrected answer.""",
         },
     ]
 
