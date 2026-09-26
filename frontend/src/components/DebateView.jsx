@@ -222,8 +222,31 @@ function mentionables(seats, debate) {
 }
 
 // One line of plain words where the user is looking, so the quiet gaps between turns never look frozen
+// "4:07", or "1h 02m" past an hour
+export function formatElapsed(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(s % 60).padStart(2, '0')}`
+}
+
+function useNow(active, every = 1000) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!active) return undefined
+    const t = setInterval(() => setNow(Date.now()), every)
+    return () => clearInterval(t)
+  }, [active, every])
+  return now
+}
+
 function LiveStatus({ state }) {
   const { debate, seats, messages } = state
+  const ticking = ['running', 'concluding'].includes(debate.status)
+  const now = useNow(ticking)
+  // Time since this question was asked (a follow-up starts its own clock)
+  const asked = messages.find((m) => m.author_kind === 'user' && m.topic === debate.topic)?.created_at || debate.created_at
+  const elapsed = ticking && asked ? formatElapsed(now - new Date(asked).getTime()) : null
   const streaming = messages.filter((m) => m.status === 'streaming')
   const seatName = (id) => seats.find((s) => s.id === id)?.handle
   const writer = streaming.find((m) => m.author_kind === 'seat')
@@ -243,7 +266,12 @@ function LiveStatus({ state }) {
     text = streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is researching before round 1…` : 'Getting started…'
   }
   if (!text) return null
-  return <span className="live-status" role="status"><i className="live-dot" />{text}</span>
+  return (
+    <span className="live-status" role="status">
+      <i className="live-dot" />{text}
+      {elapsed && <span className="elapsed" title="Time since you asked" aria-label={`${elapsed} since you asked`}>{elapsed}</span>}
+    </span>
+  )
 }
 
 function Composer({ debate, seats, onError, state }) {
