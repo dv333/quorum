@@ -268,7 +268,7 @@ function Evidence({ claims }) {
   )
 }
 
-export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question, claims = [] }) {
+export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question, title, claims = [] }) {
   const [level, setLevel] = useState('standard')
   const [versions, setVersions] = useState({})
   const [busy, setBusy] = useState(null)
@@ -295,14 +295,25 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
 
   // Print just this answer: a copy goes into a plain top-level container (the app itself scrolls inside a
   // fixed-height window, which would cut the printout at one page), and print CSS hides everything else.
+  // Collapsed sections (Evidence checked, Behind the answer) are opened in the copy, since a PDF can't expand
+  // them, and the page title becomes the conundrum's, which browsers use as the PDF's title and file name.
   const print = () => {
     if (!cardRef.current) return
     const holder = document.createElement('div')
     holder.id = 'print-root'
-    holder.appendChild(cardRef.current.cloneNode(true))
+    const copy = cardRef.current.cloneNode(true)
+    copy.querySelectorAll('details').forEach((d) => { d.open = true })
+    holder.appendChild(copy)
     document.body.appendChild(holder)
     document.body.classList.add('print-answer')
-    const done = () => { holder.remove(); document.body.classList.remove('print-answer'); window.removeEventListener('afterprint', done) }
+    const pageTitle = document.title
+    if (title) document.title = title
+    const done = () => {
+      holder.remove()
+      document.body.classList.remove('print-answer')
+      document.title = pageTitle
+      window.removeEventListener('afterprint', done)
+    }
     window.addEventListener('afterprint', done)
     setTimeout(() => window.print(), 50)
   }

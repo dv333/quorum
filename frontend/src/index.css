@@ -642,6 +642,10 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   #print-root .print-q { font: 600 15px var(--font); padding: 0 26px 10px; color: #333; }
   #print-root .copy-btn, #print-root .export, #print-root .seg, #print-root .diagram-hint, #print-root .why-hint { display: none; }
   #print-root .stats, #print-root .bars, #print-root .diagram { break-inside: avoid; }
+  /* Sections that are collapsed on screen print open (print() opens them), without the disclosure arrow */
+  #print-root summary { list-style: none; cursor: default; }
+  #print-root summary::-webkit-details-marker { display: none; }
+  #print-root .evidence li { break-inside: avoid; }
 }
 
 /* Round recaps: the divider shows how the council stands and folds the round away */
