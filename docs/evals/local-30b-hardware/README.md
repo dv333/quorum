@@ -14,6 +14,7 @@ Reference: [reference.md](reference.md), sealed before Quorum answered. Regressi
 | v2 | 6 | 6 | 6 | 6 | 8 | 32 | 6/8 |
 | v3 | 4 | 5 | 5 | 5 | 5 | 24 | 6/8 |
 | v4 | 7 | 6 | 7 | 8 | 8 | 36 | 7/8 |
+| v5 | 7 | 7 | 6 | 6 | 8 | 34 | 6/8 |
 
 **Blind judge on v4** ([judge.md](judge.md)): medians accuracy 8/5, evidence 7/6, reasoning 9/7, completeness 8/7,
 clarity 8/7 (40 vs 32). Accuracy is 3 apart: v4's headline speeds came from a different model's benchmark.
@@ -26,3 +27,4 @@ clarity 8/7 (40 vs 32). Accuracy is 3 apart: v4's headline speeds came from a di
 | v2 | The chair audited its own answer; a bottom line built on unchecked cost claims, against the research | An independent auditor (the largest non-chair model), bottom-line reasons checked first, realistic versions of each option |
 | v3 | Drifted to an RTX 5090 and 64 GB Macs; hedged "no single superior choice" | The question's numbers (48 GB, 24 GB) must be answered; conditional recommendations instead of "no clear winner" |
 | v4 | Figures with no source behind them | Every price, size and speed checked against what the research read |
+| v5 | "Cost" answered without a single price | A quantity criterion (cost, speed, range) needs a number |

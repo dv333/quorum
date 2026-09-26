@@ -13,6 +13,7 @@ Reference: [reference.md](reference.md), sealed before Quorum answered. Regressi
 | v2 | 6 | 6 | 6 | 6 | 5 | 29 | 7/8 |
 | v3 | 6 | 6 | 7 | 7 | 8 | 34 | 7/8 |
 | v4 | 6 | 6 | 7 | 6 | 5 | 30 | 6/8 |
+| v5 | 5 | 6 | 6 | 7 | 8 | 32 | 7/8 |
 
 ## What each run exposed, and the fix
 
@@ -22,3 +23,4 @@ Reference: [reference.md](reference.md), sealed before Quorum answered. Regressi
 | v2 | Hedged bottom line; still no Model Y | A "best … ranked list" search for open which-is-best questions |
 | v3 | No page named the Model Y | The shortlist can propose two well-known options, each confirmed by its own search |
 | v4 | The revision put every missing option in the bottom line (about 100 words); an invented $53k price | Missing options go into the key points; a bottom line still too long keeps two sentences; figures checked against the sources |
+| v5 | Picks the Model Y, as the reference does, but pairs one trim's price with another's range and misprices the Ioniq 5; the shortlist included "Tesla Supercharger" | The shortlist takes only candidates of the kind asked, sold where the user is |

@@ -12,6 +12,7 @@ Reference: [reference.md](reference.md), sealed before Quorum answered. Regressi
 | Reference | 8 | 7 | 8 | 8 | 9 | **40** | |
 | v1 ([quorum.md](quorum.md)) | 6 | 6 | 6 | 7 | 5 | 30 | 7/7 |
 | v2 | 6 | 6 | 7 | 6 | 8 | 33 | 6/7 |
+| v3 | 7 | 6 | 8 | 6 | 7 | 34 | 4/7 |
 
 v1 lost two lookups when the Firecrawl cloud credits ran out; later runs use self-hosted Firecrawl.
 
@@ -24,3 +25,4 @@ clarity 9/7 (45 vs 33). v2's claim that Cloud Run enforces mTLS by default is wr
 |---|---|---|
 | v1 | Four-sentence hedged bottom line; Docker and Nomad added because the shortlist treated "A or B" as open | Bottom lines over 55 words are flagged; the shortlist runs only for open which-is-best questions |
 | v2 | "(Beagle research)" in the answer; an unsourced security claim | Researcher and agent names cleaned from answers; figures checked against the sources |
+| v3 | Never mentioned Fly.io, which the question names | Options the question lists are checked in the answer |

@@ -13,6 +13,7 @@ Reference: [reference.md](reference.md), sealed before Quorum answered. Regressi
 | v1 ([quorum.md](quorum.md)) | 5 | 5 | 6 | 6 | 5 | 27 | 7/8 |
 | v2 | 4 | 5 | 6 | 7 | 8 | 30 | 7/8 |
 | v3 | 5 | 5 | 7 | 6 | 8 | 31 | 5/8 |
+| v4 | 6 | 5 | 7 | 7 | 8 | 33 | 6/8 |
 
 v1 had no web research at all: the Firecrawl cloud account ran out of credits (HTTP 402).
 
