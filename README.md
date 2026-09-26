@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Many minds. One answer.</b><br>
- Quorum brings a council of AI models together to explore your question, check claims against sources, and give you a clear answer—with disagreements and uncertainty visible. It runs locally by default; web research and cloud models are optional.
+  A local-first second opinion for Codex and Claude Code. Quorum brings a council of AI models together to explore your question, check claims against sources, and give you a clear answer—with disagreements and uncertainty visible. It runs locally by default; web research and cloud models are optional.
 </p>
 
 <p align="center">
@@ -15,6 +15,36 @@
   <img src="https://img.shields.io/badge/python-3.10%2B-3776ab.svg" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/runs-100%25%20local-34c759.svg" alt="Runs locally">
 </p>
+
+## A second opinion for your coding agent
+
+Your coding agent writes the change; a council of local models reviews it. Quorum seats specialists for what the diff
+touches (security, performance, database, concurrency, API compatibility, tests), lets them argue over several rounds,
+and asks a read-only **Coder** (Claude Code or Codex) how the code really works, checking every `file:line` it cites.
+You get findings by severity, each with a fix, plus the points the reviewers disagreed on.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/review/chart-dark.svg">
+    <img src="docs/benchmarks/review/chart-light.svg" width="780" alt="Planted bugs found: ruff 19%, one local model alone 91%, Quorum 100%, Claude Code alone 100%">
+  </picture>
+</p>
+
+**Eight local models together caught every planted bug; the largest of them, reviewing alone, missed 2 of 22.** A
+linter caught 19%. Claude Code reviewing alone also caught every one, in about 40 seconds against Quorum's half hour,
+so Quorum is a second opinion that works in the background while you keep coding, not a replacement for your agent.
+[The method, every finding and how to rerun it →](docs/benchmarks/review/)
+
+```bash
+uv run quorum mcp install --client claude --apply   # or: --client codex
+uv run quorum mcp doctor                            # checks the engine, models and client setup
+```
+
+Then ask your agent to *have Quorum review my uncommitted change*. To watch a recorded review first, run
+`./start.sh --demo`. The council runs on your machine; the Coder uses the Claude Code or Codex you already have, so
+its questions about your code go to that service. Set `QUORUM_CODER=off` to keep a review entirely local.
+
+## A council for any question
 
 <p align="center">
   <img src="docs/images/demo.gif" width="880" alt="Quorum answering: Should I rent or buy a home in Cupertino in 2026?">
