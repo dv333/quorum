@@ -633,3 +633,15 @@ def test_shortlisted_options_must_be_on_the_pages_and_in_the_answer():
     assert check_shortlist(raw, pages) == ["Tesla Model Y", "Hyundai Ioniq 5"]  # the EV9 isn't on any page
     assert option_mentioned("Tesla Model Y", "The Model Y Standard is the safest pick.")
     assert not option_mentioned("Cloud Run", "We run twelve services.")
+
+
+def test_the_numbers_a_question_states_must_be_answered():
+    from backend.engine import open_choice, question_specifics, specific_covered
+
+    q = "Best way to run a 30B-parameter model locally: 48 GB Mac or a PC with a 24 GB NVIDIA GPU? Speed, cost."
+    assert question_specifics(q) == ["30B", "48 GB", "24 GB"]
+    assert specific_covered("24 GB", "fits in the card's 24.0 GB") and not specific_covered("48 GB", "a 64GB Mac")
+    assert specific_covered("$45k", "stays under $45,000")
+    assert question_specifics("Should I switch to induction in 2026?") == []  # years aren't specifics
+    assert open_choice("Which EV under $45k is best for a family?")
+    assert not open_choice(q)  # it names its options, so there's nothing to shortlist

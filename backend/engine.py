@@ -259,7 +259,47 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
     return out[:limit]
 
 
-_CHOICE_Q = re.compile(r"\b(which|best|or|vs\.?|versus|should|choose|pick|recommend)\b", re.I)
+_OPEN_CHOICE = re.compile(r"\b(which|best|recommend)\b", re.I)
+_NAMED = re.compile(r"\b(or|vs\.?|versus)\b", re.I)
+
+
+def open_choice(question: str) -> bool:
+    """A "which is best" question that doesn't name its options ("…A or B?" does), so the research should list them."""
+    main = question.split("?")[0]
+    return bool(_OPEN_CHOICE.search(main)) and not _NAMED.search(main)
+
+
+_SPEC = re.compile(
+    r"\$?\d+(?:[.,]\d+)?\s?(?:[kKmM]\b|%|GB|TB|MB|B\b|W\b|kW|kWh|mph|miles?\b|mi\b|engineers?\b|services?\b|"
+    r"people\b|users?\b|years?\b|months?\b)|\$\d[\d,]*",
+)
+
+
+def question_specifics(question: str) -> List[str]:
+    """The numbers the question pins down, with their units ("48 GB", "$45k", "12 services"), excluding years."""
+    out = []
+    for m in _SPEC.finditer(question):
+        s = m.group(0).strip()
+        if re.fullmatch(r"(19|20)\d\d", s) or s in out:
+            continue
+        out.append(s)
+    return out
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"[\s\u00a0\u202f,\-\u2011]", "", text.lower())
+
+
+def specific_covered(spec: str, text: str) -> bool:
+    """Whether the answer uses a number the question stated (spacing, commas and "-" ignored; "$45k" = "$45,000")."""
+    s, low = _squash(spec), _squash(text)
+    if s in low:
+        return True
+    num = re.search(r"\d+(?:\.\d+)?", s).group(0)
+    if s.endswith("k") and s.startswith("$"):
+        return f"${num}000" in low or f"{num}k" in low
+    unit = s[s.index(num) + len(num):]
+    return bool(re.search(rf"(?<![\d.]){re.escape(num)}(?:\.0)?{re.escape(unit)}", low))
 
 
 def check_shortlist(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 6) -> List[str]:
@@ -1365,7 +1405,7 @@ class DebateEngine:
             )
             partial = self.partials[msg_id]
             content = strip_thinking(partial["content"]).strip() or "The sources didn't answer this."
-            if kind == "brief" and _CHOICE_Q.search(question):
+            if kind == "brief" and open_choice(question):
                 # Choice questions: name every contender the pages mention, so the debate doesn't anchor on one
                 options = await self._make_shortlist(d["topic"], question, ep_id, model, think)
                 if options:
@@ -1913,6 +1953,14 @@ class DebateEngine:
             }
             for r in stated_requirements(question)
             if not requirement_covered(r, row["content"])
+        ] + [
+            {
+                "text": "",
+                "issue": f"The question is specifically about {s}, but the answer doesn't address that; answer for what "
+                "the question states (other options only as an aside).",
+            }
+            for s in question_specifics(question)
+            if not specific_covered(s, row["content"])
         ] + check_arithmetic(row["content"]) + [
             {
                 "text": "",
