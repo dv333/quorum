@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // Renders a Mermaid diagram written by the chair. Local models sometimes produce invalid
 // Mermaid, so failures render nothing instead of an error box.
@@ -14,7 +14,34 @@ function loadMermaid() {
 }
 
 function isDark() {
+  const forced = document.documentElement.dataset.theme // Settings → Appearance
+  if (forced) return forced === 'dark'
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches
+}
+
+function download(svg) {
+  const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
+  const a = Object.assign(document.createElement('a'), { href: url, download: 'quorum-diagram.svg' })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// The diagram full-window, for detail; Escape or a click closes it
+function Expanded({ svg, onClose }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    ref.current?.focus()
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    <div className="diagram-full" role="dialog" aria-modal="true" aria-label="Diagram" tabIndex={-1} ref={ref} onClick={onClose}>
+      <button className="icon-btn close" aria-label="Close" onClick={onClose}>✕</button>
+      {/* eslint-disable-next-line react/no-danger */}
+      <div className="diagram-full-svg" onClick={(e) => e.stopPropagation()} dangerouslySetInnerHTML={{ __html: svg }} />
+    </div>
+  )
 }
 
 // Common small-model mistakes that are safe to repair
@@ -35,6 +62,8 @@ export function tidy(code) {
 export default function Mermaid({ code, onFail }) {
   const [svg, setSvg] = useState(null)
   const [failed, setFailed] = useState(false)
+  const [full, setFull] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -73,6 +102,21 @@ export default function Mermaid({ code, onFail }) {
   }, [code, onFail])
 
   if (failed || !svg) return null
-  // eslint-disable-next-line react/no-danger
-  return <div dangerouslySetInnerHTML={{ __html: svg }} />
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(tidy(code)); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* no clipboard */ }
+  }
+  return (
+    <div className="mermaid-wrap">
+      <div className="diagram-tools">
+        <button onClick={() => setFull(true)} title="Expand" aria-label="Expand diagram">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true"><path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" /></svg>
+        </button>
+        <button onClick={copy} title="Copy Mermaid source" aria-label="Copy diagram source">{copied ? 'Copied' : 'Copy'}</button>
+        <button onClick={() => download(svg)} title="Download as SVG" aria-label="Download diagram as SVG">SVG</button>
+      </div>
+      {/* eslint-disable-next-line react/no-danger */}
+      <div dangerouslySetInnerHTML={{ __html: svg }} onDoubleClick={() => setFull(true)} />
+      {full && <Expanded svg={svg} onClose={() => setFull(false)} />}
+    </div>
+  )
 }
