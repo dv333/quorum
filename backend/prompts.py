@@ -369,7 +369,7 @@ Include this section only if a picture genuinely helps (a decision, a process, a
 One or two sentences naming the agents who disagreed and why, or "Nothing significant."
 
 ## Details
-A short paragraph with anything else the user needs: caveats, conditions, next steps."""
+A short paragraph with anything else the user needs: caveats, conditions, the practical requirements of acting on the recommendation (equipment, compatibility, installation, safety), and next steps."""
 
 
 def assign_roles_messages(

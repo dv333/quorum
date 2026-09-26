@@ -415,7 +415,12 @@ def requirement_covered(requirement: str, text: str) -> bool:
     """Whether the answer talks about a criterion at all (each word's stem appears somewhere)."""
     words = [w for w in re.findall(r"[a-z0-9]+", requirement.lower()) if len(w) > 2]
     low = text.lower()
-    return all(w[:5] in low for w in words)
+    if not all(w[:5] in low for w in words):
+        return False
+    # "health evidence", "research": saying the word isn't enough, the answer has to point at studies
+    if re.search(r"\b(evidence|research|studies)\b", requirement, re.I):
+        return bool(re.search(r"\b(stud(y|ies)|meta-?analys\w*|systematic review|trials?|cohort|survey)\b", low))
+    return True
 
 
 def criteria_queries(question: str) -> List[str]:
