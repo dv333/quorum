@@ -347,7 +347,7 @@ ANSWER_FORMAT = """Use exactly this structure, with no preamble:
 BOTTOM LINE: <one sentence a busy person could act on, wrapping the key recommendation in **bold**>
 
 ## Key points
-- 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. Name the key studies or sources and use their numbers (effect sizes, how many people or trials, how long, when) where the research gives them, and keep [n] citations where you rely on them.
+- 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. Name the key studies or sources in the sentence itself (like "a 2025 BMJ meta-analysis of 99 trials") with their numbers (effect sizes, how many people or trials, how long) where the research gives them; [n] citations are only for the checked claims.
 
 ## Diagram
 Include this section only if a picture genuinely helps (a decision, a process, a comparison or a timeline). Write one small Mermaid diagram in a ```mermaid code block: a "flowchart TD" or "flowchart LR" with at most 8 nodes and no styling, every node written as an id with a quoted label, like A["Check budget"] --> B["Buy"]. Otherwise leave this section out entirely.
@@ -609,7 +609,7 @@ List up to {max_studies} studies described in these pages that best answer the q
 - "year": publication year, only if the page states it
 - "design": what kind of study and how big, e.g. "network meta-analysis of 99 randomized trials" or "12-month randomized trial"
 - "participants": how many people, as a number, only if stated
-- "finding": one plain sentence with its key result and numbers, naming the specific forms compared (for example time-restricted eating or alternate-day fasting)
+- "finding": one plain sentence with its key result and its numbers (effect size with confidence interval, percentages, kilograms), naming the specific forms compared (for example time-restricted eating or alternate-day fasting)
 - "quote": one or two sentences copied word for word from the page that back the finding
 - "source": the page's number
 Leave out (don't describe) any detail the page doesn't state, and skip a study whose result the page doesn't give.

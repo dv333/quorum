@@ -203,6 +203,7 @@ def _related_pages(
 
 
 _NUM = re.compile(r"\d+(?:\.\d+)?")
+STUDY_PAGE_CHARS = 4500  # characters of each page the key-studies step reads
 # Models describe what's missing instead of leaving it out
 _MISSING = re.compile(r"not (?:stated|specified|provided|given|reported)|unspecified|snippet|excerpt|provided text", re.I)
 
@@ -1666,7 +1667,17 @@ class DebateEngine:
             if p.get("evidence", 0) >= 1 and p["url"] not in seen:
                 seen.add(p["url"])
                 pages.append(p)
-        pages = pages[:6]
+        question = self._question(topic)
+        # Each page re-read around its results, where the numbers are
+        pages = [
+            {
+                **p,
+                "content": firecrawl.relevant_excerpt(
+                    p.get("raw") or p["content"], f"{question} {firecrawl.RESULTS_TERMS}", STUDY_PAGE_CHARS
+                ),
+            }
+            for p in pages[:5]  # five pages fit an 8K context with room for the reply
+        ]
         if not pages:
             return []
         d = self.debate()
@@ -1676,7 +1687,7 @@ class DebateEngine:
                 "studies",
                 d["chair_endpoint_id"],
                 d["chair_model"],
-                prompts.studies_messages(self._question(topic), pages),
+                prompts.studies_messages(question, pages),
                 await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
             )
             return check_studies(parse_json_loose(text).get("studies") or [], pages)

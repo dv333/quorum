@@ -134,6 +134,11 @@ def relevant_excerpt(markdown: str, query: str, limit: int = RESEARCH_PAGE_CHARS
     return "\n\n".join(c for _, c in sorted(picked))
 
 
+PAGE_KEEP_CHARS = 60_000  # page text kept in memory for later steps (key studies)
+# Words that find a study's results in its page
+RESULTS_TERMS = "results conclusions findings participants trials randomized difference weight kg compared versus"
+
+
 # Search engines behind self-hosted Firecrawl (DuckDuckGo by default) block bursts of automated queries, so searches
 # go out at most two at a time, spaced apart.
 _SEARCH_SLOTS = asyncio.Semaphore(2)
@@ -197,6 +202,7 @@ async def _search(query: str, limit: int, focus: str = "") -> List[Dict[str, str
                 "title": item.get("title") or (item.get("metadata") or {}).get("title") or url,
                 "description": item.get("description") or "",
                 "content": relevant_excerpt(item.get("markdown") or "", f"{query} {focus}".strip()),
+                "raw": (item.get("markdown") or "")[:PAGE_KEEP_CHARS],
             }
         )
     return out
