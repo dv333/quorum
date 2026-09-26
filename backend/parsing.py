@@ -146,7 +146,8 @@ _STATUS_PLAIN = [
     (re.compile(r"\bthe provided (?:evidence|research(?: findings)?)\b", re.I), "the evidence"),
     (re.compile(r"\bthe research findings\b", re.I), "the studies"),
     # Council members and the researcher cited like sources ("[Otter]", "[Beagle]'s data")
-    (re.compile(r"\[?\bBeagle\b\]?(?:’s|'s)\s+(?:data|research|findings|brief|lookups?)", re.I), "the research"),
+    (re.compile(r"\s*\(\s*\bBeagle\b(?:’s|'s)?\s+(?:data|research|findings|brief|lookups?)\s*\)", re.I), ""),
+    (re.compile(r"\[?\bBeagle\b\]?(?:(?:’s|'s)\s+|\s+)(?:data|research|findings|brief|lookups?)", re.I), "the research"),
     (re.compile(r"\s*\[(?:Otter|Panda|Koala|Penguin|Hedgehog|Bunny|Turtle|Dolphin|Beagle)\]"), ""),
     (re.compile(r"\b(?:it )?remains unverified\b", re.I), lambda m: m.group(0)[: -len("remains unverified")] + "isn't established"),
     (re.compile(r"\bunverified\b", re.I), "unconfirmed"),
