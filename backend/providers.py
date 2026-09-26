@@ -323,6 +323,43 @@ async def loaded_models(ep: Endpoint) -> List[Dict[str, Any]]:
         return []
 
 
+OLLAMA_REGISTRY = "https://registry.ollama.ai/v2"
+_MODEL_NAME = re.compile(r"^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)?(:[a-zA-Z0-9._-]+)?$")
+
+
+async def lookup_model(name: str) -> Optional[int]:
+    """The download size of any model in Ollama's public library ("qwen3:30b", "user/model:tag"), read from the
+    registry's manifest; None when there's no such model or tag. This is how `ollama pull` finds models too."""
+    name = name.strip().lower()
+    if not _MODEL_NAME.match(name):
+        return None
+    repo, _, tag = name.partition(":")
+    path = repo if "/" in repo else f"library/{repo}"
+    url = f"{OLLAMA_REGISTRY}/{path}/manifests/{tag or 'latest'}"
+    headers = {"Accept": "application/vnd.docker.distribution.manifest.v2+json"}
+    async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+        try:
+            resp = await client.get(url, headers=headers)
+        except httpx.HTTPError as e:
+            raise ProviderError(f"Couldn't reach Ollama's library: {e}") from e
+    if resp.status_code == 404:
+        return None
+    if resp.status_code >= 400:
+        raise ProviderError(_error_text(resp.text, resp.status_code))
+    layers = resp.json().get("layers") or []
+    return sum(int(layer.get("size") or 0) for layer in layers)
+
+
+async def delete_model(ep: Endpoint, model: str) -> None:
+    """Remove a downloaded model from an Ollama server, freeing its disk space."""
+    if ep.kind != "ollama":
+        raise ProviderError("Removing models is only supported for Ollama endpoints")
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+        resp = await client.request("DELETE", f"{ep.base_url}/api/delete", json={"model": model})
+    if resp.status_code >= 400:
+        raise ProviderError(_error_text(resp.text, resp.status_code))
+
+
 async def pull_model(ep: Endpoint, model: str) -> AsyncIterator[Dict[str, Any]]:
     """Stream Ollama pull progress events."""
     if ep.kind != "ollama":

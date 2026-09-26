@@ -27,8 +27,9 @@ from .config import (
     RESEARCHER_NAME,
     SEAT_COLORS,
 )
+from .hardware import estimate_model_bytes, fit_label
 from .engine import drop_engine, get_engine, recover_after_restart
-from .providers import ProviderError, pull_model
+from .providers import ProviderError, delete_model, lookup_model, pull_model
 
 
 @asynccontextmanager
@@ -212,6 +213,33 @@ async def post_pull(body: PullIn):
         inventory.invalidate()
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@app.get("/api/models/lookup")
+async def get_model_lookup(name: str, num_ctx: int = DEFAULT_NUM_CTX):
+    """Any model in Ollama's public library by name: its download size and whether it fits this machine."""
+    try:
+        size = await lookup_model(name)
+    except ProviderError as e:
+        raise HTTPException(502, str(e))
+    if size is None:
+        return {"model": name.strip(), "found": False}
+    est = estimate_model_bytes(size, {}, num_ctx)
+    usable = inventory.system_info()["usable_bytes"]
+    return {"model": name.strip(), "found": True, "size_bytes": size, "est_bytes": est, "fit": fit_label(est, usable)}
+
+
+@app.post("/api/models/delete")
+async def post_model_delete(body: PullIn):
+    ep = inventory.endpoint(body.endpoint_id)
+    if not ep:
+        raise HTTPException(404, "Endpoint not found")
+    try:
+        await delete_model(ep, body.model)
+    except ProviderError as e:
+        raise HTTPException(400, str(e))
+    inventory.invalidate()
+    return {"ok": True}
 
 
 @app.get("/api/providers")
