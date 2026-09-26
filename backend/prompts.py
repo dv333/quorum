@@ -723,6 +723,8 @@ EVIDENCE_RULES = """Rules for factual claims (they override the debate):
   review (with its year and key numbers) instead of using the briefs' citation numbers.
 - When the research found systematic reviews, meta-analyses or large randomized trials, the answer leads with them,
   named with their year and key numbers, even if the checked claims are narrower.
+- Laws, regulations, bans and rebate programs need an official source (a government or program page); a blog or
+  news mention alone isn't enough to state them as fact.
 - Write for the user in plain words ("Oracle's documentation confirms…", "not confirmed by the sources"). Never mention
   the ledger, these rules, statuses in capitals or item numbers, and don't explain how claims were checked."""
 

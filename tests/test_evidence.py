@@ -691,3 +691,16 @@ async def test_shortlist_checks_well_known_options_the_pages_missed():
     eng.search_fn = lookup
     options = await eng._make_shortlist(1, "Which EV under $45k is best?", 1, "m", None)
     assert options == ["Hyundai Ioniq 5", "Tesla Model Y"]  # the made-up one found no page, so it's left out
+
+
+def test_laws_need_an_official_source_and_blogs_are_not_reviews():
+    from backend.engine import check_legal_names
+
+    pages = [
+        {"title": "IRA rebate programs", "raw": "The Inflation Reduction Act funds HEEHRA.", "primary": True},
+        {"title": "Stove law 2026", "content": "The Clean Cooking Act of 2026 bans gas stoves.", "primary": False},
+    ]
+    flagged = check_legal_names("The Clean Cooking Act of 2026 bans sales; the Inflation Reduction Act pays.", pages)
+    assert [p["text"] for p in flagged] == ["The Clean Cooking Act of 2026"]
+    assert firecrawl.evidence_level("Induction vs gas cooktops", "A meta-analysis found…", "https://blog.example/x") == 0
+    assert firecrawl.evidence_level("Gas stoves and asthma", "A meta-analysis of 41 studies", "https://x.stanford.edu/a") == 3

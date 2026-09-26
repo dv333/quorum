@@ -73,6 +73,7 @@ _PRIMARY_HOST = re.compile(
 _PRIMARY_PATH = re.compile(r"/(docs|documentation|help|manual|reference|readiness|api)(/|$)", re.I)
 
 
+_SCHOLARLY_HOST = re.compile(r"\.(gov|edu|ac\.[a-z]{2})$|(^|\.)(who\.int|europa\.eu|pubmed\.ncbi\.nlm\.nih\.gov)$")
 _REVIEW = re.compile(r"meta-?analys|systematic review|cochrane|umbrella review|pooled analysis", re.I)
 _TRIAL = re.compile(r"randomi[sz]ed|\brct\b|clinical trial|controlled trial", re.I)
 
@@ -93,9 +94,12 @@ def evidence_level(title: str, text: str = "", url: str = "") -> int:
         return 3
     if _TRIAL.search(title):
         return 2
-    if _REVIEW.search(head):
+    # The start of the page only counts on a journal, government or university site: blogs and guides mention
+    # "a meta-analysis found…" without being one
+    scholarly = bool(host and (_JOURNAL_HOST.search(host) or _SCHOLARLY_HOST.search(host)))
+    if scholarly and _REVIEW.search(head):
         return 3
-    if _TRIAL.search(head):
+    if scholarly and _TRIAL.search(head):
         return 2
     return 1 if host and _JOURNAL_HOST.search(host) else 0
 

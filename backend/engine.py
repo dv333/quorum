@@ -451,6 +451,36 @@ def check_bottom_line(text: str, limit_words: int = 55) -> List[Dict[str, str]]:
     ]
 
 
+_LAW = re.compile(
+    r"\b(?:[A-Z][A-Za-z0-9’'-]*\s+){1,6}(?:Act|Law|Bill|Ordinance|Mandate|Regulation|Directive)\b(?:\s+of\s+\d{4})?"
+    r"|\b(?:AB|SB|HR|H\.R\.)\s?\d{2,5}\b"
+)
+
+
+def check_legal_names(text: str, pages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """Laws, acts and bills the answer names that no official (government or documentation) page mentions: a
+    blog's claim about a law isn't enough."""
+    official = " ".join(
+        f"{p.get('title', '')} {p.get('raw') or p.get('content', '')}" for p in pages if p.get("primary")
+    ).lower()
+    problems, seen = [], set()
+    for m in _LAW.finditer(text):
+        name = re.sub(r"^(The|A|An|California|Federal|US|U\.S\.)\s+", "", m.group(0).strip())
+        core = re.sub(r"\s+of\s+\d{4}$", "", name)
+        if len(core.split()) < 2 or core.lower() in seen:
+            continue
+        seen.add(core.lower())
+        if core.lower() not in official:
+            problems.append(
+                {
+                    "text": m.group(0).strip(),
+                    "issue": f"no official source the research read mentions {core}; remove it, or say plainly that "
+                    "it couldn't be confirmed",
+                }
+            )
+    return problems
+
+
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
     """Calculations written out in the answer ("30 × 4.5 ÷ 8 ≈ 17") whose result is off by more than 15%."""
     problems = []
@@ -2009,7 +2039,9 @@ class DebateEngine:
             }
             for s in question_specifics(question)
             if not specific_covered(s, row["content"])
-        ] + check_bottom_line(row["content"]) + check_arithmetic(row["content"]) + [
+        ] + check_bottom_line(row["content"]) + check_arithmetic(row["content"]) + check_legal_names(
+            row["content"], self._research_pages.get(row["topic"], [])
+        ) + [
             {
                 "text": "",
                 "issue": f"The research found {o} as an option, but the answer doesn't mention it; compare it with the "
