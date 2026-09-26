@@ -1,0 +1,16 @@
+{
+  "name": "Buying: family road-trip EV under $45k in 2026",
+  "why": "The answer has to compare real 2026 models under $45k on range, fast-charging access (Supercharger/NACS vs CCS adapters, charging speed) and reliability, and note that the $7,500 federal credit ended on September 30, 2025.",
+  "question": "Which EV under $45k is best for a US family that road-trips, in 2026? Range, charging network, reliability.",
+  "expect": {
+    "mentions_groups": [
+      ["Model Y"],
+      ["Ioniq 5", "IONIQ 5"],
+      ["Equinox"],
+      ["Supercharger", "NACS"],
+      ["tax credit", "federal credit", "$7,500"],
+      ["reliab"]
+    ],
+    "never_says": ["[UNVERIFIED]", "ledger"]
+  }
+}
