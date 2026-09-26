@@ -2,14 +2,23 @@ import { useEffect, useRef, useState } from 'react'
 import { displayTitle } from '../agents'
 import { ResourceCards } from './Resources'
 
-function groupByDay(debates) {
+// Pinned conundrums live in this browser only: a per-viewer convenience, like a bookmark
+const PIN_KEY = 'quorum.pinned'
+function loadPins() {
+  try { return new Set(JSON.parse(localStorage.getItem(PIN_KEY) || '[]')) } catch { return new Set() }
+}
+function savePins(pins) {
+  try { localStorage.setItem(PIN_KEY, JSON.stringify([...pins])) } catch { /* private mode: pins last this session */ }
+}
+
+function groupByDay(debates, pins = new Set()) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
   const week = new Date(today); week.setDate(today.getDate() - 7)
-  const groups = [['Today', []], ['Yesterday', []], ['Previous 7 days', []], ['Earlier', []]]
+  const groups = [['Pinned', []], ['Today', []], ['Yesterday', []], ['Previous 7 days', []], ['Earlier', []]]
   for (const d of debates) {
     const t = new Date(d.created_at)
-    const g = t >= today ? 0 : t >= yesterday ? 1 : t >= week ? 2 : 3
+    const g = pins.has(d.id) ? 0 : t >= today ? 1 : t >= yesterday ? 2 : t >= week ? 3 : 4
     groups[g][1].push(d)
   }
   return groups.filter(([, items]) => items.length)
@@ -47,6 +56,13 @@ function matches(d, query) {
 
 export default function Sidebar({ debates, currentId, view, series, attention, onSelect, onNew, onDelete, onSettings, onCollapse, onOpenResource, appName }) {
   const [query, setQuery] = useState('')
+  const [pins, setPins] = useState(loadPins)
+  const togglePin = (id) => setPins((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    savePins(next)
+    return next
+  })
   const searchRef = useRef(null)
   const shown = query.trim() ? debates.filter((d) => matches(d, query)) : debates
 
@@ -87,17 +103,24 @@ export default function Sidebar({ debates, currentId, view, series, attention, o
         </div>
       )}
       <nav className="history">
-        {groupByDay(shown).map(([label, items]) => (
+        {groupByDay(shown, pins).map(([label, items]) => (
           <div key={label}>
             <div className="side-h">{label}</div>
             {items.map((d) => {
               const live = ['running', 'concluding', 'researching', 'intake'].includes(d.status)
               return (
-                <div key={d.id} className={`hist ${view === 'debate' && d.id === currentId ? 'on' : ''}`}
+                <div key={d.id} className={`hist ${view === 'debate' && d.id === currentId ? 'on' : ''} ${pins.has(d.id) ? 'pinned' : ''}`}
                   role="button" tabIndex={0} onClick={() => onSelect(d.id)} onKeyDown={(e) => e.key === 'Enter' && onSelect(d.id)}>
                   <div className="t">{displayTitle(d.title, d.question)}</div>
                   {attention?.has(d.id) && <i className="badge" aria-label="Needs your attention" />}
                   <div className="s">{live && <i className="live-dot" />}{STATUS[d.status] || d.status}{d.round ? ` · ${d.round} round${d.round === 1 ? '' : 's'}` : ''}</div>
+                  <button className={`icon-btn pin ${pins.has(d.id) ? 'on' : ''}`} aria-pressed={pins.has(d.id)}
+                    aria-label={pins.has(d.id) ? 'Unpin' : 'Pin to top'} title={pins.has(d.id) ? 'Unpin' : 'Pin to top'}
+                    onClick={(e) => { e.stopPropagation(); togglePin(d.id) }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill={pins.has(d.id) ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                      <path d="M5.5 1.5h5l-.8 4.3 2.8 2.7v1h-4v5l-.5 1-.5-1v-5h-4v-1l2.8-2.7z" strokeLinejoin="round" />
+                    </svg>
+                  </button>
                   <button className="icon-btn x" aria-label="Delete"
                     onClick={(e) => { e.stopPropagation(); if (confirm('Delete this conundrum and its debate?')) onDelete(d.id) }}>✕</button>
                 </div>
