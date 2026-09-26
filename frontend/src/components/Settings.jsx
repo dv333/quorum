@@ -6,6 +6,70 @@ import { THEMES, getTheme, setTheme } from '../theme'
 const TABS = [['models', 'Models'], ['providers', 'Providers'], ['search', 'Web search'], ['appearance', 'Appearance']]
 const FIT = { fits: ['ok', 'Fits'], too_big: ['bad', 'Too big'], unknown: ['', 'Unknown size'], cloud: ['', 'Cloud'] }
 
+// A settings row: what it is and why on the left, the control on the right
+function SettingRow({ label, desc, children }) {
+  return (
+    <div className="set-row">
+      <div className="set-label"><b>{label}</b>{desc && <p>{desc}</p>}</div>
+      <div className="set-control">{children}</div>
+    </div>
+  )
+}
+
+function Section({ title, desc, children }) {
+  return (
+    <section className="set-section">
+      <div className="set-section-head"><h2>{title}</h2>{desc && <p>{desc}</p>}</div>
+      {children}
+    </section>
+  )
+}
+
+// A ring that fills with the share of setup checks that pass
+function Ring({ value }) {
+  const r = 15
+  const c = 2 * Math.PI * r
+  return (
+    <svg className="ring" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
+      <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" className="ring-track" />
+      <circle cx="20" cy="20" r={r} fill="none" strokeWidth="4" strokeLinecap="round" className="ring-fill"
+        strokeDasharray={`${c * value} ${c}`} transform="rotate(-90 20 20)" />
+    </svg>
+  )
+}
+
+// What Quorum needs to work well, at a glance, with one way to fix the first problem
+function SetupStatus({ inv, research, onChoose, onRunSetup }) {
+  const [hidden, setHidden] = useState(false)
+  if (!inv || hidden) return null
+  const fits = inv.models.filter((m) => m.fit === 'fits').length
+  // [when fine, is it fine, where to fix it, the button, when not fine]
+  const checks = [
+    ['Model server running', inv.endpoints.some((e) => e.enabled && e.reachable), 'providers', 'Check providers', 'No model server is running. Start Ollama or add a provider.'],
+    [`${fits} models fit in memory`, fits >= 3, 'models', 'Get models', `Only ${fits} model${fits === 1 ? ' fits' : 's fit'} in memory; three or more make a good council.`],
+    ['Web search ready', !!research?.ready, 'search', 'Set up web search', `${RESEARCHER} can't search the web, so answers won't be checked against sources.`],
+  ]
+  const passing = checks.filter(([, ok]) => ok).length
+  const firstProblem = checks.find(([, ok]) => !ok)
+  return (
+    <div className={`setup-status ${firstProblem ? 'warn' : ''}`}>
+      <Ring value={passing / checks.length} />
+      <div className="grow">
+        <b>{firstProblem ? `${checks.length - passing} of ${checks.length} setup checks need attention` : 'Quorum is ready'}</b>
+        <p>{firstProblem ? firstProblem[4] : checks.map(([t]) => t).join(' · ')}</p>
+      </div>
+      {firstProblem ? (
+        <button className="btn primary small" onClick={() => onChoose(firstProblem[2])}>{firstProblem[3]}</button>
+      ) : (
+        <>
+          <button className="btn small" onClick={() => setHidden(true)}>Dismiss</button>
+          <button className="btn small" onClick={onRunSetup}>Run setup again</button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function SearchField({ value, onChange, placeholder }) {
   return (
     <div className="search-field">
@@ -47,9 +111,9 @@ function PullButton({ endpoints, model, onDone }) {
 function AppearanceTab() {
   const [theme, choose] = useState(getTheme)
   return (
-    <section>
-      <h3>Theme</h3>
-      <div className="appearance" role="radiogroup" aria-label="Appearance">
+    <Section title="Appearance" desc="How Quorum looks on this computer.">
+      <SettingRow label="Theme" desc="System follows your computer's light or dark setting. Kept in this browser.">
+      <div className="appearance" role="radiogroup" aria-label="Theme">
         {THEMES.map(([k, label]) => (
           <button key={k} role="radio" aria-checked={theme === k} className={`theme-card ${theme === k ? 'on' : ''}`}
             onClick={() => { setTheme(k); choose(k) }}>
@@ -58,8 +122,8 @@ function AppearanceTab() {
           </button>
         ))}
       </div>
-      <p className="muted small" style={{ marginTop: 12 }}>System follows your computer's light or dark setting. This choice is kept in this browser.</p>
-    </section>
+      </SettingRow>
+    </Section>
   )
 }
 
@@ -273,36 +337,31 @@ function WebSearchTab() {
   }
   if (!status) return <p className="muted">{error || 'Checking…'}</p>
   return (
-    <div className="group">
-      <div className="list">
-        <div className="list-row stack-sm">
-          <div className="grow"><b>Search with</b><div className="sub">Self-hosted is free and private. Cloud needs a Firecrawl key and uses credits.</div></div>
-          <div className="seg">
-            <button className={status.mode === 'self' ? 'on' : ''} onClick={() => save({ firecrawl_mode: 'self' })}>Self-hosted</button>
-            <button className={status.mode === 'cloud' ? 'on' : ''} onClick={() => save({ firecrawl_mode: 'cloud' })}>Cloud</button>
-          </div>
+    <Section title="Web search"
+      desc={<>{RESEARCHER} uses <a href="https://github.com/firecrawl/firecrawl" target="_blank" rel="noreferrer noopener">Firecrawl</a> to search and read pages, then writes cited briefs for the council.</>}>
+      <SettingRow label="Search with" desc="Self-hosted is free and private. Cloud needs a Firecrawl key and uses credits.">
+        <div className="seg">
+          <button className={status.mode === 'self' ? 'on' : ''} onClick={() => save({ firecrawl_mode: 'self' })}>Self-hosted</button>
+          <button className={status.mode === 'cloud' ? 'on' : ''} onClick={() => save({ firecrawl_mode: 'cloud' })}>Cloud</button>
         </div>
-        {status.mode === 'self' ? (
-          <div className="list-row stack-sm">
-            <div className="grow"><b>Firecrawl address</b><div className="sub">Start it with <code>scripts/firecrawl.sh up</code> (needs Docker)</div></div>
-            <input className="input" type="url" value={url} onChange={(e) => setUrl(e.target.value)} style={{ width: 220 }} />
-            <button className="btn small" onClick={() => save({ firecrawl_url: url })}>Save</button>
-          </div>
-        ) : (
-          <div className="list-row stack-sm">
-            <div className="grow"><b>Firecrawl API key</b><div className="sub">{status.api_key_set ? `Saved (${status.api_key_hint})` : <a href="https://www.firecrawl.dev/app/api-keys" target="_blank" rel="noreferrer noopener">Get a key</a>}</div></div>
-            <input className="input" type="password" value={key} placeholder="fc-…" autoComplete="off" onChange={(e) => setKey(e.target.value)} style={{ width: 200 }} />
-            <button className="btn small" disabled={!key.trim()} onClick={() => { save({ firecrawl_api_key: key }); setKey('') }}>Save</button>
-            {status.api_key_set && <button className="btn small ghost danger" onClick={() => save({ firecrawl_api_key: '' })}>Remove</button>}
-          </div>
-        )}
-        <div className="list-row">
-          <div className="grow"><b>Status</b><div className="sub">{status.ready ? `${RESEARCHER} can search the web` : status.error}</div></div>
-          {status.ready ? <span className="pill ok">Ready</span> : <span className="pill">Unavailable</span>}
-          <button className="btn small" disabled={busy || !status.ready} onClick={runTest}>{busy ? 'Searching…' : 'Test'}</button>
-        </div>
-      </div>
-      <p>{RESEARCHER} uses <a href="https://github.com/firecrawl/firecrawl" target="_blank" rel="noreferrer noopener">Firecrawl</a> to search and read pages, then writes cited briefs for the council.</p>
+      </SettingRow>
+      {status.mode === 'self' ? (
+        <SettingRow label="Firecrawl address" desc={<>Start it with <code>scripts/firecrawl.sh up</code> (needs Docker).</>}>
+          <input className="input" type="url" value={url} aria-label="Firecrawl address" onChange={(e) => setUrl(e.target.value)} />
+          <button className="btn small" onClick={() => save({ firecrawl_url: url })}>Save</button>
+        </SettingRow>
+      ) : (
+        <SettingRow label="Firecrawl API key"
+          desc={status.api_key_set ? `Saved (${status.api_key_hint}).` : <a href="https://www.firecrawl.dev/app/api-keys" target="_blank" rel="noreferrer noopener">Get a key</a>}>
+          <input className="input" type="password" value={key} placeholder="fc-…" autoComplete="off" aria-label="Firecrawl API key" onChange={(e) => setKey(e.target.value)} />
+          <button className="btn small" disabled={!key.trim()} onClick={() => { save({ firecrawl_api_key: key }); setKey('') }}>Save</button>
+          {status.api_key_set && <button className="btn small ghost danger" onClick={() => save({ firecrawl_api_key: '' })}>Remove</button>}
+        </SettingRow>
+      )}
+      <SettingRow label="Status" desc={status.ready ? `${RESEARCHER} can search the web.` : status.error}>
+        {status.ready ? <span className="pill ok">✓ Ready</span> : <span className="pill warn">Unavailable</span>}
+        <button className="btn small" disabled={busy || !status.ready} onClick={runTest}>{busy ? 'Searching…' : 'Test'}</button>
+      </SettingRow>
       {error && <p className="error">{error}</p>}
       {test && (
         <div className="srcs">
@@ -310,7 +369,7 @@ function WebSearchTab() {
           {test.length === 0 && <span className="muted small">No results</span>}
         </div>
       )}
-    </div>
+    </Section>
   )
 }
 
@@ -319,6 +378,8 @@ export default function Settings({ mobileBar, onRunSetup }) {
   const [inv, setInv] = useState(null)
   const [catalog, setCatalog] = useState([])
   const [error, setError] = useState(null)
+  const [research, setResearch] = useState(null)
+  useEffect(() => { api.researchStatus().then(setResearch, () => {}) }, [tab])
 
   const load = useCallback(async (refresh = false) => {
     try {
@@ -338,19 +399,20 @@ export default function Settings({ mobileBar, onRunSetup }) {
       <div className="page">
         <div className="page-inner">
           <div className="settings-head">
-            <h1>Settings</h1>
-            <div className="seg tabs" role="tablist">
-              {TABS.map(([k, label]) => (
-                <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => choose(k)}>{label}</button>
-              ))}
+            <div>
+              <h1>Settings</h1>
+              <p className="lead">
+                Models, providers, web search and appearance
+                {inv && <> · {inv.system.label} · {formatGB(inv.system.usable_bytes)} available for local models</>}
+              </p>
             </div>
           </div>
-          {inv && (
-            <p className="lead">
-              {inv.system.label} · {formatGB(inv.system.usable_bytes)} available for local models ·{' '}
-              <button className="linkish" onClick={onRunSetup}>Run setup again</button>
-            </p>
-          )}
+          <div className="tabs-line" role="tablist" aria-label="Settings sections">
+            {TABS.map(([k, label]) => (
+              <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => choose(k)}>{label}</button>
+            ))}
+          </div>
+          <SetupStatus inv={inv} research={research} onChoose={choose} onRunSetup={onRunSetup} />
           {error && <p className="error">{error}</p>}
           {tab === 'search' && <WebSearchTab />}
           {tab === 'appearance' && <AppearanceTab />}

@@ -955,3 +955,39 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .study-src { margin-top: auto; padding-top: 2px; font-size: 12px; color: var(--blue); text-decoration: none; }
 .study-src:hover { text-decoration: underline; }
 @media print { .studies ol { display: block; } .study { break-inside: avoid; margin-bottom: 8px; } }
+
+/* Settings: a quiet header, text tabs, a setup status card, and two-column rows */
+.tabs-line { display: flex; gap: 4px; flex-wrap: wrap; margin: 14px 0 18px; padding-bottom: 12px; border-bottom: 0.5px solid var(--hairline-strong); }
+.tabs-line button {
+  border: 0; background: none; padding: 6px 12px; border-radius: 8px; font: 500 13.5px var(--font); color: var(--text-2); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.tabs-line button:hover { color: var(--text); background: var(--fill); }
+.tabs-line button.on { color: var(--text); background: var(--fill-2); font-weight: 600; }
+.tabs-line button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.setup-status {
+  display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 22px; border-radius: 14px;
+  background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline-strong);
+}
+.setup-status .grow { flex: 1; min-width: 0; }
+.setup-status b { font-size: 14px; }
+.setup-status p { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); }
+.ring { flex: none; }
+.ring-track { stroke: var(--fill-2); }
+.ring-fill { stroke: var(--agree); transition: stroke-dasharray 0.6s var(--ease); }
+.setup-status.warn .ring-fill { stroke: var(--refine); }
+.set-section { margin-bottom: 28px; }
+.set-section-head { padding-bottom: 12px; border-bottom: 0.5px solid var(--hairline-strong); }
+.set-section-head h2 { font: 600 16px var(--display); margin: 0; }
+.set-section-head p { margin: 3px 0 0; font-size: 13px; color: var(--text-2); }
+.set-row { display: grid; grid-template-columns: minmax(180px, 280px) 1fr; gap: 12px 28px; align-items: center; padding: 16px 0; border-bottom: 0.5px solid var(--hairline); }
+.set-label b { font-size: 13.5px; font-weight: 600; }
+.set-label p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
+.set-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+.set-control .input { flex: 1; min-width: 160px; max-width: 280px; }
+.set-control .appearance { margin-top: 0; width: 100%; max-width: 440px; }
+@media (max-width: 640px) {
+  .set-row { grid-template-columns: 1fr; }
+  .set-control { justify-content: flex-start; }
+  .setup-status { flex-wrap: wrap; }
+}
