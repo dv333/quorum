@@ -942,3 +942,16 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .evidence li.flash { animation: flash 1.6s var(--ease); border-radius: 10px; }
 @keyframes flash { 0%, 40% { background: color-mix(in srgb, var(--blue) 14%, transparent); } 100% { background: transparent; } }
 @media print { .cite-pop { display: none; } .cite-n { background: none; color: inherit; padding: 0; } }
+
+/* Key studies: the sources behind an evidence answer, as cards */
+.studies h3 { margin-bottom: 10px; }
+.studies ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.study { display: flex; flex-direction: column; gap: 5px; padding: 12px 14px; border-radius: 14px; background: var(--fill); font-size: 13px; line-height: 1.45; }
+.study-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.study-head b { font-size: 13.5px; }
+.study-year { flex-shrink: 0; font: 600 11px var(--font); color: var(--text-2); background: var(--card); padding: 1px 7px; border-radius: 999px; }
+.study-design { color: var(--text-2); font-size: 12px; }
+.study-finding { color: var(--text); }
+.study-src { margin-top: auto; padding-top: 2px; font-size: 12px; color: var(--blue); text-decoration: none; }
+.study-src:hover { text-decoration: underline; }
+@media print { .studies ol { display: block; } .study { break-inside: avoid; margin-bottom: 8px; } }
