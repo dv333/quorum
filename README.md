@@ -134,6 +134,19 @@ MacBook Pro. Click any image to see it full size.
 </tr>
 </table>
 
+## Look before you install
+
+```bash
+git clone https://github.com/dv333/quorum.git
+cd quorum
+./start.sh --demo        # Windows: .\start.ps1 -Demo
+```
+
+Open **http://localhost:5173/#demo** to watch recorded conundrums replay in the real app: a code review of a change
+with planted bugs (with the Coder reading the repository), and a health question researched on the web. It needs only
+Node.js 20+: no models, Docker, Python or API keys. Switch reading levels on the answer, change the speed, or skip to
+the answer.
+
 ## Requirements
 
 | | Minimum | Recommended |
@@ -148,6 +161,10 @@ MacBook Pro. Click any image to see it full size.
 
 GPU acceleration comes from Ollama: Apple Silicon (Metal), NVIDIA (CUDA) and AMD (ROCm) all work. CPU-only machines
 work too, just slower.
+
+`./start.sh --check` tells you what your machine can run before anything downloads: which model sizes fit in its
+memory, whether there's disk space for the starter council (about 8, 11 or 22 GB depending on memory) and web search
+(about 4 GB, downloaded on its first start), and whether Claude Code or Codex is there for the Coder.
 
 ## Quick start
 
@@ -417,6 +434,12 @@ uv run --with playwright python scripts/screenshots.py --answer <debate-id>
 uv run --with playwright python scripts/record_demo.py
 uv run --with pillow python scripts/make_gifs.py
 uv run python scripts/licenses.py    # refresh THIRD_PARTY_NOTICES.md
+```
+
+The replay demo's recordings are finished conundrums, saved with:
+
+```bash
+uv run python scripts/record_replay.py <debate-id> --name code-review --label "A code review" --short "Code review"
 ```
 
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).

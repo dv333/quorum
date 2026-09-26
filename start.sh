@@ -5,15 +5,18 @@
 #   ./start.sh           check, install what's needed, start
 #   ./start.sh --check   only check and install; don't start anything
 #   ./start.sh --yes     install missing prerequisites without asking
+#   ./start.sh --demo    replay a recorded debate: needs only Node.js (no models, Docker or keys)
 set -euo pipefail
 cd "$(dirname "$0")"
 
 CHECK_ONLY=""
+DEMO=""
 ASSUME_YES="${QUORUM_YES:-}"
 for arg in "$@"; do
   case "$arg" in
     --check) CHECK_ONLY=1 ;;
     --yes | -y) ASSUME_YES=1 ;;
+    --demo) DEMO=1 ;;
     -h | --help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $arg (try --help)"; exit 1 ;;
   esac
@@ -61,12 +64,15 @@ if [ "$OS" = Darwin ] && ! have brew; then
   warn "Homebrew isn't installed, so missing tools can't be installed for you. Get it at https://brew.sh"
 fi
 
+if [ -z "$DEMO" ]; then
 # --- uv (Python)
 if have uv || brew_install "uv" uv; then
   ok "uv $(uv --version | awk '{print $2}')"
 else
   fail "uv is required. Install it: curl -LsSf https://astral.sh/uv/install.sh | sh  (or: brew install uv)"
   exit 1
+fi
+
 fi
 
 # --- Node.js 20+
@@ -80,6 +86,40 @@ if have node || brew_install "Node.js" node; then
 else
   fail "Node.js 20+ is required: https://nodejs.org  (or: brew install node)"
   exit 1
+fi
+
+if [ -z "$DEMO" ]; then
+# --- Memory and disk: what fits, and room for the models
+if [ "$OS" = Darwin ]; then
+  RAM_GB=$(( $(sysctl -n hw.memsize) / 1073741824 ))
+else
+  RAM_GB=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1048576 ))
+fi
+USABLE_GB=$(( RAM_GB * 3 / 4 ))
+if [ "$USABLE_GB" -ge 30 ]; then
+  STARTER_GB=22; FITS="models up to about 30B parameters"
+elif [ "$USABLE_GB" -ge 14 ]; then
+  STARTER_GB=11; FITS="models up to about 14B parameters"
+else
+  STARTER_GB=8; FITS="small models (3–8B parameters)"
+fi
+if [ "$RAM_GB" -lt 8 ]; then
+  warn "${RAM_GB} GB of memory: only the smallest models fit, and debates will be slow. 16 GB or more works well."
+else
+  GPU_NOTE=""
+  [ "$OS" = Linux ] && GPU_NOTE=" (with an NVIDIA GPU, its memory decides instead)"
+  ok "${RAM_GB} GB of memory: $FITS fit$GPU_NOTE"
+fi
+MODEL_DIR="${OLLAMA_MODELS:-$HOME/.ollama}"
+[ -d "$MODEL_DIR" ] || MODEL_DIR="$HOME"
+FREE_GB=$(df -Pk "$MODEL_DIR" | awk 'NR==2 {print int($4 / 1048576)}')
+WEB_GB=4
+[ -n "${QUORUM_NO_WEB:-}" ] && WEB_GB=0
+NEED_GB=$(( STARTER_GB + WEB_GB + 2 ))
+if [ "$FREE_GB" -lt "$NEED_GB" ]; then
+  warn "${FREE_GB} GB free disk; Quorum needs about ${NEED_GB} GB: ${STARTER_GB} GB for the starter models, ${WEB_GB} GB for web search (downloaded on its first start) and room to spare"
+else
+  ok "${FREE_GB} GB free disk (the starter models take about ${STARTER_GB} GB, web search about 4 GB)"
 fi
 
 # --- Ollama: runs the models
@@ -112,6 +152,7 @@ if ollama_up; then
   fi
 else
   warn "Ollama isn't running. Install it from https://ollama.com/download (or: brew install ollama), then run: ollama serve"
+  warn "Just want to look first? ./start.sh --demo replays a recorded debate and needs only Node.js."
 fi
 
 # --- Docker: needed for web search (Beagle)
@@ -144,9 +185,18 @@ else
   fi
 fi
 
+# --- The Coder: a coding agent that reads your repository in code debates (optional)
+if have claude || have codex; then
+  CODER="$(have claude && echo "Claude Code" || echo "Codex")"
+  ok "Coder: $CODER can read repositories in code debates (read-only; sign in once by running $(have claude && echo claude || echo codex))"
+else
+  warn "Coder (optional): install Claude Code or Codex so code debates can read your repository"
+fi
+
 # --- Python dependencies
 uv sync -q
 ok "Python packages"
+fi
 
 # --- App dependencies. Reinstall when node_modules is missing, incomplete (an interrupted install)
 # or older than package-lock.json.
@@ -167,6 +217,16 @@ if [ ! -x frontend/node_modules/.bin/vite ] || [ ! -f frontend/node_modules/.pac
   fi
 fi
 ok "App packages"
+
+if [ -n "$DEMO" ]; then
+  if lsof -ti tcp:5173 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Quorum is already running: open http://localhost:5173/#demo"
+    exit 0
+  fi
+  echo ""
+  echo "Replay demo: http://localhost:5173/#demo  (a recording: no models, Docker or keys needed)"
+  cd frontend && exec npm run dev -- --strictPort
+fi
 
 if [ -n "$CHECK_ONLY" ]; then
   echo "All set. Run ./start.sh to open Quorum."
@@ -199,7 +259,12 @@ if [ -n "$WEB" ]; then
     echo "Web search: Firecrawl is running."
   else
     mkdir -p data
-    echo "Web search: starting Firecrawl in the background (log: data/firecrawl.log)"
+    if docker image ls --format '{{.Repository}}' 2>/dev/null | grep -qi firecrawl; then
+      echo "Web search: starting Firecrawl in the background (log: data/firecrawl.log)"
+    else
+      echo "Web search: first start. Firecrawl downloads about 4 GB in the background (5–15 minutes; log:"
+      echo "  data/firecrawl.log). The council works meanwhile; web search turns on when the download is done."
+    fi
     (./scripts/firecrawl.sh up > data/firecrawl.log 2>&1 &)
   fi
 fi

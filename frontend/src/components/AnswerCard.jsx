@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 // Models write "~$12k" for approximations; only ~~double~~ tildes should strike through
 const GFM = [[remarkGfm, { singleTilde: false }]]
 import { api, exportMarkdown, exportUrl } from '../api'
+import { ReplayContext } from '../replay'
 import { RESEARCHER, agentFor, formatDuration, formatTime, formatTokens, modelShort } from '../agents'
 import { CiteContext, CopyButton, Markdown, MdLink, Orb, citeLinks, copyText } from './Message'
 import Mermaid from './Mermaid'
@@ -342,14 +343,16 @@ function Evidence({ claims }) {
 }
 
 export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question, title, claims = [] }) {
+  const replay = useContext(ReplayContext)
   const [level, setLevel] = useState('standard')
-  const [versions, setVersions] = useState({})
+  // A replay carries the reading levels it was recorded with; it can't write new ones
+  const [versions, setVersions] = useState(() => (replay?.recording.versions || {}))
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
   const [diagramFailed, setDiagramFailed] = useState(false)
   const cardRef = useRef(null)
   const onDiagramFail = useCallback(() => setDiagramFailed(true), [])
-  const canTrace = !!verdict && verdict.reason !== 'direct' && msg?.status === 'done'
+  const canTrace = !replay && !!verdict && verdict.reason !== 'direct' && msg?.status === 'done'
   const [sel, setSel] = useSelection(cardRef, canTrace)
   const [why, setWhy] = useState(null) // { text, x, y, loading, data, error, chair }
   const closeWhy = useCallback(() => setWhy(null), [])
@@ -433,11 +436,12 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
       <div className="a-head">
         <div className="t">{verdict ? headline(verdict, finalStances, seats.length, factChecked, chairName) : <span>{chairName} is writing the answer…</span>}</div>
         {verdict && <CopyButton text={text} label="Copy answer" />}
-        {verdict && msg?.status === 'done' && <ExportMenu debateId={debateId} level={versions[level] || level === 'standard' ? level : 'standard'} onPrint={print} />}
+        {!replay && verdict && msg?.status === 'done' && <ExportMenu debateId={debateId} level={versions[level] || level === 'standard' ? level : 'standard'} onPrint={print} />}
         {verdict && verdict.reason !== 'direct' && (
           <div className="seg" role="group" aria-label="Reading level">
             {LEVELS.map(([k, label]) => (
-              <button key={k} className={level === k ? 'on' : ''} disabled={!!busy} onClick={() => chooseLevel(k)}>
+              <button key={k} className={level === k ? 'on' : ''} disabled={!!busy || (replay && k !== 'standard' && !versions[k])}
+                onClick={() => chooseLevel(k)}>
                 {busy === k ? '…' : label}
               </button>
             ))}

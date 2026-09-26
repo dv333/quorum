@@ -1,4 +1,5 @@
-import { useEffect, useReducer } from 'react'
+import { useContext, useEffect, useReducer } from 'react'
+import { ReplayContext, play } from './replay'
 
 // Live debate state: a snapshot on connect, then incremental SSE events.
 
@@ -56,9 +57,17 @@ function reducer(state, event) {
 
 export function useDebate(debateId) {
   const [state, dispatch] = useReducer(reducer, empty)
+  const replay = useContext(ReplayContext)
+
+  // A recorded conundrum plays back on a clock instead of connecting to the backend
+  useEffect(() => {
+    if (!replay) return undefined
+    dispatch({ type: 'reset' })
+    return play(replay.recording, dispatch, replay.control, replay.onDone)
+  }, [replay])
 
   useEffect(() => {
-    if (!debateId) return undefined
+    if (!debateId || replay) return undefined
     dispatch({ type: 'reset' })
     let source = null
     let retry = null
@@ -80,7 +89,7 @@ export function useDebate(debateId) {
     }
     connect()
     return () => { closed = true; clearTimeout(retry); source?.close() }
-  }, [debateId])
+  }, [debateId, replay])
 
   return state
 }

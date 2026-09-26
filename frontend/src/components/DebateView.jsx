@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { RESEARCHER, displayTitle, modelShort } from '../agents'
+import { ReplayContext } from '../replay'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
@@ -453,6 +454,7 @@ function TopicBlock({ topic, state, seatsById, current, answerRef, onIntake }) {
 
 export default function DebateView({ debateId, onChanged, mobileBar }) {
   const state = useDebate(debateId)
+  const replaying = !!useContext(ReplayContext)
   const scrollRef = useRef(null)
   const stickRef = useRef(true)
   const answerRef = useRef(null)
@@ -512,12 +514,12 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           <h2 title={question}>{displayTitle(debate.title, question)}</h2>
           <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</div>
         </div>
-        {INTAKE.includes(status) && (
+        {!replaying && INTAKE.includes(status) && (
           <div className="actions">
             <button className="btn" onClick={() => act(() => api.confirmIntake(debate.id))}>Skip, just start</button>
           </div>
         )}
-        {!['concluded', 'idle', ...INTAKE].includes(status) && (
+        {!replaying && !['concluded', 'idle', ...INTAKE].includes(status) && (
           <div className="actions">
             {status === 'running' && <button className="btn" onClick={() => act(() => api.stopDebate(debate.id))}>Pause</button>}
             {status === 'paused' && <button className="btn" onClick={() => act(() => api.continueDebate(debate.id))}>Continue</button>}
@@ -573,7 +575,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           </button>
         </div>
       )}
-      <Composer debate={debate} seats={seats} onError={setError} state={state} />
+      {!replaying && <Composer debate={debate} seats={seats} onError={setError} state={state} />}
     </>
   )
 }

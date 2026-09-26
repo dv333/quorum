@@ -65,10 +65,11 @@ export function CopyButton({ text, label = 'Copy' }) {
 export function Orb({ handle, size = '', speaking = false, dim = false, chair = false }) {
   const a = agentFor(handle)
   return (
-    <div className={`orb ${size} c-${a.color} ${speaking ? 'speaking' : ''} ${dim ? 'dim' : ''}`} aria-hidden="true">
+    // A span, since orbs also sit inside paragraphs (an @mention); .orb sets its own display
+    <span className={`orb ${size} c-${a.color} ${speaking ? 'speaking' : ''} ${dim ? 'dim' : ''}`} aria-hidden="true">
       {a.emoji}
       {chair && <span className="crown" title="Chair">★</span>}
-    </div>
+    </span>
   )
 }
 
