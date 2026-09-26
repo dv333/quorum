@@ -370,6 +370,10 @@ async def list_debates(
     """Conundrums, newest first. Without parameters, all of them; the sidebar pages through them with `limit` and
     `before` (the last item's created_at) within a day group's range."""
     where, params = _debate_filter(before, after, q, ids, status, exclude)
+    return _debate_rows(where, params, limit)
+
+
+def _debate_rows(where: str, params: List[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
     return db.query(
         "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, "
         "(SELECT COUNT(*) FROM seats s WHERE s.debate_id = d.id) AS seat_count, "
@@ -378,6 +382,43 @@ async def list_debates(
         f"FROM debates d{where} ORDER BY d.created_at DESC, d.id DESC" + (" LIMIT ?" if limit else ""),
         params + ([limit] if limit else []),
     )
+
+
+def _debate_count(where: str, params: List[Any]) -> int:
+    return db.query_one(f"SELECT COUNT(*) AS n FROM debates d{where}", params)["n"]
+
+
+@app.get("/api/sidebar")
+async def sidebar(
+    groups: str = "[]", pins: Optional[str] = None, q: Optional[str] = None, limit: int = Query(20, ge=1, le=200)
+):
+    """Everything the sidebar shows, in one request: for each day group (a time range from the client, in its own
+    time zone) the count and, for open groups, the first `limit` items; the pinned conundrums; or search results.
+    Pinned conundrums are left out of the groups."""
+    try:
+        specs = json.loads(groups)
+        assert isinstance(specs, list)
+    except (ValueError, AssertionError):
+        raise HTTPException(400, "groups must be a JSON list")
+    pin_ids = ",".join(i for i in (pins or "").split(",") if i)
+    pinned = _debate_rows(*_debate_filter(None, None, None, pin_ids, None), None) if pin_ids else []
+    if q and q.strip():
+        where, params = _debate_filter(None, None, q, None, None)
+        return {
+            "results": {"items": _debate_rows(where, params, limit), "count": _debate_count(where, params)},
+            "pinned": pinned,
+        }
+    out: Dict[str, Any] = {}
+    for spec in specs[:8]:
+        if not isinstance(spec, dict) or not spec.get("key"):
+            continue
+        where, params = _debate_filter(spec.get("before"), spec.get("after"), None, None, None, pin_ids or None)
+        size = max(0, min(int(spec.get("limit") or 0), 200))
+        out[str(spec["key"])] = {
+            "count": _debate_count(where, params),
+            "items": _debate_rows(where, params, size) if size else [],
+        }
+    return {"groups": out, "pinned": pinned}
 
 
 @app.get("/api/debates/count")
@@ -389,7 +430,7 @@ async def count_debates(
     exclude: Optional[str] = None,
 ):
     where, params = _debate_filter(before, after, q, None, status, exclude)
-    return {"count": db.query_one(f"SELECT COUNT(*) AS n FROM debates d{where}", params)["n"]}
+    return {"count": _debate_count(where, params)}
 
 
 @app.post("/api/debates")

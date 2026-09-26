@@ -10,6 +10,10 @@ import ShortcutsHelp from './components/ShortcutsHelp'
 import { ResourceSheet } from './components/Resources'
 import Sidebar, { ComposeIcon, SidebarIcon } from './components/Sidebar'
 
+function sameLive(a, b) {
+  return a.length === b.length && a.every((d, i) => d.id === b[i].id && d.status === b[i].status && d.round === b[i].round && d.title === b[i].title)
+}
+
 // Statuses worth watching: live debates and ones waiting for your answer
 const TRACKED = ['intake', 'clarifying', 'confirming', 'running', 'paused', 'concluding', 'researching']
 
@@ -47,6 +51,7 @@ export default function App() {
   const [help, setHelp] = useState(false)
   const [pendingDelete, setPendingDelete] = useState(null) // { id, title, timer }: deleted after a few seconds unless undone
   const prevStatus = useRef(null)
+  const prevRounds = useRef({})
   const routeRef = useRef(route)
   routeRef.current = route
 
@@ -77,7 +82,8 @@ export default function App() {
       // Conundrums that were live and aren't any more: fetch them to see how they ended (answered, stopped)
       const ended = prevIds.filter((id) => !current.some((d) => d.id === id))
       const list = ended.length ? [...current, ...(await api.listDebates({ ids: ended }))] : current
-      setLive(current)
+      // Only a real change re-renders the app (and refreshes the sidebar)
+      setLive((prev) => (sameLive(prev, current) ? prev : current))
       setBackendError(null)
       // Alert on transitions: the chair needs you, or an answer is ready
       const prev = prevStatus.current
@@ -100,11 +106,15 @@ export default function App() {
       const before = prevStatus.current
       prevStatus.current = Object.fromEntries(current.map((d) => [d.id, d.status]))
       // Any change in what's live (new, ended, moved on) refreshes the sidebar's loaded pages
-      if (!before || ended.length || current.some((d) => before[d.id] !== d.status)) refreshSidebar()
+      if (!before || ended.length || current.some((d) => before[d.id] !== d.status || prevRounds.current[d.id] !== d.round)) refreshSidebar()
+      prevRounds.current = Object.fromEntries(current.map((d) => [d.id, d.round]))
     } catch (e) {
       setBackendError(e.message)
     }
   }, [refreshSidebar])
+
+  // Stable, so the debate page's effect doesn't re-run (and re-fetch) on every render
+  const onDebateChanged = useCallback(() => { loadDebates(); refreshSidebar() }, [loadDebates, refreshSidebar])
 
   useEffect(() => {
     api.config().then(setConfig, (e) => setBackendError(e.message))
@@ -223,7 +233,6 @@ export default function App() {
       <Sidebar
         appName={config.app_name}
         refreshKey={refreshKey}
-        polling={anyActive}
         hiddenId={pendingDelete?.id}
         currentId={route.id}
         view={route.view}
@@ -250,7 +259,7 @@ export default function App() {
             onCreated={(id) => { loadDebates(); refreshSidebar(); go('debate', id) }} />
         )}
         {route.view === 'debate' && route.id && (
-          <DebateView key={route.id} debateId={route.id} onChanged={() => { loadDebates(); refreshSidebar() }} mobileBar={mobileBar} />
+          <DebateView key={route.id} debateId={route.id} onChanged={onDebateChanged} mobileBar={mobileBar} />
         )}
         {route.view === 'settings' && <Settings mobileBar={mobileBar} onRunSetup={() => go('welcome')} />}
         </ErrorBoundary>

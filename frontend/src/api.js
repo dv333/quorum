@@ -39,6 +39,8 @@ export const api = {
   // Newest first; { limit, before, after, q, ids, status, exclude } page and filter on the server
   listDebates: (params = {}) => request(`/debates${query(params)}`),
   countDebates: (params = {}) => request(`/debates/count${query(params)}`).then((r) => r.count),
+  // The whole sidebar in one request: { groups: [{ key, after, before, limit }], pins: [ids], q }
+  sidebar: ({ groups, pins, q, limit }) => request(`/sidebar${query({ groups: JSON.stringify(groups), pins, q, limit })}`),
   getDebate: (id) => request(`/debates/${id}`),
   createDebate: (body) => request('/debates', { method: 'POST', body }),
   deleteDebate: (id) => request(`/debates/${id}`, { method: 'DELETE' }),
