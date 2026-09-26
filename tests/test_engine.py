@@ -110,7 +110,7 @@ class FakeSearch:
         self.queries = []
         self.fail = fail
 
-    async def __call__(self, query, limit):
+    async def __call__(self, query, limit, focus=""):
         self.queries.append(query)
         if self.fail:
             raise self.fail

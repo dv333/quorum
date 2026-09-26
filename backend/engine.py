@@ -1422,8 +1422,13 @@ class DebateEngine:
             # Each claim is searched as asked and, when it names one, on the vendor's documentation site
             site_q = {id(it): f"site:{it['site']} {it['query']}" for it in items if it["site"]}
             queries = [it["query"] for it in items] + list(site_q.values())
+            claim_of = {it["query"]: it["claim"] for it in items} | {
+                site_q[id(it)]: it["claim"] for it in items if id(it) in site_q
+            }
+            # Pages are trimmed to the passages about the claim itself, so a caveat like "uses middleware" survives
             results = await asyncio.gather(
-                *[self.search_fn(q, RESEARCH_SOURCES_PER_CLAIM) for q in queries], return_exceptions=True
+                *[self.search_fn(q, RESEARCH_SOURCES_PER_CLAIM, focus=claim_of[q]) for q in queries],
+                return_exceptions=True,
             )
             by_query = dict(zip(queries, results))
             found = []

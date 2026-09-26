@@ -25,6 +25,8 @@
   - A blocked search engine is reported as an outage (Firecrawl answers "success" with no results when DuckDuckGo
     refuses), claims stay unverified rather than "no sources", and searches are paced to avoid being blocked
   - Answers explain evidence in plain words, without ledger jargon
+  - Pages are trimmed around the claim being checked (not just the search query), so caveats like "uses Oracle
+    Integration Cloud middleware" survive; claim lists start with one claim per stated requirement
 - Roles: before round 1 the chair gives every agent a role matched to its model: always a Skeptic, a Pragmatist and a
   User advocate, plus experts specific to the question. Roles appear next to agent names (messages, stage, @mentions,
   exports), a Roles row opens the debate, and each message keeps the role it was written under

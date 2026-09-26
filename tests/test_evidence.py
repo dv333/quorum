@@ -24,7 +24,7 @@ def memory_db():
     yield
 
 
-async def search(query, limit):
+async def search(query, limit, focus=""):
     if "middleware" in query or "integration" in query:
         return [
             {
@@ -225,7 +225,7 @@ def test_vendor_help_sites_with_hyphens_are_primary():
 async def test_claims_are_also_searched_on_the_vendors_docs_site():
     queries = []
 
-    async def search_spy(query, limit):
+    async def search_spy(query, limit, focus=""):
         queries.append(query)
         if query.startswith("site:docs.oracle.com"):
             return [
@@ -302,7 +302,7 @@ async def test_a_blocked_search_engine_is_an_error_not_an_empty_result(firecrawl
 
 
 async def test_when_search_is_down_the_ledger_still_binds_the_answer():
-    async def blocked(query, limit):
+    async def blocked(query, limit, focus=""):
         raise firecrawl.SearchError("the search engine returned nothing at all")
 
     client = cpq_client()
@@ -321,3 +321,28 @@ async def test_when_search_is_down_the_ledger_still_binds_the_answer():
 def test_the_answer_is_written_for_the_user_not_about_the_ledger():
     rules = prompts.EVIDENCE_RULES
     assert "Never mention the ledger" in rules and "item numbers" in rules
+
+
+def test_excerpts_keep_the_passages_about_the_claim():
+    page = "\n\n".join(
+        [f"Section {i}: Oracle CPQ pricing, discounts and quoting features for sales teams." for i in range(40)]
+        + ["Subscription Management integration uses Oracle Integration Cloud as middleware for synchronization."]
+    )
+    by_query = firecrawl.relevant_excerpt(page, "oracle cpq pricing quoting", limit=600)
+    by_claim = firecrawl.relevant_excerpt(
+        page, "oracle cpq pricing quoting integration eliminates middleware", limit=600
+    )
+    assert "Integration Cloud" not in by_query and "Integration Cloud" in by_claim
+
+
+async def test_claim_searches_pass_the_claim_as_focus():
+    seen = []
+
+    async def spy(query, limit, focus=""):
+        seen.append(focus)
+        return await search(query, limit)
+
+    eng = make_debate(cpq_client(), research=True, search=spy)
+    await eng.post_user_message("Which CPQ?")
+    await eng.task
+    assert MIDDLEWARE in seen and COST in seen

@@ -114,18 +114,19 @@ _SEARCH_GAP = 1.0  # seconds between search starts
 _last_start = 0.0
 
 
-async def search(query: str, limit: int) -> List[Dict[str, str]]:
-    """Search the web and return [{url, title, description, content}] with query-relevant page excerpts."""
+async def search(query: str, limit: int, focus: str = "") -> List[Dict[str, str]]:
+    """Search the web and return [{url, title, description, content}] with page excerpts relevant to the query (and to
+    `focus`, for example the claim being checked, so passages about it survive the trimming)."""
     global _last_start
     async with _SEARCH_SLOTS:
         wait = _last_start + _SEARCH_GAP - time.monotonic()
         if wait > 0:
             await asyncio.sleep(wait)
         _last_start = time.monotonic()
-        return await _search(query, limit)
+        return await _search(query, limit, focus)
 
 
-async def _search(query: str, limit: int) -> List[Dict[str, str]]:
+async def _search(query: str, limit: int, focus: str = "") -> List[Dict[str, str]]:
     s = settings()
     if s["mode"] == "cloud" and not s["api_key"]:
         raise SearchError("No Firecrawl API key set")
@@ -168,7 +169,7 @@ async def _search(query: str, limit: int) -> List[Dict[str, str]]:
                 "url": url,
                 "title": item.get("title") or (item.get("metadata") or {}).get("title") or url,
                 "description": item.get("description") or "",
-                "content": relevant_excerpt(item.get("markdown") or "", query),
+                "content": relevant_excerpt(item.get("markdown") or "", f"{query} {focus}".strip()),
             }
         )
     return out

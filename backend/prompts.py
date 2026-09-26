@@ -532,7 +532,7 @@ def claims_messages(
 {summ}Final positions:
 {pos}
 
-List up to {max_claims} factual claims the final answer will rely on, most decisive first. Include what the debate asserts about how the options meet each requirement stated in the question, then claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write a web search query naming the specific product and feature and, when the claim is about one vendor's product, that vendor's documentation site (like "docs.oracle.com" or "help.salesforce.com").
+List up to {max_claims} factual claims the final answer will rely on. Start with one claim for each requirement stated in the question (what the debate asserts about how the options meet it), then claims that could be wrong or overstated: product capabilities, integrations ("works without middleware"), costs, speed of implementation, versions, numbers, and any comparative claim ("cheaper", "faster", "better integrated") between options. State each claim exactly as the debate asserts it, without softening it. For each, write a web search query naming the specific product and feature and, when the claim is about one vendor's product, that vendor's documentation site (like "docs.oracle.com" or "help.salesforce.com").
 
 Reply like: {{"claims": [{{"claim": "...", "query": "...", "docs_site": "..."}}]}}""",
         },
