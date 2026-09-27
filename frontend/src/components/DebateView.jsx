@@ -6,6 +6,7 @@ import { formatElapsed, useNow } from '../time'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
+import { MoreMenu, usePopover } from './Popover'
 import RoundTable from './RoundTable'
 import { AgentMessage, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
@@ -119,6 +120,26 @@ function Thread({ items, seatsById, debate, onIntake }) {
 }
 
 // The stage's compact view is a per-viewer preference; storage can be unavailable (private windows)
+// Reading mode: the debate as a quiet transcript. The Aa button or the R key switches it; the choice is remembered.
+function useReadingMode() {
+  const [on, setOn] = useState(() => {
+    try { return localStorage.getItem('quorum.reading') === '1' } catch { return false }
+  })
+  const toggle = () => setOn((v) => {
+    try { localStorage.setItem('quorum.reading', v ? '0' : '1') } catch { /* keep it for this visit */ }
+    return !v
+  })
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]')
+      if (e.key.toLowerCase() === 'r' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) toggle()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  return [on, toggle]
+}
+
 // The table folds into a line while you read further down, or always if you choose; the choice is remembered
 function useFoldedTable(scrolled) {
   const [pref, setPref] = useState(() => {
@@ -139,7 +160,7 @@ function useFoldedTable(scrolled) {
   return [folded, toggle]
 }
 
-function Stage({ state, speakingSeatIds, beagleBusy, searches, scrolled }) {
+function Stage({ state, speakingSeatIds, beagleBusy, searches, scrolled, away }) {
   const { debate, seats, messages } = state
   const stances = latestStances(messages, debate.topic, seats)
   const [folded, toggleFolded] = useFoldedTable(scrolled)
@@ -159,21 +180,23 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches, scrolled }) {
     if (folded || tally || dissent.length > 0) roundPill = (
       <button className="consensus-pill" onClick={jump} title="Jump to this round">
         {folded && <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>}
-        {folded && <span className="cp-dots" aria-hidden="true">{stances.map((st, i) => <i key={i} className={`dot ${st ? st.toLowerCase() : 'idle'}`} />)}</span>}
-        {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
+        {/* Folded, the icons carry each stance: the pill only names who dissents */}
+        {folded ? dissent.length > 0 && <em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em>
+          : (tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
       </button>
     )
   }
   const since = askedAt(messages, debate)
+  const draft = <LivingAnswer compact drafts={(state.drafts || []).filter((d) => d.topic === debate.topic)} chair={debate.chair_handle} />
   return (
-    <div className="stage-wrap">
+    // While you scroll down to read, the bar slides away; scrolling up or following the newest message brings it back
+    <div className={`stage-wrap ${away ? 'away' : ''}`}>
       <div className="stage">
         <RoundTable seats={seats} debate={debate} stances={stances} speakingSeatIds={speakingSeatIds}
           beagleBusy={beagleBusy} coderBusy={coderBusy} searches={searches} coderAnswers={coderAnswers}
           since={since} speed={avgTokPerS(state.metrics)} collapsed={folded} onToggle={toggleFolded}
-          roundPill={roundPill} clock={<TotalTime since={since} />} />
+          roundPill={roundPill} draft={draft} clock={<TotalTime since={since} />} />
       </div>
-      <LivingAnswer drafts={(state.drafts || []).filter((d) => d.topic === debate.topic)} chair={debate.chair_handle} />
     </div>
   )
 }
@@ -235,11 +258,6 @@ function CheckIcon() {
 
 function LiveStatus({ state }) {
   const { debate, seats, messages } = state
-  const ticking = ['running', 'concluding'].includes(debate.status)
-  const now = useNow(ticking)
-  // Time since this question was asked (a follow-up starts its own clock)
-  const asked = askedAt(messages, debate)
-  const elapsed = ticking && asked ? formatElapsed(now - new Date(asked).getTime()) : null
   const streaming = messages.filter((m) => m.status === 'streaming')
   const seatName = (id) => seats.find((s) => s.id === id)?.handle
   const writer = streaming.find((m) => m.author_kind === 'seat')
@@ -255,11 +273,10 @@ function LiveStatus({ state }) {
   } else if (debate.status === 'paused') {
     text = `Paused after round ${debate.round}`
   } else if (debate.status === 'running' && debate.round > 0) {
-    const spoken = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done').length
     const who = writer ? `${seatName(writer.seat_id)} is writing…`
       : streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is searching…`
-      : 'next speaker is thinking…'
-    text = `Round ${debate.round} of ${debate.max_rounds} · ${spoken} of ${seats.length} spoken · ${who}`
+      : 'Next speaker is thinking…'
+    text = who // the round and who has spoken are in the bar at the top
   } else if (debate.status === 'running') {
     text = streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is researching before round 1…` : 'Getting started…'
   }
@@ -267,7 +284,7 @@ function LiveStatus({ state }) {
   return (
     <span className="live-status" role="status">
       <i className="live-dot" />{text}
-      {elapsed && <span className="elapsed" title="Time since you asked" aria-label={`${elapsed} since you asked`}>{elapsed}</span>}
+
     </span>
   )
 }
@@ -350,22 +367,39 @@ function Composer({ debate, seats, onError, state }) {
       <div className="composer">
         <textarea ref={ref} rows={1} value={text} placeholder={placeholder} aria-label="Message"
           onChange={onChange} onKeyDown={onKeyDown} onBlur={() => setTimeout(() => setPicker(null), 150)} />
+        <ComposerOptions debate={debate} set={(fields) => act(() => api.updateDebate(id, fields))} />
         <button className="send" style={{ width: 34, height: 34, fontSize: 16 }} disabled={!text.trim() || busy} onClick={send} aria-label="Send">↑</button>
       </div>
-      <div className="composer-meta">
-        {state && <LiveStatus state={state} />}
-        <label className="switch" title="Opening brief, lookups when agents ask, and a fact-check before the answer">
-          <input type="checkbox" checked={debate.research_enabled}
-            onChange={(e) => act(() => api.updateDebate(id, { research_enabled: e.target.checked }))} />
-          Web research
-        </label>
-        <label className="switch" title="Off: pause after every round so you can steer">
-          <input type="checkbox" checked={debate.autopilot}
-            onChange={(e) => act(() => api.updateDebate(id, { autopilot: e.target.checked }))} />
-          Autopilot
-        </label>
-      </div>
+      {state && <div className="composer-meta"><LiveStatus state={state} /></div>}
     </div>
+  )
+}
+
+// Web research and Autopilot, behind a small button beside Send; it shows when either is off
+function ComposerOptions({ debate, set }) {
+  const { open, setOpen, ref } = usePopover()
+  const changed = !debate.research_enabled || !debate.autopilot
+  return (
+    <span className="pop-anchor" ref={ref}>
+      <button className={`icon-btn composer-opts ${changed ? 'changed' : ''}`} aria-label="Debate options" title="Web research and Autopilot"
+        aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+          <path d="M3 6h9M15 6h2M3 14h3M9 14h8" /><circle cx="13.5" cy="6" r="1.8" /><circle cx="7.5" cy="14" r="1.8" />
+        </svg>
+      </button>
+      {open && (
+        <div className="pop-menu up options" role="dialog" aria-label="Debate options">
+          <label className="switch" title="Opening brief, lookups when agents ask, and a fact-check before the answer">
+            <input type="checkbox" checked={debate.research_enabled} onChange={(e) => set({ research_enabled: e.target.checked })} />
+            <span><b>Web research</b><small>A brief first, lookups when agents ask, a fact-check at the end</small></span>
+          </label>
+          <label className="switch" title="Off: pause after every round so you can steer">
+            <input type="checkbox" checked={debate.autopilot} onChange={(e) => set({ autopilot: e.target.checked })} />
+            <span><b>Autopilot</b><small>Off: pause after every round so you can steer</small></span>
+          </label>
+        </div>
+      )}
+    </span>
   )
 }
 
@@ -456,6 +490,9 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   const [error, setError] = useState(null)
   const [jump, setJump] = useState(null) // 'latest' while live and scrolled up, 'answer' when the answer is out of view
   const [scrolled, setScrolled] = useState(false) // read past the top: the table folds into a line
+  const [reading, toggleReading] = useReadingMode()
+  const [barAway, setBarAway] = useState(false)
+  const lastTopRef = useRef(0)
   const seatsById = useMemo(() => Object.fromEntries(state.seats.map((s) => [s.id, s])), [state.seats])
 
   const status = state.debate?.status
@@ -487,14 +524,17 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   const question = messages.find((m) => m.author_kind === 'user' && m.round === 0)?.content || ''
   const searches = state.metrics[debate.topic]?.totals?.searches || 0
 
+  // One line under the title's height: who chairs (why, on hover) and the topic pack
   let sub
+  let subHint
   if (debate.chair_handle) {
-    const by = debate.chair_picked_by && debate.chair_picked_by !== debate.chair_handle ? ` — picked by ${debate.chair_picked_by}` : ''
-    sub = <>Chair: {debate.chair_handle}{by}{debate.chair_reason && ` · “${debate.chair_reason}”`}</>
+    const by = debate.chair_picked_by && debate.chair_picked_by !== debate.chair_handle ? `, picked by ${debate.chair_picked_by}` : ''
+    sub = `${debate.chair_handle} chairs`
+    subHint = `Chair: ${debate.chair_handle}${by}${debate.chair_reason ? ` · “${debate.chair_reason}”` : ''}`
   } else if (debate.chair_mode === 'auto' && ['running', 'intake'].includes(status)) {
-    sub = <>Choosing a chair…</>
+    sub = 'Choosing a chair…'
   } else {
-    sub = <>Chair: {debate.chair_model}</>
+    sub = `Chair: ${modelShort(debate.chair_model)}`
   }
   // Once answered, the top of the session says how long it took
   const verdict = state.verdicts.filter((v) => v.topic === debate.topic).at(-1)
@@ -516,8 +556,11 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
       <div className={`topbar tone-${tone}`}>
         <div className="q-title">
           <h2 title={question}>{displayTitle(debate.title, question)}</h2>
-          <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</div>
+          <span className="sub" title={subHint}>{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</span>
         </div>
+        <button className="btn reading-btn" onClick={toggleReading} aria-pressed={reading}
+          title={reading ? 'Leave reading mode (R)' : 'Reading mode: just the conversation (R)'}
+          aria-label="Reading mode">Aa</button>
         {(statusPill || speed) && (
           <div className="head-pills">
             {statusPill && <span className="head-pill status">{tone === 'ok' && <CheckIcon />}{statusPill}</span>}
@@ -533,21 +576,27 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           <div className="actions">
             {status === 'running' && <button className="btn" onClick={() => act(() => api.stopDebate(debate.id))}>Pause</button>}
             {STOPPED.includes(status) && <button className="btn" onClick={() => act(() => api.continueDebate(debate.id))}>Resume</button>}
+            {/* The rarer actions wait behind ⋯ so the header stays one quiet line */}
             {!['cancelled', 'failed'].includes(status) && (
-              <button className="btn" onClick={() => act(() => api.cancelDebate(debate.id))}>Cancel</button>
-            )}
-            {(status === 'running' || status === 'paused') && (
-              <button className="btn primary" onClick={() => act(() => api.concludeDebate(debate.id))}>Answer now</button>
+              <MoreMenu label="More actions" items={[
+                (status === 'running' || status === 'paused') && { label: 'Answer now', hint: 'The chair answers from what was said so far', run: () => act(() => api.concludeDebate(debate.id)) },
+                { label: 'Cancel', hint: 'Stop for good; you can resume later', danger: true, run: () => act(() => api.cancelDebate(debate.id)) },
+              ].filter(Boolean)} />
             )}
           </div>
         )}
       </div>
-      <div className="scroller" ref={scrollRef}
+      <div className={`scroller ${reading ? 'reading' : ''}`} ref={scrollRef}
         onScroll={(e) => {
           const el = e.currentTarget
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
           const top = el.scrollTop // the table folds past 90px and opens again near the top (no flicker in between)
           setScrolled((was) => (was ? top > 8 : top > 90))
+          // Reading down hides the debate bar; up, the top, or following the newest message shows it
+          const delta = top - lastTopRef.current
+          lastTopRef.current = top
+          if (stickRef.current || top < 140 || delta < -6) setBarAway(false)
+          else if (delta > 6) setBarAway(true)
           const card = answerRef.current?.firstElementChild
           let next = null
           if (live && !stickRef.current) next = 'latest'
@@ -558,7 +607,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           }
           if (next !== jump) setJump(next)
         }}>
-        {live && <Stage state={state} speakingSeatIds={speakingSeatIds} beagleBusy={beagleBusy} searches={searches} scrolled={scrolled} />}
+        {live && <Stage state={state} speakingSeatIds={speakingSeatIds} beagleBusy={beagleBusy} searches={searches} scrolled={scrolled} away={barAway} />}
         <div className="thread">
           {topics.map((t) => (
             <TopicBlock key={t} topic={t} state={state} seatsById={seatsById} current={t === debate.topic} answerRef={answerRef}

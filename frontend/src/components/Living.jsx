@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { usePopover } from './Popover'
 
 // The living answer: the chair's draft after each round, pinned in the stage while the council debates.
 // Words that changed since the previous draft are highlighted, and earlier drafts are a click away.
@@ -40,8 +41,12 @@ function Marked({ prev, text }) {
   return diffWords(prev, text).map((t, i) => (t.changed ? <mark key={i}>{t.w}</mark> : <span key={i}>{t.w}</span>))
 }
 
-export default function LivingAnswer({ drafts, chair }) {
-  const [open, setOpen] = useState(false)
+// compact: a "Draft" pill in the debate bar that opens the draft in a panel, instead of a strip of its own
+export default function LivingAnswer({ drafts, chair, compact = false }) {
+  const pop = usePopover()
+  const [openStrip, setOpenStrip] = useState(false)
+  const open = compact ? pop.open : openStrip
+  const setOpen = compact ? pop.setOpen : setOpenStrip
   const [pick, setPick] = useState(null) // index into drafts; null = latest
   const latest = drafts.length - 1
   useEffect(() => { setPick(null) }, [drafts.length]) // a new draft always takes the stage
@@ -52,14 +57,24 @@ export default function LivingAnswer({ drafts, chair }) {
   const prev = idx > 0 ? parseDraft(drafts[idx - 1].content) : null
   const prevAll = prev && [prev.bottom, ...prev.points].join(' ')
   return (
-    <div className={`living ${open ? 'open' : ''}`}>
-      <button className="living-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="living-label">Draft answer · round {draft.round}</span>
-        <span className="living-bl"><Marked prev={prev?.bottom} text={cur.bottom} /></span>
-        <span className="chev" aria-hidden="true">›</span>
-      </button>
+    <div className={`living ${compact ? 'compact pop-anchor' : ''} ${open ? 'open' : ''}`} ref={compact ? pop.ref : undefined}>
+      {compact ? (
+        <button className="draft-pill" onClick={() => setOpen(!open)} aria-expanded={open} title={cur.bottom}>
+          Draft · R{draft.round}
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 3.8 5 6.3l2.5-2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
+      ) : (
+        <button className="living-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span className="living-label">Draft answer · round {draft.round}</span>
+          <span className="living-bl"><Marked prev={prev?.bottom} text={cur.bottom} /></span>
+          <span className="chev" aria-hidden="true">›</span>
+        </button>
+      )}
       {open && (
-        <div className="living-body">
+        <div className={compact ? 'living-body pop-menu draft-panel' : 'living-body'}>
+          {compact && (
+            <p className="draft-bl"><span className="living-label">Draft answer · round {draft.round}</span><Marked prev={prev?.bottom} text={cur.bottom} /></p>
+          )}
           {cur.points.length > 0 && (
             <ul>{cur.points.map((p, i) => <li key={i}><Marked prev={prevAll} text={p} /></li>)}</ul>
           )}
