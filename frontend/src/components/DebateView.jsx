@@ -2,6 +2,7 @@ import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } fro
 import { api } from '../api'
 import { RESEARCHER, displayTitle, modelShort } from '../agents'
 import { ReplayContext } from '../replay'
+import { formatElapsed, useNow } from '../time'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
@@ -69,6 +70,11 @@ function Thread({ items, seatsById, debate, onIntake }) {
     if (m.author_kind !== 'seat') continue
     ;(turnsByRound[m.round] ||= []).push({ ...m, handle: seatsById[m.seat_id]?.handle })
   }
+  // Each agent's total speaking time in this conversation, shown on every one of its bubbles
+  const totals = {}
+  for (const m of items) {
+    if (m.author_kind === 'seat' && m.duration_ms) totals[m.seat_id] = (totals[m.seat_id] || 0) + m.duration_ms
+  }
   let lastRound = null
   const out = []
   const lastModerator = [...items].reverse().find((m) => m.author_kind === 'moderator')
@@ -107,7 +113,7 @@ function Thread({ items, seatsById, debate, onIntake }) {
     }
     else if (m.author_kind === 'seat') {
       const seat = seatsById[m.seat_id]
-      out.push(<AgentMessage key={m.id} msg={m} seat={seat} isChair={seat?.handle === debate.chair_handle} />)
+      out.push(<AgentMessage key={m.id} msg={m} seat={seat} isChair={seat?.handle === debate.chair_handle} total={totals[m.seat_id]} />)
     }
   }
   return out
@@ -199,6 +205,7 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
         return (
           <button className="consensus-pill" onClick={jump} title="Jump to this round">
             <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>
+            <TotalTime since={askedAt(messages, debate)} />
             <span className="cp-dots" aria-hidden="true">{stances.map((s, i) => <i key={i} className={`dot ${s ? s.toLowerCase() : 'idle'}`} />)}</span>
             {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
           </button>
@@ -225,30 +232,27 @@ function mentionables(seats, debate) {
 }
 
 // One line of plain words where the user is looking, so the quiet gaps between turns never look frozen
-// "4:07", or "1h 02m" past an hour
-export function formatElapsed(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000))
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(s % 60).padStart(2, '0')}`
+
+// When the current question was asked (a follow-up starts its own clock)
+function askedAt(messages, debate) {
+  return messages.find((m) => m.author_kind === 'user' && m.topic === debate.topic)?.created_at || debate.created_at
 }
 
-function useNow(active, every = 1000) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!active) return undefined
-    const t = setInterval(() => setNow(Date.now()), every)
-    return () => clearInterval(t)
-  }, [active, every])
-  return now
+// The total time so far, ticking on its own so the rest of the stage doesn't re-render every second
+function TotalTime({ since }) {
+  const now = useNow(!!since)
+  if (!since) return null
+  const total = formatElapsed(now - new Date(since).getTime())
+  return <span className="cp-time" title="Total time since you asked" aria-label={`${total} since you asked`}>{total}</span>
 }
+
 
 function LiveStatus({ state }) {
   const { debate, seats, messages } = state
   const ticking = ['running', 'concluding'].includes(debate.status)
   const now = useNow(ticking)
   // Time since this question was asked (a follow-up starts its own clock)
-  const asked = messages.find((m) => m.author_kind === 'user' && m.topic === debate.topic)?.created_at || debate.created_at
+  const asked = askedAt(messages, debate)
   const elapsed = ticking && asked ? formatElapsed(now - new Date(asked).getTime()) : null
   const streaming = messages.filter((m) => m.status === 'streaming')
   const seatName = (id) => seats.find((s) => s.id === id)?.handle
@@ -500,6 +504,11 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   } else {
     sub = <>Chair: {debate.chair_model}</>
   }
+  // Once answered, the top of the session says how long it took
+  const verdict = state.verdicts.filter((v) => v.topic === debate.topic).at(-1)
+  const took = status === 'concluded' && verdict
+    ? formatElapsed(new Date(verdict.created_at).getTime() - new Date(askedAt(messages, debate)).getTime())
+    : null
 
   const act = async (fn) => {
     setError(null)
@@ -512,7 +521,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
       <div className="topbar">
         <div className="q-title">
           <h2 title={question}>{displayTitle(debate.title, question)}</h2>
-          <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</div>
+          <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}{took && <> · took {took}</>}</div>
         </div>
         {!replaying && INTAKE.includes(status) && (
           <div className="actions">

@@ -1,3 +1,4 @@
+import { formatElapsed, useNow } from '../time'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -122,7 +123,20 @@ function Folding({ text, fold, children }) {
   )
 }
 
-export function AgentMessage({ msg, seat, isChair }) {
+// How long this turn took (ticking while it's written), and the agent's total so far
+function TurnTime({ msg, total }) {
+  const streaming = msg.status === 'streaming'
+  const now = useNow(streaming)
+  const turn = streaming ? now - new Date(msg.created_at).getTime() : msg.duration_ms
+  if (!turn && !total) return null
+  const label = [turn ? formatElapsed(turn) : null, total && !streaming && total !== turn ? `${formatElapsed(total)} total` : null]
+    .filter(Boolean).join(' · ')
+  return <span className="turn-time" title={`This turn${total ? ` · ${seatTotalHint(total)}` : ''}`}>{label}</span>
+}
+
+const seatTotalHint = (total) => `${formatElapsed(total)} for this agent across the debate`
+
+export function AgentMessage({ msg, seat, isChair, total }) {
   const streaming = msg.status === 'streaming'
   const body = visibleBody(msg)
   const meta = [modelShort(seat?.model)]
@@ -133,7 +147,7 @@ export function AgentMessage({ msg, seat, isChair }) {
     <div className="msg">
       <Orb handle={seat?.handle} speaking={streaming} chair={isChair} />
       <div className="bubble">
-        <div className="who">{seat?.handle}{(msg.meta?.role || seat?.role) && <span className="role-tag">{msg.meta?.role || seat?.role}</span>}<span>{meta.filter(Boolean).join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
+        <div className="who">{seat?.handle}{(msg.meta?.role || seat?.role) && <span className="role-tag">{msg.meta?.role || seat?.role}</span>}<span>{meta.filter(Boolean).join(' · ')}</span><TurnTime msg={msg} total={total} /><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
         <Thinking text={msg.thinking} live={streaming && !body} />
         {body ? <Folding text={body} fold={!streaming}><Markdown>{body}</Markdown></Folding>
           : streaming ? <Typing />

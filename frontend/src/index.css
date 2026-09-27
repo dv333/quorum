@@ -1054,3 +1054,8 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .demo-note { color: var(--text-2); flex: 1 1 260px; min-width: 0; }
 .demo-bar a.btn { text-decoration: none; }
 @media (max-width: 640px) { .demo-bar { padding: 10px 16px; } }
+
+/* Total time, right after the round number */
+.consensus-pill .cp-time { font-variant-numeric: tabular-nums; color: var(--text-2); padding: 0 7px; border-radius: 999px; background: var(--fill); font-size: 11.5px; }
+/* A turn's time, and the agent's total, beside its name */
+.who .turn-time { font-variant-numeric: tabular-nums; color: var(--text-3); font-size: 11.5px; white-space: nowrap; }
