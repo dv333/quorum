@@ -1368,3 +1368,38 @@ async def test_metrics_total_the_time_spent_writing_for_the_speed():
     totals = eng.metrics(1)["totals"]
     writing = db.query_one("SELECT SUM(duration_ms) AS ms FROM usage WHERE output_tokens > 0")["ms"] or 0
     assert totals["gen_ms"] == writing and totals["duration_ms"] >= writing + 90000
+
+
+# ------------------------------------------------------------ memory
+
+
+def test_a_watcher_that_stops_reading_is_dropped_and_told_to_reconnect(monkeypatch):
+    monkeypatch.setattr(engine_mod.EventBus, "QUEUE_LIMIT", 3)
+    bus = engine_mod.EventBus()
+    stalled, reading = bus.subscribe(), bus.subscribe()
+    for i in range(5):
+        bus.publish({"i": i})
+        reading.get_nowait()
+    assert bus._subscribers == [reading]
+    assert stalled.get_nowait() is None and stalled.empty()  # only the "end the stream" marker is left
+
+
+async def test_answered_debates_nobody_watches_are_let_go(monkeypatch):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client)
+    engine_mod._engines["d1"] = eng
+    await eng.post_user_message("Q")
+    await eng.task
+    for debate_id, status in [("d2", "paused"), ("d3", "concluded")]:
+        db.execute(
+            "INSERT INTO debates (id, title, created_at, chair_endpoint_id, chair_model, max_rounds, num_ctx, status) "
+            "VALUES (?, 't', ?, 1, 'm', 2, 8192, ?)",
+            [debate_id, db.now(), status],
+        )
+        engine_mod.get_engine(debate_id)
+    watched = engine_mod.get_engine("d3").bus.subscribe()
+    monkeypatch.setattr(engine_mod, "ENGINE_IDLE_SECONDS", -1)
+    engine_mod.get_engine("d4")
+    assert set(engine_mod._engines) == {"d2", "d3", "d4"}  # d1 is answered and unwatched; d2 can still resume
+    engine_mod.get_engine("d3").bus.unsubscribe(watched)
+    engine_mod._engines.clear()

@@ -77,11 +77,16 @@ def estimate_tokens(text: str) -> int:
 
 
 class EventBus:
+    """Live events for everyone watching a debate. A watcher that stops reading (a sleeping laptop, a stalled tab) is
+    dropped once it falls QUEUE_LIMIT events behind; its stream ends and the app reconnects to a fresh snapshot."""
+
+    QUEUE_LIMIT = 5000
+
     def __init__(self) -> None:
         self._subscribers: List[asyncio.Queue] = []
 
     def subscribe(self) -> asyncio.Queue:
-        q: asyncio.Queue = asyncio.Queue()
+        q: asyncio.Queue = asyncio.Queue(maxsize=self.QUEUE_LIMIT)
         self._subscribers.append(q)
         return q
 
@@ -91,7 +96,16 @@ class EventBus:
 
     def publish(self, event: Dict[str, Any]) -> None:
         for q in list(self._subscribers):
-            q.put_nowait(event)
+            try:
+                q.put_nowait(event)
+            except asyncio.QueueFull:
+                self.unsubscribe(q)
+                while not q.empty():
+                    q.get_nowait()
+                q.put_nowait(None)  # tells the stream to end
+
+    def watched(self) -> bool:
+        return bool(self._subscribers)
 
 
 # ---------------------------------------------------------------------------
@@ -3028,12 +3042,29 @@ def waiting_text(actor: str, holder: Caller, debate_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 _engines: Dict[str, DebateEngine] = {}
+_last_used: Dict[str, float] = {}
+ENGINE_IDLE_SECONDS = 600  # an answered debate nobody watches is let go after this; it's rebuilt when opened again
 
 
 def get_engine(debate_id: str) -> DebateEngine:
+    _evict_idle(exclude=debate_id)
     if debate_id not in _engines:
         _engines[debate_id] = DebateEngine(debate_id)
+    _last_used[debate_id] = time.monotonic()
     return _engines[debate_id]
+
+
+def _evict_idle(exclude: str) -> None:
+    """Drop engines for answered debates that nobody watches and nothing ran on for a while. Paused and failed ones
+    stay: they keep what the Researcher read and any lookups queued for when they resume."""
+    cutoff = time.monotonic() - ENGINE_IDLE_SECONDS
+    for debate_id, eng in list(_engines.items()):
+        if debate_id == exclude or _last_used.get(debate_id, 0) > cutoff or eng.is_running() or eng.bus.watched():
+            continue
+        row = db.query_one("SELECT status FROM debates WHERE id = ?", [debate_id])
+        if row is None or row["status"] in ("concluded", "idle"):
+            _engines.pop(debate_id, None)
+            _last_used.pop(debate_id, None)
 
 
 async def drop_engine(debate_id: str) -> None:

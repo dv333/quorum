@@ -656,6 +656,8 @@ async def debate_events(debate_id: str):
             while True:
                 try:
                     event = await asyncio.wait_for(q.get(), timeout=15)
+                    if event is None:  # fell too far behind: end the stream, and the app reconnects
+                        return
                     yield f"data: {json.dumps(event)}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
