@@ -9,7 +9,7 @@ Run 2026-09-26. Cases: `benchmarks/review/cases/`. Method: `scripts/benchmark_re
 | lint | 5 of 27 (19%) | 0 | 1 | 0.0 min | $0.00 |
 | local | 27 of 27 (100%) | 1 | 1 | 12.9 min | $0.00 |
 | claude | 26 of 27 (96%) | 0 | 1 | 3.6 min | $1.10 |
-| quorum | 24 of 27 (89%) | 2 | 2 | 230.0 min | $0.00 |
+| quorum | 26 of 27 (96%) | 3 | 7 | 53.6 min | $0.00 |
 
 Cost is API spend; local models cost $0 beyond electricity. Time is wall-clock for all cases.
 
@@ -30,9 +30,8 @@ Task: Retry failed fetches with exponential backoff and log how many URLs were f
 
 **claude** (Claude Code (claude-haiku-4-5-20251001,claude-opus-5-5); 0.5 min): 10 findings
 
-**quorum** (Quorum (8 local models: deepseek-r1:8b, gemma3:12b, gpt-oss:20b, llama3.1:8b, phi4:14b, qwen3.6:latest, qwen3.8:latest, qwen3:14b); 16.8 min, conundrum `ae311204c456`, Coder calls: 2): 11 findings
-- unmatched (high): **High** · `fetcher.py` · 19‑20 · No URL validation – potential SSRF. · Validate `url.scheme in ('http', 'https')` and reject private IP ranges or use a safe host‑allowlist.
-- unmatched (medium): **Medium** · `fetcher.py` · 14 · `retries` is caller‑supplied and can be arbitrarily large. · Clamp to a reasonable maximum (e.g., `retries = min(max(retries, 1), 5)`).
+**quorum** (Quorum (5 local models: gemma3:12b, gpt-oss:20b, phi4:14b, qwen3.6:latest, qwen3:14b); 10.5 min, conundrum `8c8f6a8e1097`, Coder calls: 4): 4 findings
+- unmatched (medium): **[low] The HTTP client does not set a User‑Agent header, increasing the risk of being blocked by strict APIs.** (fetcher.py:7), raised by Panda: Many servers reject requests without a proper User-Agent string. Fix: Add 
 
 ## orders: 14 planted bugs
 
@@ -47,7 +46,7 @@ Task: Add order search, response caching, background charging and payment retrie
 | the payments URL is plain http | · | ✓ | ✓ | ✓ |
 | requests.post has no timeout | ✓ | ✓ | ✓ | ✓ |
 | 10 retries, fixed 0.1 s sleep, no backoff or status check | · | ✓ | ✓ | ✓ |
-| every exception is swallowed and None returned | · | ✓ | ✓ | · |
+| every exception is swallowed and None returned | · | ✓ | ✓ | ✓ |
 | the order is marked paid even when the charge failed (None) | · | ✓ | ✓ | ✓ |
 | one SQLite connection shared across threads (check_same_thread=False) | · | ✓ | ✓ | ✓ |
 | the global _cache is read and cleared across threads without a lock | · | ✓ | · | ✓ |
@@ -63,7 +62,8 @@ Task: Add order search, response caching, background charging and payment retrie
 **claude** (Claude Code (claude-haiku-4-5-20251001,claude-opus-5-5); 0.9 min): 20 findings
 - unmatched (high): Fix: Either keep charging synchronous, or insert the order with `status='pending_payment'` and hand the charge to a durable queue (RQ, Celery, or an outbox table plus a worker). Record `paid` or `payment_failed` explicit
 
-**quorum** (Quorum (8 local models: deepseek-r1:8b, gemma3:12b, gpt-oss:20b, llama3.1:8b, phi4:14b, qwen3.6:latest, qwen3.8:latest, qwen3:14b); 36.1 min, conundrum `dc0748b124e5`, Coder calls: 2): 21 findings
+**quorum** (Quorum (5 local models: gemma3:12b, gpt-oss:20b, phi4:14b, qwen3.6:latest, qwen3:14b); 5.7 min, conundrum `94cb091abd07`, Coder calls: 1): 12 findings
+- unmatched (medium): BOTTOM LINE:: The code change introduces several critical security and correctness issues that must be fixed before it can be merged; priority should be securing the database queries, payment integration, and concurrency
 
 ## pagination: 4 planted bugs
 
@@ -82,7 +82,7 @@ Task: Cap page size at 100 and return whether another page follows.
 
 **claude** (Claude Code (claude-haiku-4-5-20251001,claude-opus-5-5); 0.6 min): 9 findings
 
-**quorum** (Quorum (8 local models: deepseek-r1:8b, gemma3:12b, gpt-oss:20b, llama3.1:8b, phi4:14b, qwen3.6:latest, qwen3.8:latest, qwen3:14b); 12.5 min, conundrum `a83c305ca95c`, Coder calls: 3): 7 findings
+**quorum** (Quorum (5 local models: gemma3:12b, gpt-oss:20b, phi4:14b, qwen3.6:latest, qwen3:14b); 10.0 min, conundrum `1d2efad89e03`, Coder calls: 4): 3 findings
 
 ## settings: clean change (no bugs)
 
@@ -95,8 +95,7 @@ Task: Move settings into a typed, immutable dataclass, accept true/yes/on for DE
 
 **claude** (Claude Code (claude-haiku-4-5-20251001,claude-opus-5-5); 0.5 min): 7 findings
 
-**quorum** (Quorum (8 local models: deepseek-r1:8b, gemma3:12b, gpt-oss:20b, llama3.1:8b, phi4:14b, qwen3.6:latest, qwen3.8:latest, qwen3:14b); 48.4 min, conundrum `a461a1036541`, Coder calls: 3): 1 findings
-- false alarm (high): **High Correctness Risk (Medium Severity):** The widened `DEBUG` parsing now accepts `true`, `yes`, and `on`, which can inadvertently enable debug modes in production; you should add a `logging.warning` when debug is ena
+**quorum** (Quorum (5 local models: gemma3:12b, gpt-oss:20b, phi4:14b, qwen3.6:latest, qwen3:14b); 11.4 min, conundrum `8f3567c9af81`, Coder calls: 4): 1 findings
 
 ## uploads: 5 planted bugs
 
@@ -105,7 +104,7 @@ Task: Let users keep uploads in folders and choose the thumbnail size.
 | Bug | lint | local | claude | quorum |
 |---|---|---|---|---|
 | save_upload joins unsanitized folder and name (path traversal, overwrite any file) | · | ✓ | ✓ | ✓ |
-| read_upload joins unsanitized folder and name (read any file) | · | ✓ | ✓ | · |
+| read_upload joins unsanitized folder and name (read any file) | · | ✓ | ✓ | ✓ |
 | shell=True with the user's size and path (command injection) | ✓ | ✓ | ✓ | ✓ |
 | the 30 s timeout on convert was removed | · | ✓ | ✓ | ✓ |
 | files are opened without being closed (handle leak, unflushed write) | · | ✓ | ✓ | ✓ |
@@ -117,7 +116,12 @@ Task: Let users keep uploads in folders and choose the thumbnail size.
 
 **claude** (Claude Code (claude-haiku-4-5-20251001,claude-opus-5-5); 0.6 min): 9 findings
 
-**quorum** (Quorum (8 local models: deepseek-r1:8b, gemma3:12b, gpt-oss:20b, llama3.1:8b, phi4:14b, qwen3.6:latest, qwen3.8:latest, qwen3:14b); 12.4 min, conundrum `875014278b08`, Coder calls: 3): 4 findings
+**quorum** (Quorum (5 local models: gemma3:12b, gpt-oss:20b, phi4:14b, qwen3.6:latest, qwen3:14b); 4.7 min, conundrum `e37f388b61bd`, Coder calls: 1): 16 findings
+- unmatched (medium): **Lack of `safe` extraction for path components, which may contain dangerous characters leading to security risks.** 
+- unmatched (medium): *Location*: `uploads.py:16-20` 
+- unmatched (medium): **Deprecated `convert` usage may bypass environment security checks by using the shell.** 
+- unmatched (medium): *Location*: `uploads.py:28` 
+- unmatched (medium): *Location*: `uploads.py:33` 
 
 ## user-search: clean change (no bugs)
 
@@ -129,26 +133,35 @@ Task: Add a name search for users, with a capped result limit; % and _ typed by 
 
 **claude** (Claude Code (claude-haiku-4-5-20251001,claude-opus-5-5); 0.5 min): 8 findings
 
-**quorum** (Quorum (8 local models: deepseek-r1:8b, gemma3:12b, gpt-oss:20b, llama3.1:8b, phi4:14b, qwen3.6:latest, qwen3.8:latest, qwen3:14b); 103.8 min, conundrum `e45d1c1ccaea`, Coder calls: 4): 6 findings
-- false alarm (medium): **Medium** · `users.py:12` · `term=None` causes `AttributeError` with no clear guard. · Add `if term is None: raise TypeError("term cannot be None")`.
+**quorum** (Quorum (5 local models: gemma3:12b, gpt-oss:20b, phi4:14b, qwen3.6:latest, qwen3:14b); 11.2 min, conundrum `2a0921051cd1`, Coder calls: 4): 10 findings
+- false alarm (high): [High] Validate Limit Type (users.py:13): Converting the limit argument with `int(limit)` can raise a `ValueError` or `TypeError` if a non‑numeric string is passed (e.g., "abc" or "10.5"), leading to an unhandled excepti
+- false alarm (medium): **Add None Guard:** Insert `if term is None: return []` at the start of `search_users`. This prevents crashes and clearly defines "no search" as "empty results," which is safer than implicitly treating it as an empty str
+- false alarm (medium): **Fix Sorting:** Change `ORDER BY name` to `ORDER BY name, id` to ensure deterministic ordering when names collide.
 
 
 ## Notes from checking by hand
 
-- **Quorum's misses were dropped in the summary, not missed by the council.** In the orders review
-  (`dc0748b124e5`), Panda and Koala raised the removed `<int:>` converter and Panda and Hedgehog the swallowed
-  exceptions in round 1; the chair's answer left both out. In the uploads review (`875014278b08`), `read_upload`
-  traversal came up 10 times in the debate and appears in the answer's fix plan, but not in its findings. Making the
-  answer keep every finding an agent raised, unless it's ruled out, is the next change to reviews.
-- **The uploads review first ran as a "direct" answer** (`c1b977742a9d`): the chair took the diff for a simple
-  question and replied "Ready to get started?". Code reviews now always go to the council (#25); the result above is
-  the rerun.
-- **False alarms.** Quorum on settings rated the requested change (DEBUG accepting true/yes/on) a High risk; on
-  user-search it rated a missing `None` guard Medium. The single local model on settings rated a design preference
-  (defaults read from the dataclass) Medium. Claude Code's point that the limit cap is never really tested is correct
-  and isn't counted.
+- **Quorum was rerun** after three changes to reviews: the answer keeps every finding an agent raised
+  (#27), turns have time and length limits and thinking only in round 1 (#29), and the check for dropped findings is
+  one short call (#31). Lint, the local model and Claude Code are from the first run; their scores are unchanged
+  by the scoring fixes below.
+- **Before these changes** Quorum found 24 of 27 bugs with 2 false alarms, taking 38 minutes per review on average.
+  Its misses were raised in the debate and dropped from the answer.
+- **Rounds.** The chair sizes each debate: it gave orders and uploads 1 round and the other cases 3. Times are
+  comparable only for the 3-round reviews: fetcher 16.8 → 10.5 min, pagination 12.5 → 10.0, settings 48.4 → 11.4 and
+  user-search 103.8 → 11.2.
+- **The one miss** (orders, the removed `<int:>` route converter) was raised by the Coder and by Panda in round 1, and
+  left out of the answer; the check for dropped findings didn't bring it back.
+- **False alarms** are all on user-search. Two were in the chair's answer: a missing `None` guard for `term` (the
+  function takes a string) and `ORDER BY name, id` (a nit presented as a fix). The third was added back by the check
+  for dropped findings: Panda rated non-numeric `limit` values High; the point is fair at Medium, but High claims a
+  must-fix bug on a clean change. The single local model on settings rated a design preference (defaults read from
+  the dataclass) Medium.
+- **Scoring fixes in this run.** Numbered bold titles with sub-bullets (`1. **[High] Title:**`) are now read as one
+  finding, and a bold label like `**Code fixes:**` as a group; "cannot test" counts as a test-coverage point. The case
+  repositories had picked up compiled Python files (`__pycache__/`) from running the cases' tests, so every reviewer
+  saw them in the settings and user-search diffs; only Quorum mentioned them, rightly, so that isn't counted as a
+  false alarm. The repositories now leave them out.
 - **Unmatched findings on changes with bugs** were checked: SSRF on fetcher (the fetcher takes URLs by design; a fair
   hardening note), ruff's unused loop variable, and duplicates of bugs already found in other words.
-- **One run per case.** Model output varies between runs; a difference of one or two bugs is within that noise. The
-  orders case earlier used a Stripe-shaped fake key, which GitHub's secret scanning blocks, so it was rerun with an
-  obviously fake key; all numbers above are from the published cases.
+- **One run per case.** Model output varies between runs; a difference of one or two bugs is within that noise.

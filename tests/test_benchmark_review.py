@@ -173,3 +173,42 @@ def test_a_high_finding_on_a_clean_change_is_a_false_alarm_even_when_the_point_i
         {"severity": "medium", "text": "DEBUG now accepts yes"},
     ]
     assert [f["severity"] for f in bench.score(clean, findings)["false_alarms"]] == ["high"]
+
+
+def test_numbered_bold_titles_group_or_title_their_sub_bullets():
+    answer = (
+        "## Details\n"
+        "1. **Code fixes (`users.py`):**\n"
+        " * **Add a guard:** return early when `term` is None.\n"
+        " * **Fix sorting:** order by name, id.\n"
+        "2. **[High] Validate limit (`users.py:13`):**\n"
+        " * `int(limit)` raises on a non-numeric string.\n"
+        " * **Fix:** wrap it in try/except.\n"
+        "3. **Repository hygiene:**\n"
+        " * Remove `__pycache__/` from the diff.\n"
+    )
+    assert [(f["severity"], f["text"]) for f in bench.split_findings(answer)] == [
+        (
+            "high",
+            "[High] Validate limit (users.py:13): `int(limit)` raises on a non-numeric string. "
+            "**Fix:** wrap it in try/except.",
+        ),
+        ("medium", "**Add a guard:** return early when `term` is None."),
+        ("medium", "**Fix sorting:** order by name, id."),
+        ("medium", "Remove `__pycache__/` from the diff."),
+    ]
+
+
+def test_case_repos_leave_out_compiled_python(tmp_path):
+    (c,) = bench.load_cases(["user-search"])
+    change = c["folder"] / "change" / "__pycache__"
+    made = not change.exists()
+    change.mkdir(exist_ok=True)
+    (change / "stray.cpython-313.pyc").write_bytes(b"\0")
+    try:
+        repo = bench.build_repo(c, tmp_path.resolve())
+        assert not list(repo.rglob("*.pyc")) and not list(repo.rglob("__pycache__"))
+    finally:
+        (change / "stray.cpython-313.pyc").unlink()
+        if made:
+            change.rmdir()

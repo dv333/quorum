@@ -3,6 +3,7 @@
   "clean": true,
   "bugs": [],
   "acceptable": [
+    {"id": "build-artifacts", "match": ["__pycache__|\\.pyc\\b"]},
     {
       "id": "invalid-workers",
       "match": [
@@ -20,7 +21,7 @@
     {
       "id": "tests",
       "match": [
-        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested|(never|not|isn't|aren't) (actually )?tested|tests? (don't|do not|never) (check|cover|test)"
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested|(never|not|isn't|aren't) (actually )?tested|tests? (don't|do not|never) (check|cover|test)|(cannot|can't|can not) (\\w+ )?test\\b"
       ]
     },
     {

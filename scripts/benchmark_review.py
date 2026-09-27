@@ -73,13 +73,14 @@ def build_repo(case: Dict[str, Any], into: Path) -> Path:
     def git(*args: str) -> None:
         subprocess.run(["git", "-C", str(into), *args], check=True, capture_output=True)
 
-    shutil.copytree(case["folder"] / "base", into, dirs_exist_ok=True)
+    skip = shutil.ignore_patterns("__pycache__", "*.pyc")  # left by running a case's tests; not part of the change
+    shutil.copytree(case["folder"] / "base", into, dirs_exist_ok=True, ignore=skip)
     git("init", "-q")
     git("config", "user.email", "benchmark@example.com")
     git("config", "user.name", "Benchmark")
     git("add", ".")
     git("commit", "-qm", "base")
-    shutil.copytree(case["folder"] / "change", into, dirs_exist_ok=True)
+    shutil.copytree(case["folder"] / "change", into, dirs_exist_ok=True, ignore=skip)
     git("add", "-N", ".")  # new files show up in the diff
     return into
 
@@ -187,6 +188,7 @@ def run_quorum(case: Dict[str, Any], repo: Path, mode: str) -> Dict[str, Any]:
 
 _ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*)")
 _NONE = re.compile(r"\s*(none|no (issues|findings|problems|bugs)|nothing)\b", re.I)
+_BOLD_TITLE = re.compile(r"^\*\*(.{1,160}?)\*\*:?\s*$")  # a list item that is only a bold title
 _BOLD_LEAD = re.compile(r"^\s*\*\*(.{1,160}?)\*\*[:.]?\s*(\S.*)$")  # "**Title**: rest of the line"
 _LABEL = re.compile(
     r"\s*(fix(es)?|suggested fix|why|impact|example|note|evidence|risk|details?|how|issue|problem|file|files|location|lines?)\b",
@@ -281,6 +283,16 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
         header = None
         if item:
             indented = len(line) - len(line.lstrip()) >= 2
+            bold = _BOLD_TITLE.match(item.group(1))
+            if bold and not indented and section not in ("high", "medium", "low", "summary"):
+                # "1. **[High] Title (file:line):**" titles a finding whose sub-bullets follow;
+                # "1. **Code fixes:**" without a severity only groups the findings under it
+                title = re.sub(r"[*_`]", "", bold.group(1)).strip()
+                sev = severity_of(title[:40])
+                current = {"severity": sev, "text": title, "titled": True, "tagged": True} if sev else None
+                if current:
+                    items.append(current)
+                continue
             if current is not None and (current["titled"] or indented):
                 current["text"] += " " + item.group(1)
                 continue
@@ -295,8 +307,8 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
         elif current is not None:
             current["text"] += " " + line.strip()
     findings = [i for i in items if i["severity"] in ("high", "medium", "low", "summary")]
-    if not any(f["severity"] != "summary" for f in findings):
-        # no severity structure: every item outside a skipped or summary section counts as medium
+    if not any(f["severity"] != "summary" and not f.get("tagged") for f in findings):
+        # no severity structure (a few tagged titles aside): every item outside a skipped or summary section is medium
         findings += [{"severity": "medium", "text": i["text"]} for i in items if i["severity"] is None]
     return [{"severity": f["severity"], "text": f["text"]} for f in findings]
 
@@ -364,7 +376,7 @@ CHART_LABELS = {
     "lint": ("ruff", "linter, bug + security rules"),
     "local": ("One local model", "the council's largest, alone"),
     "claude": ("Claude Code", "frontier cloud model, alone"),
-    "quorum": ("Quorum", "8 local models + the Coder"),
+    "quorum": ("Quorum", "a council of local models + the Coder"),
 }
 
 
@@ -394,6 +406,9 @@ def chart_svg(summary: List[Dict[str, Any]], dark: bool) -> str:
     for i, s in enumerate(summary):
         y = 70 + i * row
         name, note = CHART_LABELS.get(s["reviewer"], (s["reviewer"], ""))
+        council = re.search(r"(\d+) local models", s["model"] or "")
+        if s["reviewer"] == "quorum" and council:
+            note = f"{council.group(1)} local models + the Coder"
         share = s["found"] / s["planted"] if s["planted"] else 0
         color = accent if s["reviewer"] == "quorum" else grey
         cost = "$0 API" if not s["cost"] else f"${s['cost'] / max(1, s['reviews']):.2f}"
