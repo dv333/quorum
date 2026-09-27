@@ -229,10 +229,12 @@ function Interrupted({ list, onChanged }) {
     onChanged?.()
   }
   const one = list.length === 1
+  const name = list[0].title || list[0].question || 'A conundrum'
+  const short = name.length > 70 ? `${name.slice(0, 68).trimEnd()}…` : name
   return (
     <div className="interrupted" role="status">
       <span>
-        {one ? <>“{list[0].title || list[0].question || 'A conundrum'}” stopped</> : <>{list.length} conundrums stopped</>} when Quorum restarted.
+        {one ? <>“{short}” stopped</> : <>{list.length} conundrums stopped</>} when Quorum restarted.
       </span>
       <button className="btn small blue" disabled={busy}
         onClick={() => act(() => Promise.all(list.map((d) => api.continueDebate(d.id))))}>
