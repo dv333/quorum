@@ -28,6 +28,8 @@ from .config import (
     RESEARCH_MAX_SOURCES,
     RESEARCH_SOURCES_PER_CLAIM,
     CODER_REQUESTS_PER_ROUND,
+    REVIEW_MAX_ADDED,
+    REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
     RESEARCHER_NAME,
@@ -2363,6 +2365,81 @@ class DebateEngine:
                 log.warning("answer revision failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
 
+    async def _keep_review_findings(self, msg_id: int) -> None:
+        """A code review's answer keeps every defect the agents raised: the auditor reads the debate in parts and lists
+        what the answer left out, and the chair adds each one (or says why it's wrong). The summary used to drop
+        findings the council had agreed on."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not row or row["status"] != "done" or not row["content"]:
+            return
+        d = self.debate()
+        handles = self._handles()
+        debate = [
+            m
+            for m in self._verbatim(row["topic"], 0)
+            if m["author_kind"] in ("seat", "researcher") and m["status"] == "done" and m["content"]
+        ]
+        parts: List[List[Dict[str, Any]]] = [[]]
+        for m in debate:
+            if parts[-1] and sum(len(x["content"]) for x in parts[-1]) + len(m["content"]) > REVIEW_PART_CHARS:
+                parts.append([])
+            parts[-1].append(m)
+        auditor, a_ep, a_model = self._auditor(d)
+        think = await self._thinking_flag(a_ep, a_model, False)
+        missing: List[Dict[str, str]] = []
+        seen = set()
+        for part in parts:
+            if not part:
+                continue
+            try:
+                text = await self._complete(
+                    auditor,
+                    "review-check",
+                    a_ep,
+                    a_model,
+                    prompts.review_gap_messages(row["content"], prompts.render_transcript(part, handles)),
+                    think,
+                )
+                found = parse_json_loose(text).get("missing") or []
+            except Exception as e:
+                log.warning("review check failed: %s", e)
+                continue
+            for f in found:
+                if not isinstance(f, dict) or not str(f.get("finding") or "").strip():
+                    continue
+                item = {k: str(f.get(k) or "").strip()[:300] for k in ("finding", "where", "severity", "raised_by")}
+                key = (item["where"].lower(), " ".join(item["finding"].lower().split()[:6]))
+                if key not in seen:
+                    seen.add(key)
+                    missing.append(item)
+        missing = missing[:REVIEW_MAX_ADDED]
+        meta = json.loads(row["meta_json"] or "{}") if row.get("meta_json") else {}
+        meta["review"] = {"checked": True, "missing": missing, "auditor": auditor}
+        content = row["content"]
+        if missing:
+            try:
+                revised = strip_thinking(
+                    await self._complete(
+                        self._chair_label(d),
+                        "review-add",
+                        d["chair_endpoint_id"],
+                        d["chair_model"],
+                        prompts.review_add_messages(row["content"], missing),
+                        await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                    )
+                ).strip()
+                sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
+                if (
+                    re.search(r"BOTTOM\s*LINE", revised, re.I)
+                    and sections(row["content"]) <= sections(revised)
+                    and len(revised) >= 0.9 * len(row["content"])
+                ):
+                    content = plain_answer(revised)
+                    meta["review"].update(revised=True, original=row["content"])
+            except Exception as e:
+                log.warning("review revision failed: %s", e)
+        self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
+
     # ----------------------------------------------------------------- why?
 
     async def why(self, verdict_id: int, passage: str) -> Dict[str, Any]:
@@ -2573,6 +2650,8 @@ class DebateEngine:
             finally:
                 self.partials.pop(row["id"], None)
             await self._audit_answer(row["id"], claims, studies)
+            if is_code_debate(self._question(topic), d["pack"], d.get("repo_path")):
+                await self._keep_review_findings(row["id"])
             done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])
             if studies and done and done["status"] == "done" and done["content"]:
                 self._finish_message(

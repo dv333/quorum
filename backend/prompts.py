@@ -797,6 +797,58 @@ Where a problem says the answer skips something the question asks about, add a k
     ]
 
 
+REVIEW_GAP_SYSTEM = "You check an AI council's code review against its debate, so no finding gets lost."
+
+
+def review_gap_messages(answer: str, transcript: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": REVIEW_GAP_SYSTEM},
+        {
+            "role": "user",
+            "content": f"""The council's final review:
+{answer}
+
+Part of the debate it came from:
+{transcript}
+
+List the defects in the change that an agent raised in this part of the debate but the final review leaves out: a bug,
+a security or data-loss risk, a breaking change, or missing protection (a timeout, validation, error handling, a lock)
+that the change introduced. Skip anything the review already covers in other words, anything it explicitly rules out,
+anything another agent convincingly refuted, and style, naming or praise. Return JSON only:
+{{"missing": [{{"finding": "<the defect, one sentence>", "where": "<file:line, if given>", "severity": "high|medium|low", "raised_by": "<agent>"}}]}}
+Return {{"missing": []}} when nothing is missing.""",
+        },
+    ]
+
+
+REVIEW_ADD_SYSTEM = "You finish an AI council's code review: every defect the council found belongs in it."
+
+
+def review_add_messages(answer: str, missing: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    items = "\n".join(
+        f"- [{m.get('severity') or 'medium'}] {m['finding']}"
+        + (f" ({m['where']})" if m.get("where") else "")
+        + (f", raised by {m['raised_by']}" if m.get("raised_by") else "")
+        for m in missing
+    )
+    return [
+        {"role": "system", "content": REVIEW_ADD_SYSTEM},
+        {
+            "role": "user",
+            "content": f"""Your review:
+{answer}
+
+The council raised these defects during the debate, but your review leaves them out:
+{items}
+
+Add each one to the part of the review for its severity, with its file and line and a concrete fix, in the same style
+as the findings already there. If you're sure one is wrong, don't add it; instead add one line saying why under the
+review's section on what looks correct. Keep everything else word for word, including the bottom line, every section and
+heading. Output only the updated review.""",
+        },
+    ]
+
+
 def research_brief_messages(
     request: str, requested_by: Optional[str], sources: List[Dict[str, str]], kind: str
 ) -> List[Dict[str, str]]:
