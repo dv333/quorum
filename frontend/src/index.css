@@ -5,7 +5,7 @@
   --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   --emoji: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
 
-  --blue: #0a84ff;
+  --blue: #0071e3;
   --page: #f5f5f7;
   --window: #fbfbfd;
   --glass: rgba(255, 255, 255, 0.62);
@@ -14,7 +14,9 @@
   --hairline-strong: rgba(0, 0, 0, 0.14);
   --text: #1d1d1f;
   --text-2: #6e6e73;
-  --text-3: #a1a1a6;
+  --text-3: #737378;
+  --serif: ui-serif, 'New York', 'Iowan Old Style', Charter, Georgia, serif;
+  --bubble-me: #0066cc;
   --card: #ffffff;
   --fill: rgba(118, 118, 128, 0.1);
   --fill-2: rgba(118, 118, 128, 0.16);
@@ -25,7 +27,7 @@
   --hedgehog: #a2845e; --beagle: #ff9f0a; --chair: #bf5af2; --coder: #636366;
   --bunny: #ff6482; --turtle: #00c7be; --dolphin: #409cff;
 
-  --agree: #248a3d; --agree-bg: rgba(52, 199, 89, 0.14);
+  --agree: #1d7d36; --agree-bg: rgba(52, 199, 89, 0.14);
   --refine: #b25000; --refine-bg: rgba(255, 159, 10, 0.16);
   --disagree: #d70015; --disagree-bg: rgba(255, 55, 95, 0.12);
   --danger: #d70015;
@@ -48,7 +50,7 @@
     --hairline-strong: rgba(255, 255, 255, 0.16);
     --text: #f5f5f7;
     --text-2: #a1a1a6;
-    --text-3: #6e6e73;
+    --text-3: #8e8e93;
     --card: #1f1f22;
     --fill: rgba(118, 118, 128, 0.2);
     --fill-2: rgba(118, 118, 128, 0.3);
@@ -72,7 +74,7 @@
   --hairline-strong: rgba(255, 255, 255, 0.16);
   --text: #f5f5f7;
   --text-2: #a1a1a6;
-  --text-3: #6e6e73;
+  --text-3: #8e8e93;
   --card: #1f1f22;
   --fill: rgba(118, 118, 128, 0.2);
   --fill-2: rgba(118, 118, 128, 0.3);
@@ -419,11 +421,12 @@ textarea.input { resize: vertical; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .dot.agree { background: var(--agree); } .dot.refine { background: var(--refine); } .dot.disagree { background: var(--disagree); } .dot.idle { background: var(--text-3); }
 
-.thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: 1360px; margin: 0 auto; }
+/* 760px keeps a message to about 85 characters a line, the upper end of comfortable reading */
+.thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: 760px; margin: 0 auto; }
 .divider { text-align: center; font: 600 11px var(--font); color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; margin: 8px 0 -2px; }
 .msg { display: flex; gap: 12px; max-width: min(1240px, 100%); animation: rise 0.5s var(--ease) both; min-width: 0; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
-.bubble { background: var(--card); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline); font-size: 14.5px; line-height: 1.55; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.bubble { background: var(--card); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline); font-size: 15px; line-height: 1.6; min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .who { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font: 600 13px var(--font); margin-bottom: 3px; }
 .who span { font-weight: 400; color: var(--text-3); font-size: 12px; }
 .who .ts { margin-left: auto; font-variant-numeric: tabular-nums; }
@@ -432,7 +435,7 @@ textarea.input { resize: vertical; }
 .stance.agree { background: var(--agree-bg); color: var(--agree); } .stance.refine { background: var(--refine-bg); color: var(--refine); } .stance.disagree { background: var(--disagree-bg); color: var(--disagree); }
 .stance .dot { margin-top: 5px; background: currentColor; }
 .msg.me { align-self: flex-end; max-width: min(860px, 80%); }
-.msg.me .bubble { background: var(--blue); color: #fff; box-shadow: none; border-bottom-right-radius: 6px; }
+.msg.me .bubble { background: var(--bubble-me); color: #fff; box-shadow: none; border-bottom-right-radius: 6px; }
 .msg.me .bubble a { color: #fff; text-decoration: underline; }
 .bubble.beagle { background: linear-gradient(180deg, color-mix(in srgb, var(--beagle) 8%, var(--card)), var(--card)); box-shadow: var(--shadow), 0 0 0 0.5px color-mix(in srgb, var(--beagle) 40%, transparent); }
 .bubble.moderator { box-shadow: var(--shadow), 0 0 0 0.5px color-mix(in srgb, var(--chair) 40%, transparent);
@@ -556,6 +559,11 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .md h1, .md h2, .md h3, .md h4 { font-size: 15px; margin: 12px 0 4px; }
 .md table { border-collapse: collapse; margin: 0 0 8px; display: block; overflow-x: auto; }
 .md th, .md td { border: 0.5px solid var(--hairline-strong); padding: 5px 9px; }
+/* A file:line or identifier in a table stays whole; the table scrolls sideways instead of breaking it mid-word */
+.md td code, .md th code { white-space: nowrap; overflow-wrap: normal; }
+.md td, .md th { overflow-wrap: normal; word-break: normal; }
+.md td:has(code:only-child) { white-space: nowrap; }
+.reading .md table { font-family: var(--font); font-size: 14px; line-height: 1.5; }
 .md blockquote { margin: 0 0 8px; padding-left: 12px; border-left: 3px solid var(--hairline-strong); color: var(--text-2); }
 .msg.me .md code { background: rgba(255, 255, 255, 0.2); }
 
@@ -1193,3 +1201,34 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .rt-toggle { position: absolute; right: 0; top: 6px; z-index: 5; }
 .rt.folded .rt-toggle { top: 50%; transform: translateY(-50%); }
 @media (prefers-reduced-motion: reduce) { .rt, .rt-seat, .rt-orb, .rt-spot, .rt-bubble { transition: none; } .rt-bubble i, .rt-work i { animation: none; } }
+
+/* ---------------------------------------------------------------- reading mode */
+/* The debate as a transcript: one narrow column in a serif, only who said it, their role and stance. Everything else
+   (model, speed, times, thinking, search logs, notes, the table) is hidden, and long turns are shown in full. */
+.read-stance { display: none; }
+.reading .stage-wrap, .reading .sysrow, .reading .roles-row, .reading .disclose, .reading .copy-btn, .reading .ts, .reading .me-ts,
+.reading .turn-time, .reading .who .meta, .reading .who > span:not(.role-tag):not(.read-stance), .reading .stance,
+.reading .fold-btn, .reading .msg > .agent-tip-anchor, .reading .msg > .orb { display: none; }
+.reading .thread { max-width: 680px; gap: 0; padding-top: 28px; }
+.reading .msg { max-width: none; padding: 20px 0; animation: none; }
+.reading .msg + .msg { border-top: 0.5px solid var(--hairline); }
+.reading .bubble, .reading .bubble.beagle, .reading .bubble.coder, .reading .bubble.moderator {
+  background: none; box-shadow: none; padding: 0; border-radius: 0; font-family: var(--serif); font-size: 17px; line-height: 1.7;
+}
+.reading .bubble .md p { font-size: 17px; }
+.reading .bubble code, .reading .bubble pre { font-size: 14px; }
+.reading .who { font: 600 15px var(--font); margin-bottom: 6px; align-items: baseline; }
+.reading .role-tag { background: none; padding: 0; margin-left: 2px; font: 400 13.5px var(--font); letter-spacing: 0; color: var(--text-2); }
+.reading .read-stance { display: inline; margin-left: auto; font: 500 12.5px var(--font); }
+.reading .read-stance.agree { color: var(--agree); }
+.reading .read-stance.refine { color: var(--refine); }
+.reading .read-stance.disagree { color: var(--disagree); }
+.reading .folding:not(.open) { max-height: none; overflow: visible; -webkit-mask-image: none; mask-image: none; }
+.reading .msg.me { align-self: stretch; max-width: none; }
+.reading .msg.me .bubble { color: var(--text); border-left: 3px solid var(--blue); padding-left: 16px; }
+.reading .msg.me .bubble::before { content: 'You'; display: block; font: 600 15px var(--font); margin-bottom: 6px; }
+.reading .msg.me .md code { background: var(--fill); }
+.reading .msg.me .bubble a { color: var(--blue); }
+.reading .msg.me .mention { background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue); }
+.reading-btn { font: 600 13px var(--serif); letter-spacing: 0.02em; min-width: 34px; }
+.reading-btn[aria-pressed="true"] { background: var(--text); color: var(--window); border-color: transparent; }

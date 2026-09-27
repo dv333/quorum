@@ -119,6 +119,26 @@ function Thread({ items, seatsById, debate, onIntake }) {
 }
 
 // The stage's compact view is a per-viewer preference; storage can be unavailable (private windows)
+// Reading mode: the debate as a quiet transcript. The Aa button or the R key switches it; the choice is remembered.
+function useReadingMode() {
+  const [on, setOn] = useState(() => {
+    try { return localStorage.getItem('quorum.reading') === '1' } catch { return false }
+  })
+  const toggle = () => setOn((v) => {
+    try { localStorage.setItem('quorum.reading', v ? '0' : '1') } catch { /* keep it for this visit */ }
+    return !v
+  })
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]')
+      if (e.key.toLowerCase() === 'r' && !typing && !e.metaKey && !e.ctrlKey && !e.altKey) toggle()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  return [on, toggle]
+}
+
 // The table folds into a line while you read further down, or always if you choose; the choice is remembered
 function useFoldedTable(scrolled) {
   const [pref, setPref] = useState(() => {
@@ -456,6 +476,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   const [error, setError] = useState(null)
   const [jump, setJump] = useState(null) // 'latest' while live and scrolled up, 'answer' when the answer is out of view
   const [scrolled, setScrolled] = useState(false) // read past the top: the table folds into a line
+  const [reading, toggleReading] = useReadingMode()
   const seatsById = useMemo(() => Object.fromEntries(state.seats.map((s) => [s.id, s])), [state.seats])
 
   const status = state.debate?.status
@@ -518,6 +539,9 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           <h2 title={question}>{displayTitle(debate.title, question)}</h2>
           <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</div>
         </div>
+        <button className="btn reading-btn" onClick={toggleReading} aria-pressed={reading}
+          title={reading ? 'Leave reading mode (R)' : 'Reading mode: just the conversation (R)'}
+          aria-label="Reading mode">Aa</button>
         {(statusPill || speed) && (
           <div className="head-pills">
             {statusPill && <span className="head-pill status">{tone === 'ok' && <CheckIcon />}{statusPill}</span>}
@@ -542,7 +566,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           </div>
         )}
       </div>
-      <div className="scroller" ref={scrollRef}
+      <div className={`scroller ${reading ? 'reading' : ''}`} ref={scrollRef}
         onScroll={(e) => {
           const el = e.currentTarget
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120

@@ -190,7 +190,9 @@ export function AgentMessage({ msg, seat, isChair, total }) {
         <Orb handle={seat?.handle} speaking={streaming} chair={isChair} />
       </AgentTip>
       <div className="bubble">
-        <div className="who">{seat?.handle}{(msg.meta?.role || seat?.role) && <span className="role-tag">{msg.meta?.role || seat?.role}</span>}<span>{meta.filter(Boolean).join(' · ')}</span><TurnTime msg={msg} total={total} /><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
+        <div className="who">{seat?.handle}{(msg.meta?.role || seat?.role) && <span className="role-tag">{msg.meta?.role || seat?.role}</span>}<span className="meta">{meta.filter(Boolean).join(' · ')}</span><TurnTime msg={msg} total={total} /><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}
+          {msg.status === 'done' && msg.stance && <span className={`read-stance ${msg.stance.toLowerCase()}`}>{STANCE_WORD[msg.stance]?.toLowerCase()}</span>}
+        </div>
         <Thinking text={msg.thinking} live={streaming && !body} />
         {body ? <Folding text={body} fold={!streaming}><Markdown>{body}</Markdown></Folding>
           : streaming ? <Typing />
