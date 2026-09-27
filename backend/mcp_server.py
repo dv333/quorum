@@ -233,6 +233,8 @@ def wait(debate_id: str, seconds: float) -> Tuple[Dict[str, Any], bool]:
                 cli._answer_intake(debate_id, snap, interactive=False, progress=quiet)
         elif d["status"] == "paused":
             cli.post(f"/debates/{debate_id}/continue")
+        elif d["status"] in ("cancelled", "failed"):
+            return snap, False  # stopped for good: the user resumes it in the app
         if time.monotonic() >= deadline:
             return snap, False
         time.sleep(cli.POLL_SECONDS)
@@ -261,6 +263,8 @@ def status_line(snap: Dict[str, Any]) -> str:
         "running": "starting the debate",
         "concluding": "fact-checking and writing the answer",
         "paused": "paused",
+        "cancelled": "cancelled in the app",
+        "failed": "stopped after an error",
         "concluded": "answered",
     }.get(d["status"], d["status"])
 
@@ -271,6 +275,8 @@ def respond(debate_id: str, snap: Dict[str, Any], done: bool, level: str = "stan
     watch = f"Watch it live: {link}" if app_up() else "Run ./start.sh to open the app and watch it live"
     if done:
         return f"{cli._result(debate_id, level, False, False).strip()}\n\nConundrum {debate_id} · {link}"
+    if snap["debate"]["status"] in ("cancelled", "failed"):
+        return f"Quorum {status_line(snap)}: {cli.stop_reason(snap)} Conundrum id: {debate_id} · {link}"
     return (
         f"Quorum is still on it ({status_line(snap)}). Conundrum id: {debate_id}. {watch}.\n"
         f'Call quorum_result with conundrum_id="{debate_id}" (and wait_seconds) to get the answer when it\'s ready.'

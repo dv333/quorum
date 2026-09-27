@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 
-// "4:07", or "1h 02m" past an hour
+// "45s", "4m 07s", or "1h 02m" past an hour
 export function formatElapsed(ms) {
   const s = Math.max(0, Math.floor(ms / 1000))
   const h = Math.floor(s / 3600)
   const m = Math.floor((s % 3600) / 60)
-  return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}:${String(s % 60).padStart(2, '0')}`
+  if (h) return `${h}h ${String(m).padStart(2, '0')}m`
+  return m ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`
 }
 
 // The current time, updated every `every` ms while `active`

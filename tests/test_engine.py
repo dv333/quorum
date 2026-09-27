@@ -286,12 +286,12 @@ async def test_failed_seat_is_skipped_and_debate_continues():
     assert "Otter:" in verdict_prompt and "- Koala:" not in verdict_prompt  # C has no final position
 
 
-async def test_too_few_responders_pauses():
+async def test_too_few_responders_fails():
     client = FakeClient(lambda h, r, m: (_ for _ in ()).throw(RuntimeError("down")) if h != "Otter" else reply("AGREE"))
     eng = make_debate(client)
     await eng.post_user_message("Q")
     await eng.task
-    assert eng.debate()["status"] == "paused"
+    assert eng.debate()["status"] == "failed"
     assert (
         "Fewer than two agents"
         in db.query("SELECT content FROM messages WHERE author_kind = 'system' ORDER BY id DESC")[0]["content"]
@@ -1048,3 +1048,59 @@ async def test_the_review_check_is_one_call_and_says_what_it_is_doing():
     await eng.task
     assert len(client.calls_with("You check an AI council's code review")) == 1
     assert phases and "checking the review" in phases[0] and phases[-1] is None
+
+
+# ------------------------------------------------------------ cancel, fail and resume
+
+
+async def test_cancel_stops_for_good_keeps_what_was_said_and_can_resume():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.gates["Koala"] = asyncio.Event()  # Koala is mid-turn when the user cancels
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+    await eng.cancel()
+    assert eng.debate()["status"] == "cancelled" and not eng.is_running()
+    said = db.query("SELECT author_kind, status, content FROM messages WHERE author_kind IN ('seat', 'system')")
+    assert [m["status"] for m in said if m["author_kind"] == "seat"] == ["done", "done", "stopped"]
+    assert "Cancelled by you" in said[-1]["content"]
+    await eng.continue_()  # Resume
+    client.gates["Koala"].set()
+    await eng.task
+    assert eng.debate()["status"] == "concluded"
+
+
+async def test_an_engine_error_marks_the_debate_failed_and_it_can_resume(monkeypatch):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, seats=3, max_rounds=1)
+    original = eng._run_rounds
+    calls = []
+
+    async def crash_once():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("disk full")
+        await original()
+
+    monkeypatch.setattr(eng, "_run_rounds", crash_once)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert eng.debate()["status"] == "failed"
+    await eng.continue_()
+    await eng.task
+    assert eng.debate()["status"] == "concluded"
+
+
+async def test_metrics_total_the_time_spent_writing_for_the_speed():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, seats=2, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    db.execute(
+        "INSERT INTO usage (debate_id, topic, actor, model, kind, prompt_tokens, output_tokens, duration_ms, searches, "
+        "pages, created_at) VALUES ('d1', 1, 'Beagle', 'm', 'search', 0, 0, 90000, 3, 3, ?)",
+        [db.now()],
+    )
+    totals = eng.metrics(1)["totals"]
+    writing = db.query_one("SELECT SUM(duration_ms) AS ms FROM usage WHERE output_tokens > 0")["ms"] or 0
+    assert totals["gen_ms"] == writing and totals["duration_ms"] >= writing + 90000

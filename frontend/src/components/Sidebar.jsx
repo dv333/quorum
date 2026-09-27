@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { displayTitle } from '../agents'
 import { ResourceCards } from './Resources'
+import { formatElapsed } from '../time'
 
 // Pinned conundrums live in this browser only: a per-viewer convenience, like a bookmark
 const PIN_KEY = 'quorum.pinned'
@@ -112,7 +113,9 @@ function useHistory({ query, pins, open, refreshKey }) {
 const STATUS = {
   intake: 'Reading', clarifying: 'Needs your answer', confirming: 'Review assumptions',
   running: 'Debating', paused: 'Paused', concluding: 'Writing answer', researching: 'Researching', concluded: 'Answered', idle: 'New',
+  cancelled: 'Cancelled', failed: 'Failed',
 }
+const TONE = { concluded: 'ok', failed: 'bad', cancelled: 'off', paused: 'hold' }
 
 export function SidebarIcon() {
   // Two-pane glyph, like the macOS "Show/Hide Sidebar" toolbar icon
@@ -196,7 +199,10 @@ export default function Sidebar({ refreshKey, hiddenId, currentId, view, series,
         role="button" tabIndex={0} onClick={() => onSelect(d.id)} onKeyDown={(e) => e.key === 'Enter' && onSelect(d.id)}>
         <div className="t">{title}</div>
         {attention?.has(d.id) && <i className="badge" aria-label="Needs your attention" />}
-        <div className="s">{live && <i className="live-dot" />}{STATUS[d.status] || d.status}{d.round ? ` · ${d.round} round${d.round === 1 ? '' : 's'}` : ''}</div>
+        <div className={`s tone-${TONE[d.status] || 'live'}`}>
+          {live && <i className="live-dot" />}{STATUS[d.status] || d.status}{d.round ? ` · ${d.round} round${d.round === 1 ? '' : 's'}` : ''}
+          {d.status === 'concluded' && d.took_seconds != null && ` · ${formatElapsed(d.took_seconds * 1000)}`}
+        </div>
         <button className={`icon-btn pin ${pins.has(d.id) ? 'on' : ''}`} aria-pressed={pins.has(d.id)}
           aria-label={pins.has(d.id) ? 'Unpin' : 'Pin to top'} title={pins.has(d.id) ? 'Unpin' : 'Pin to top'}
           onClick={(e) => { e.stopPropagation(); togglePin(d.id) }}>

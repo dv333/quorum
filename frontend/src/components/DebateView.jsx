@@ -263,6 +263,30 @@ function TotalTime({ since }) {
 }
 
 
+// The header's color by status: answered, stopped by an error, cancelled, paused, or still going
+const TONE = { concluded: 'ok', failed: 'bad', cancelled: 'off', paused: 'hold' }
+const STOPPED = ['paused', 'cancelled', 'failed']
+const STOPPED_LABEL = { paused: 'Paused', cancelled: 'Cancelled', failed: 'Failed' }
+
+// Output tokens per second of generation, over every question in the conversation
+function avgTokPerS(metrics) {
+  let tokens = 0
+  let ms = 0
+  for (const m of Object.values(metrics || {})) {
+    tokens += m?.totals?.output_tokens || 0
+    ms += m?.totals?.gen_ms || 0
+  }
+  return tokens && ms ? Math.round(tokens / (ms / 1000)) : null
+}
+
+function CheckIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+      <path d="M2.5 6.3 5 8.6l4.5-5.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function LiveStatus({ state }) {
   const { debate, seats, messages } = state
   const ticking = ['running', 'concluding'].includes(debate.status)
@@ -528,6 +552,9 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   const took = status === 'concluded' && verdict
     ? formatElapsed(new Date(verdict.created_at).getTime() - new Date(askedAt(messages, debate)).getTime())
     : null
+  const tone = TONE[status] || 'live'
+  const statusPill = status === 'concluded' ? (took ? `Answered in ${took}` : 'Answered') : STOPPED_LABEL[status]
+  const speed = avgTokPerS(state.metrics)
 
   const act = async (fn) => {
     setError(null)
@@ -537,11 +564,17 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   return (
     <>
       {mobileBar}
-      <div className="topbar">
+      <div className={`topbar tone-${tone}`}>
         <div className="q-title">
           <h2 title={question}>{displayTitle(debate.title, question)}</h2>
-          <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}{took && <> · took {took}</>}</div>
+          <div className="sub">{sub}{debate.pack && <> · {debate.pack.emoji} {debate.pack.name}</>}</div>
         </div>
+        {(statusPill || speed) && (
+          <div className="head-pills">
+            {statusPill && <span className="head-pill status">{tone === 'ok' && <CheckIcon />}{statusPill}</span>}
+            {speed && <span className="head-pill" title="Average generation speed across this conversation">avg {speed} t/s</span>}
+          </div>
+        )}
         {!replaying && INTAKE.includes(status) && (
           <div className="actions">
             <button className="btn" onClick={() => act(() => api.confirmIntake(debate.id))}>Skip, just start</button>
@@ -550,9 +583,9 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
         {!replaying && !['concluded', 'idle', ...INTAKE].includes(status) && (
           <div className="actions">
             {status === 'running' && <button className="btn" onClick={() => act(() => api.stopDebate(debate.id))}>Pause</button>}
-            {status === 'paused' && <button className="btn" onClick={() => act(() => api.continueDebate(debate.id))}>Continue</button>}
-            {(status === 'concluding' || status === 'researching') && (
-              <button className="btn" onClick={() => act(() => api.stopDebate(debate.id))}>Stop</button>
+            {STOPPED.includes(status) && <button className="btn" onClick={() => act(() => api.continueDebate(debate.id))}>Resume</button>}
+            {!['cancelled', 'failed'].includes(status) && (
+              <button className="btn" onClick={() => act(() => api.cancelDebate(debate.id))}>Cancel</button>
             )}
             {(status === 'running' || status === 'paused') && (
               <button className="btn primary" onClick={() => act(() => api.concludeDebate(debate.id))}>Answer now</button>

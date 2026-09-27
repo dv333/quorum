@@ -164,6 +164,12 @@ def _answer_intake(debate_id: str, snap: Dict[str, Any], interactive: bool, prog
     print(file=sys.stderr)
 
 
+def stop_reason(snap: Dict[str, Any]) -> str:
+    """The last system message of a stopped conundrum: why it stopped and what to do."""
+    note = next((m["content"] for m in reversed(snap["messages"]) if m["author_kind"] == "system"), "")
+    return note or f"Resume it in the app: {APP_URL}/#q/{snap['debate']['id']}"
+
+
 def _verdict(snap: Dict[str, Any], topic: int) -> Optional[Dict[str, Any]]:
     v = next((v for v in snap["verdicts"] if v["topic"] == topic), None)
     if not v:
@@ -187,6 +193,9 @@ def wait_for_answer(debate_id: str, interactive: bool, progress: Progress) -> Di
                 _answer_intake(debate_id, snap, interactive, progress)
         elif d["status"] == "paused":
             post(f"/debates/{debate_id}/continue")
+        elif d["status"] in ("cancelled", "failed"):
+            what = "failed" if d["status"] == "failed" else "was cancelled"
+            raise QuorumError(f"The conundrum {what}. {stop_reason(snap)}")
         time.sleep(POLL_SECONDS)
 
 

@@ -376,14 +376,26 @@ async def list_debates(
 
 
 def _debate_rows(where: str, params: List[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
-    return db.query(
+    rows = db.query(
         "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, "
         "(SELECT COUNT(*) FROM seats s WHERE s.debate_id = d.id) AS seat_count, "
+        "(SELECT m.created_at FROM messages m WHERE m.debate_id = d.id AND m.topic = d.topic AND m.author_kind = 'user' "
+        " ORDER BY m.id LIMIT 1) AS asked_at, "
+        "(SELECT v.created_at FROM verdicts v WHERE v.debate_id = d.id AND v.topic = d.topic "
+        " ORDER BY v.id DESC LIMIT 1) AS answered_at, "
         "(SELECT content FROM messages m WHERE m.debate_id = d.id AND m.author_kind = 'user' AND m.round = 0 "
         " ORDER BY m.id LIMIT 1) AS question "
         f"FROM debates d{where} ORDER BY d.created_at DESC, d.id DESC" + (" LIMIT ?" if limit else ""),
         params + ([limit] if limit else []),
     )
+    for r in rows:  # whole seconds from the current question to its answer, as the conundrum's header shows it
+        asked, answered = r.pop("asked_at"), r.pop("answered_at")
+        r["took_seconds"] = (
+            int((datetime.fromisoformat(answered) - datetime.fromisoformat(asked)).total_seconds())
+            if asked and answered
+            else None
+        )
+    return rows
 
 
 def _debate_count(where: str, params: List[Any]) -> int:
@@ -606,6 +618,13 @@ async def post_continue(debate_id: str):
 async def post_stop(debate_id: str):
     _require_debate(debate_id)
     await get_engine(debate_id).stop()
+    return {"ok": True}
+
+
+@app.post("/api/debates/{debate_id}/cancel")
+async def post_cancel(debate_id: str):
+    _require_debate(debate_id)
+    await get_engine(debate_id).cancel()
     return {"ok": True}
 
 

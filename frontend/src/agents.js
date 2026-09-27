@@ -1,3 +1,5 @@
+import { formatElapsed } from './time'
+
 // Visual identity for council members. Models only ever see the names; the emoji and colors are UI-only.
 
 export const AGENTS = {
@@ -28,10 +30,7 @@ export function modelShort(model) {
 }
 
 export function formatDuration(ms) {
-  if (ms == null) return '—'
-  const s = Math.round(ms / 1000)
-  if (s < 60) return `${s}s`
-  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
+  return ms == null ? '—' : formatElapsed(Math.round(ms / 1000) * 1000)
 }
 
 export function formatTokens(n) {
