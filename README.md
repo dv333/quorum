@@ -89,7 +89,17 @@ by severity, each with a fix, and the points the reviewers disagreed on.
 
 We measure every change to reviews against a [public benchmark](docs/benchmarks/review/): changes with planted
 bugs, clean changes to catch false alarms, and the same review from a linter, a single local model and Claude Code for
-comparison. A review takes minutes, not seconds, so it runs in the background while you keep coding.
+comparison.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/review/chart-dark.svg">
+  <img alt="Planted bugs found: ruff 19%, one local model 100%, Quorum 96%, Claude Code 96%" src="docs/benchmarks/review/chart-light.svg" width="780">
+</picture>
+
+In the latest run Quorum found 26 of 27 planted bugs, up from 24, in 9 minutes per review instead of 38. It doesn't
+beat a single strong model yet: the council's largest model alone found all 27 in 2 minutes, and Quorum raised 3 false
+alarms on clean changes. [What it missed and why](docs/benchmarks/review/README.md#notes-from-checking-by-hand). A review takes
+minutes, not seconds, so it runs in the background while you keep coding.
 
 The council runs on your machine. The Coder's questions about your code go to Claude Code or Codex; set
 `QUORUM_CODER=off` to keep a review entirely local.

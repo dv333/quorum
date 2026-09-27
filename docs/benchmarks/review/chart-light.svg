@@ -16,12 +16,12 @@
 <text x="576" y="142" font-size="12" fill="#6e6e73">1 false alarm</text>
 <text x="576" y="158" font-size="12" fill="#6e6e73">2 min per review · $0 API</text>
 <text x="0" y="199" font-size="14" font-weight="700" fill="#1d1d1f">Quorum</text>
-<text x="0" y="217" font-size="11.5" fill="#6e6e73">8 local models + the Coder</text>
+<text x="0" y="217" font-size="11.5" fill="#6e6e73">5 local models + the Coder</text>
 <rect x="220" y="188" width="290" height="22" rx="6" fill="#ececf0"/>
-<rect x="220" y="188" width="257.8" height="22" rx="6" fill="#0071e3"/>
-<text x="522" y="204" font-size="14" font-weight="700" fill="#1d1d1f">89%</text>
-<text x="576" y="198" font-size="12" fill="#6e6e73">2 false alarms</text>
-<text x="576" y="214" font-size="12" fill="#6e6e73">38 min per review · $0 API</text>
+<rect x="220" y="188" width="279.3" height="22" rx="6" fill="#0071e3"/>
+<text x="522" y="204" font-size="14" font-weight="700" fill="#1d1d1f">96%</text>
+<text x="576" y="198" font-size="12" fill="#6e6e73">3 false alarms</text>
+<text x="576" y="214" font-size="12" fill="#6e6e73">9 min per review · $0 API</text>
 <text x="0" y="255" font-size="14" font-weight="600" fill="#1d1d1f">Claude Code</text>
 <text x="0" y="273" font-size="11.5" fill="#6e6e73">frontier cloud model, alone</text>
 <rect x="220" y="244" width="290" height="22" rx="6" fill="#ececf0"/>
