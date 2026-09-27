@@ -1110,6 +1110,28 @@ async def test_a_seat_that_fails_twice_sits_out():
     assert len(client.turn_calls("Koala")) == 2  # one try and one retry in round 1, none in round 2
 
 
+async def test_a_much_slower_seat_keeps_its_seat_with_brief_replies_after_round_1(monkeypatch):
+    monkeypatch.setattr(engine_mod, "SLOW_TURN_SECONDS", 0.0)
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.gates["Koala"] = asyncio.Event()
+    eng = make_debate(client, seats=4, max_rounds=2)
+
+    async def slow_koala():
+        await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+        await asyncio.sleep(0.1)  # far longer than the others' turns
+        client.gates["Koala"].set()
+
+    slow = asyncio.create_task(slow_koala())
+    await eng.post_user_message("Q")
+    await eng.task
+    await slow
+    koala = client.turn_calls("Koala")
+    assert len(koala) == 2  # it still speaks in round 2
+    assert koala[0][1]["num_predict"] == engine_mod.TURN_MAX_TOKENS
+    assert koala[1][1]["num_predict"] == engine_mod.BRIEF_TURN_TOKENS and koala[1][1]["think"] is False
+    assert all(kw["num_predict"] == engine_mod.TURN_MAX_TOKENS for _, kw in client.turn_calls("Otter"))
+
+
 async def test_a_turn_waiting_behind_another_debate_keeps_its_full_time(monkeypatch):
     monkeypatch.setattr(engine_mod, "TURN_MAX_SECONDS", 0.2)
     client = FakeClient(lambda h, r, m: reply("REFINE"))

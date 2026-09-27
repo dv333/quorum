@@ -35,6 +35,8 @@ from .config import (
     THINK_AFTER_FIRST_ROUND,
     TURN_MAX_SECONDS,
     TURN_MAX_TOKENS,
+    BRIEF_TURN_TOKENS,
+    SLOW_TURN_SECONDS,
     REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
@@ -1266,14 +1268,16 @@ class DebateEngine:
         keep_alive: Any,
         actor: str,
         kind: str,
+        max_tokens: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Stream a reply into an existing message row, publishing deltas. Records usage; returns stats.
 
         A turn is limited in time and output (thinking included), with room for that output in the context window, so a
         model that loops stops instead of stalling the debate; what it wrote before the limit is kept (stats "cut")."""
-        max_seconds, max_tokens = (
+        max_seconds, limit = (
             (TURN_MAX_SECONDS, TURN_MAX_TOKENS) if kind == "turn" else (ANSWER_MAX_SECONDS, ANSWER_MAX_TOKENS)
         )
+        max_tokens = min(max_tokens or limit, limit)
         partial = self.partials.setdefault(msg_id, {"content": "", "thinking": ""})
         stats: Dict[str, Any] = {}
         ep = self._endpoint(endpoint_id)
@@ -1613,6 +1617,23 @@ class DebateEngine:
         )
         return text
 
+    def _slow_seats(self, topic: int) -> set:
+        """Seats whose turns so far take far longer than the council's typical turn (over SLOW_TURN_SECONDS and
+        twice the median). Local calls run one at a time, so a round lasts as long as all its turns together."""
+        rows = db.query(
+            "SELECT seat_id, duration_ms FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'seat' "
+            "AND status = 'done' AND duration_ms IS NOT NULL",
+            [self.id, topic],
+        )
+        by_seat: Dict[int, List[int]] = {}
+        for r in rows:
+            by_seat.setdefault(r["seat_id"], []).append(r["duration_ms"])
+        medians = {sid: sorted(ms)[len(ms) // 2] for sid, ms in by_seat.items()}
+        if len(medians) < 3:
+            return set()
+        typical = sorted(medians.values())[len(medians) // 2]
+        return {sid for sid, ms in medians.items() if ms > max(SLOW_TURN_SECONDS * 1000, 2 * typical)}
+
     async def _seat_turn(self, seat: Dict[str, Any], round_no: int, upcoming: Optional[Dict[str, Any]]) -> None:
         d = self.debate()
         row = self._insert_message(
@@ -1631,6 +1652,10 @@ class DebateEngine:
             messages = self._turn_context(seat, round_no, exclude_id=msg_id)
             # Think in round 1, where the independent views form; rebuttals answer without it (much faster)
             wanted = bool(seat["thinking_enabled"]) and (round_no == 1 or THINK_AFTER_FIRST_ROUND)
+            brief = round_no > 1 and seat["id"] in self._slow_seats(d["topic"])
+            if brief:
+                self._log(msg_id, "(a brief reply: this model's turns take far longer than the rest)")
+                wanted = False
             think = await self._thinking_flag(seat["endpoint_id"], seat["model"], wanted)
             partial = self.partials[msg_id]
 
@@ -1644,6 +1669,7 @@ class DebateEngine:
                     self._keep_alive(seat, upcoming),
                     seat["handle"],
                     "turn",
+                    BRIEF_TURN_TOKENS if brief else None,
                 )
 
             retried = False
