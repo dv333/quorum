@@ -414,15 +414,16 @@ textarea.input { resize: vertical; }
 .hist .s.tone-bad { color: var(--disagree); }
 .hist .s.tone-hold { color: var(--refine); }
 
-.scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; }
+.scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; container-type: inline-size; }
 .stage-wrap { position: sticky; top: 0; z-index: 2; background: color-mix(in srgb, var(--window) 88%, transparent);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 0.5px solid var(--hairline); }
 .stage { display: flex; gap: 14px; align-items: flex-end; padding: 10px 32px 8px; max-width: 1360px; margin: 0 auto; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .dot.agree { background: var(--agree); } .dot.refine { background: var(--refine); } .dot.disagree { background: var(--disagree); } .dot.idle { background: var(--text-3); }
 
-/* 760px keeps a message to about 85 characters a line, the upper end of comfortable reading */
-.thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: 760px; margin: 0 auto; }
+/* The conversation grows with the window (about three quarters of it, up to 1000px) and its text steps up with it,
+   so a big screen is used well and a line stays around 100 characters */
+.thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: clamp(760px, 72cqw, 1040px); margin: 0 auto; }
 .divider { text-align: center; font: 600 11px var(--font); color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; margin: 8px 0 -2px; }
 .msg { display: flex; gap: 12px; max-width: min(1240px, 100%); animation: rise 0.5s var(--ease) both; min-width: 0; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
@@ -1209,7 +1210,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .reading .stage-wrap, .reading .sysrow, .reading .roles-row, .reading .disclose, .reading .copy-btn, .reading .ts, .reading .me-ts,
 .reading .turn-time, .reading .who .meta, .reading .who > span:not(.role-tag):not(.read-stance), .reading .stance,
 .reading .fold-btn, .reading .msg > .agent-tip-anchor, .reading .msg > .orb { display: none; }
-.reading .thread { max-width: 680px; gap: 0; padding-top: 28px; }
+.reading .thread { max-width: clamp(680px, 56cqw, 800px); gap: 0; padding-top: 28px; }
 .reading .msg { max-width: none; padding: 20px 0; animation: none; }
 .reading .msg + .msg { border-top: 0.5px solid var(--hairline); }
 .reading .bubble, .reading .bubble.beagle, .reading .bubble.coder, .reading .bubble.moderator {
@@ -1232,3 +1233,8 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .reading .msg.me .mention { background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue); }
 .reading-btn { font: 600 13px var(--serif); letter-spacing: 0.02em; min-width: 34px; }
 .reading-btn[aria-pressed="true"] { background: var(--text); color: var(--window); border-color: transparent; }
+
+/* Bigger windows: a little larger text, so the wider conversation stays easy to read */
+@container (min-width: 1100px) { .bubble { font-size: 16px; line-height: 1.62; } }
+@container (min-width: 1300px) { .reading .bubble, .reading .bubble .md p { font-size: 18px; } }
+@container (min-width: 1500px) { .bubble { font-size: 16.5px; } }
