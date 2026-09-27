@@ -29,7 +29,7 @@ function StanceBadge({ stance }) {
 }
 
 // Where everyone sits: around an ellipse at the table (chair at the head), or left to right in the line
-function layout(width, count, helpers, collapsed, narrow) {
+export function layout(width, count, helpers, collapsed, narrow) {
   if (collapsed) {
     // One line; on a phone it squeezes to fit and the clock and tally drop to a second row
     const slots = count + helpers.length + (helpers.length ? 0.35 : 0)

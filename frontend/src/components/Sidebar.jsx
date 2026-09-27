@@ -46,7 +46,7 @@ function useHistory({ query, pins, open, refreshKey }) {
   const [pinned, setPinned] = useState([])
   const [results, setResults] = useState(null) // { items, count } while searching
   const [error, setError] = useState(null)
-  const defs = useMemo(dayGroups, [refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const defs = useMemo(dayGroups, [refreshKey])
   const pinList = useMemo(() => [...pins], [pins])
   const loaded = useRef({}) // how many items each group shows, so a refresh keeps "Show more" pages
   const q = query.trim()

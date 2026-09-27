@@ -559,7 +559,7 @@ largest model as chair. A bigger or more capable chair makes the biggest differe
 ```bash
 uv run pytest                        # backend tests, no models needed
 uvx ruff check backend tests         # lint
-cd frontend && npm run build         # frontend build
+cd frontend && npm run lint && npm test && npm run build   # frontend lint, tests, build
 ```
 
 README media are generated from the real app:
