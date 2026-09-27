@@ -548,6 +548,9 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .pill.bad { background: var(--disagree-bg); color: var(--disagree); }
 .pill.think { background: color-mix(in srgb, var(--chair) 14%, transparent); color: var(--chair); }
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+.settings-head:has(.settings-close) { flex-wrap: nowrap; align-items: flex-start; }
+.settings-head:has(.settings-close) > div { flex: 1; min-width: 0; }
+.settings-close { flex: none; margin-top: 4px; }
 .seg.tabs button { padding: 6px 16px; font-size: 13px; }
 .search-field { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 38px; border-radius: 10px; background: var(--fill); color: var(--text-2); margin-top: 18px; }
 .search-field input { flex: 1; border: 0; background: transparent; outline: none; font-size: 15px; color: var(--text); min-width: 0; }
@@ -597,7 +600,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
   .orb.lg { width: 46px; height: 46px; font-size: 25px; }
   .thread { padding: 8px 12px 20px; gap: 12px; }
   .msg { gap: 8px; }
-  .msg > .orb { width: 28px; height: 28px; font-size: 15px; }
+  .msg > .orb, .msg > .agent-tip-anchor > .orb { width: 28px; height: 28px; font-size: 15px; }
   .bubble { padding: 10px 13px; border-radius: 16px; font-size: 14px; }
   .composer-wrap { padding: 0 10px 10px; }
   .composer textarea { font-size: 16px; }
@@ -1055,7 +1058,36 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .demo-bar a.btn { text-decoration: none; }
 @media (max-width: 640px) { .demo-bar { padding: 10px 16px; } }
 
-/* Total time, right after the round number */
-.consensus-pill .cp-time { font-variant-numeric: tabular-nums; color: var(--text-2); padding: 0 7px; border-radius: 999px; background: var(--fill); font-size: 11.5px; }
+/* The total time, centred in the stage bar */
+.stage { position: relative; }
+.stage-time {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 13px; border-radius: 999px; background: var(--fill); color: var(--text); font: 600 16px var(--font);
+  font-variant-numeric: tabular-nums; letter-spacing: 0.01em; pointer-events: auto; white-space: nowrap;
+}
+.stage-time svg { color: var(--text-3); }
+.stage:not(.compact) .stage-time { top: 14px; transform: translateX(-50%); }
+@media (max-width: 900px) {
+  .stage-time { position: static; transform: none; font-size: 14px; padding: 4px 10px; align-self: center; margin-left: auto; }
+  .stage:not(.compact) .stage-time { transform: none; }
+  .stage-time + .stage-toggle { margin-left: 4px; }
+}
+
+/* Who an agent is, on hover or focus of its icon */
+.agent-tip-anchor { display: inline-flex; flex: none; align-self: flex-start; border-radius: 50%; outline: none; }
+.agent-tip-anchor:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 45%, transparent); }
+.mini-seat .agent-tip-anchor, .seat .agent-tip-anchor { align-self: center; }
+.agent-tip {
+  position: fixed; z-index: 1000; transform: translateX(-50%); min-width: 180px; max-width: 280px; padding: 10px 12px;
+  border-radius: 12px; background: var(--card); color: var(--text); font: 12.5px/1.4 var(--font); pointer-events: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 0 0 0.5px var(--hairline); animation: tip-in 0.12s var(--ease) both;
+}
+.agent-tip.above { transform: translate(-50%, -100%); }
+.agent-tip-h { display: flex; align-items: center; gap: 7px; font-size: 13.5px; }
+.agent-tip-chair { margin-left: auto; font-size: 11px; color: var(--text-2); }
+.agent-tip-role { margin-top: 6px; font-weight: 600; }
+.agent-tip-model { margin-top: 2px; color: var(--text-2); font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11.5px; overflow-wrap: anywhere; }
+.agent-tip-note { margin-top: 4px; color: var(--text-3); font-size: 11.5px; }
+@keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }
 /* A turn's time, and the agent's total, beside its name */
 .who .turn-time { font-variant-numeric: tabular-nums; color: var(--text-3); font-size: 11.5px; white-space: nowrap; }

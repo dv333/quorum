@@ -4,7 +4,8 @@ import remarkGfm from 'remark-gfm'
 
 // Models write "~$12k" for approximations; only ~~double~~ tildes should strike through
 const GFM = [[remarkGfm, { singleTilde: false }]]
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CODER, RESEARCHER, agentFor, formatTime, linkMentions, modelShort } from '../agents'
 
 // Inside an answer, [n] citations render through this (see citeLinks); elsewhere they stay plain text
@@ -70,6 +71,46 @@ export function Orb({ handle, size = '', speaking = false, dim = false, chair = 
     <span className={`orb ${size} c-${a.color} ${speaking ? 'speaking' : ''} ${dim ? 'dim' : ''}`} aria-hidden="true">
       {a.emoji}
       {chair && <span className="crown" title="Chair">★</span>}
+    </span>
+  )
+}
+
+// Hover or focus an agent's icon to see who it is: name, role and model. The card is drawn over the page (a portal),
+// so the scrolling seat bar can't clip it.
+export function AgentTip({ handle, role, model, note, chair = false, focusable = false, children }) {
+  const ref = useRef(null)
+  const id = useId()
+  const [at, setAt] = useState(null)
+  const show = () => {
+    const r = ref.current?.getBoundingClientRect()
+    if (!r) return
+    const below = r.bottom + 160 < window.innerHeight
+    const x = Math.min(Math.max(r.left + r.width / 2, 140), window.innerWidth - 140)
+    setAt({ x, y: below ? r.bottom + 8 : r.top - 8, below })
+  }
+  const hide = () => setAt(null)
+  useEffect(() => {
+    if (!at) return undefined
+    window.addEventListener('scroll', hide, true)
+    return () => window.removeEventListener('scroll', hide, true)
+  }, [at])
+  return (
+    <span className="agent-tip-anchor" ref={ref} tabIndex={focusable ? 0 : undefined} aria-describedby={at ? id : undefined}
+      onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+      {children}
+      {at && createPortal(
+        <div id={id} role="tooltip" className={`agent-tip ${at.below ? 'below' : 'above'}`} style={{ left: at.x, top: at.y }}>
+          <div className="agent-tip-h">
+            <Orb handle={handle} size="sm" />
+            <b>{handle}</b>
+            {chair && <span className="agent-tip-chair">★ Chair</span>}
+          </div>
+          {role && <div className="agent-tip-role">{role}</div>}
+          {model && <div className="agent-tip-model">{model}</div>}
+          {note && <div className="agent-tip-note">{note}</div>}
+        </div>,
+        document.body,
+      )}
     </span>
   )
 }
@@ -145,7 +186,9 @@ export function AgentMessage({ msg, seat, isChair, total }) {
   if (msg.status === 'stopped') meta.push('stopped')
   return (
     <div className="msg">
-      <Orb handle={seat?.handle} speaking={streaming} chair={isChair} />
+      <AgentTip handle={seat?.handle} role={msg.meta?.role || seat?.role} model={seat?.model} chair={isChair}>
+        <Orb handle={seat?.handle} speaking={streaming} chair={isChair} />
+      </AgentTip>
       <div className="bubble">
         <div className="who">{seat?.handle}{(msg.meta?.role || seat?.role) && <span className="role-tag">{msg.meta?.role || seat?.role}</span>}<span>{meta.filter(Boolean).join(' · ')}</span><TurnTime msg={msg} total={total} /><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={body} />}</div>
         <Thinking text={msg.thinking} live={streaming && !body} />
@@ -202,7 +245,9 @@ export function BeagleCard({ msg, model }) {
   if (msg.status === 'stopped') meta.push('stopped')
   return (
     <div className="msg">
-      <Orb handle={RESEARCHER} speaking={streaming} />
+      <AgentTip handle={RESEARCHER} role="Web research" model={model}>
+        <Orb handle={RESEARCHER} speaking={streaming} />
+      </AgentTip>
       <div className="bubble beagle">
         <div className="who">{RESEARCHER}<span>{meta.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
         {msg.requested_by && <div className="asked">Asked by {msg.requested_by}: “{msg.research_request}”</div>}
@@ -227,7 +272,9 @@ export function CoderCard({ msg }) {
   if (msg.status === 'stopped') info.push('stopped')
   return (
     <div className="msg">
-      <Orb handle={CODER} speaking={streaming} />
+      <AgentTip handle={CODER} role="Reads the repository (read-only)" model={meta.label}>
+        <Orb handle={CODER} speaking={streaming} />
+      </AgentTip>
       <div className="bubble coder">
         <div className="who">{CODER}<span>{info.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
         {msg.requested_by && <div className="asked">Asked by {msg.requested_by}: “{msg.research_request}”</div>}
@@ -268,7 +315,9 @@ export function ModeratorMessage({ msg, active, onAnswer, onConfirm, onAddDetail
   if (meta.kind === 'summary') {
     return (
       <div className="msg">
-        <Orb handle={chair} chair />
+        <AgentTip handle={chair} role="Chair" chair>
+          <Orb handle={chair} chair />
+        </AgentTip>
         <div className="bubble moderator summary">
           <div className="who">{chair}<span>here's what I'll give the council</span><span className="ts">{formatTime(msg.created_at)}</span>
             <CopyButton text={[msg.content, ...(meta.assumptions || []).map((a) => `- ${a}`)].join('\n')} /></div>
@@ -291,7 +340,9 @@ export function ModeratorMessage({ msg, active, onAnswer, onConfirm, onAddDetail
   }
   return (
     <div className="msg">
-      <Orb handle={chair} chair />
+      <AgentTip handle={chair} role="Chair" chair>
+        <Orb handle={chair} chair />
+      </AgentTip>
       <div className="bubble moderator">
         <div className="who">{chair}<span>question {meta.n || 1} of up to {meta.max || 3}</span><span className="ts">{formatTime(msg.created_at)}</span><CopyButton text={msg.content} /></div>
         <div className="md"><p>{msg.content}</p></div>

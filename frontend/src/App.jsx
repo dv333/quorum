@@ -261,7 +261,7 @@ export default function App() {
         {route.view === 'debate' && route.id && (
           <DebateView key={route.id} debateId={route.id} onChanged={onDebateChanged} mobileBar={mobileBar} />
         )}
-        {route.view === 'settings' && <Settings mobileBar={mobileBar} onRunSetup={() => go('welcome')} />}
+        {route.view === 'settings' && <Settings mobileBar={mobileBar} onRunSetup={() => go('welcome')} onClose={() => go('home')} />}
         </ErrorBoundary>
       </main>
       {resource && <ResourceSheet series={series} focus={resource} onClose={() => setResource(null)} />}
