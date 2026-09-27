@@ -189,8 +189,10 @@ textarea.input { resize: vertical; }
 .c-penguin { --c: var(--penguin); } .c-hedgehog { --c: var(--hedgehog); } .c-beagle { --c: var(--beagle); } .c-coder { --c: var(--coder); } .c-chair { --c: var(--chair); }
 .c-bunny { --c: var(--bunny); } .c-turtle { --c: var(--turtle); } .c-dolphin { --c: var(--dolphin); }
 .orb.xs { width: 17px; height: 17px; font-size: 10px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent); }
-.mention { display: inline-flex; align-items: center; gap: 4px; vertical-align: -3px; padding: 1px 7px 1px 2px; margin: 0 1px; border-radius: 999px;
+/* The chip sits on the text's baseline (its name lines up with the words around it); the icon centers inside it */
+.mention { display: inline-flex; align-items: baseline; gap: 4px; vertical-align: baseline; padding: 1px 7px 1px 2px; margin: -3px 1px; line-height: 1.3; border-radius: 999px;
   font-weight: 600; font-size: 0.93em; background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue); white-space: nowrap; }
+.mention > .orb { align-self: center; }
 .msg.me .mention { background: rgba(255, 255, 255, 0.22); color: #fff; }
 .copy-btn { border: 0; background: transparent; color: var(--text-3); width: 24px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center;
   padding: 0; opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s; flex: none; }
@@ -223,7 +225,7 @@ textarea.input { resize: vertical; }
 .collapse-btn { margin-left: auto; width: 30px; height: 30px; }
 .expand-btn { position: absolute; top: 12px; left: 12px; z-index: 6; background: var(--glass-strong); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline); animation: fade 0.3s var(--ease); }
-.app.collapsed .topbar { padding-left: 60px; }
+.app.collapsed .topbar { padding-left: 108px; } /* clear of the floating sidebar and compose buttons */
 .ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.6; background:
   radial-gradient(700px 360px at 85% -10%, color-mix(in srgb, var(--panda) 16%, transparent), transparent 70%),
   radial-gradient(600px 360px at 25% 110%, color-mix(in srgb, var(--otter) 14%, transparent), transparent 70%); }
@@ -328,7 +330,8 @@ textarea.input { resize: vertical; }
 .meter { height: 4px; border-radius: 2px; background: var(--fill-2); margin: 6px 0 5px; overflow: hidden; }
 .meter i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--koala), var(--otter)); transition: width 0.6s var(--ease); }
 
-.main { position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden; }
+.main { position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; overflow: hidden;
+  container-type: inline-size; --col: clamp(760px, 72cqw, 1040px); }
 .mobile-bar { display: none; }
 .scrim { display: none; }
 
@@ -414,23 +417,27 @@ textarea.input { resize: vertical; }
 .hist .s.tone-bad { color: var(--disagree); }
 .hist .s.tone-hold { color: var(--refine); }
 
-.scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; container-type: inline-size; }
+.scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-anchor: none; }
 .stage-wrap { position: sticky; top: 0; z-index: 2; background: color-mix(in srgb, var(--window) 88%, transparent);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 0.5px solid var(--hairline); }
-.stage { display: flex; gap: 14px; align-items: flex-end; padding: 10px 32px 8px; max-width: 1360px; margin: 0 auto; }
+/* The folded line lines up with the conversation below it; the round table may use more of the width */
+.stage { display: flex; gap: 14px; align-items: flex-end; padding: 10px 32px 8px; max-width: var(--col); margin: 0 auto; }
+.stage:has(.rt:not(.folded)) { max-width: 1360px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
 .dot.agree { background: var(--agree); } .dot.refine { background: var(--refine); } .dot.disagree { background: var(--disagree); } .dot.idle { background: var(--text-3); }
 
 /* The conversation grows with the window (about three quarters of it, up to 1000px) and its text steps up with it,
    so a big screen is used well and a line stays around 100 characters */
-.thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: clamp(760px, 72cqw, 1040px); margin: 0 auto; }
+.thread { display: flex; flex-direction: column; gap: 14px; padding: 18px 32px 28px; max-width: var(--col); margin: 0 auto; }
 .divider { text-align: center; font: 600 11px var(--font); color: var(--text-3); letter-spacing: 0.06em; text-transform: uppercase; margin: 8px 0 -2px; }
 .msg { display: flex; gap: 12px; max-width: min(1240px, 100%); animation: rise 0.5s var(--ease) both; min-width: 0; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 .bubble { background: var(--card); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline); font-size: 15px; line-height: 1.6; min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .who { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font: 600 13px var(--font); margin-bottom: 3px; }
 .who span { font-weight: 400; color: var(--text-3); font-size: 12px; }
-.who .ts { margin-left: auto; font-variant-numeric: tabular-nums; }
+.who .ts { margin-left: auto; font-variant-numeric: tabular-nums; order: 2; }
+.who .copy-btn { order: 1; margin-left: auto; }
+.who:has(.copy-btn) .ts { margin-left: 0; }
 .me-ts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; font-size: 11px; color: rgba(255, 255, 255, 0.75); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .stance { display: inline-flex; align-items: flex-start; gap: 6px; margin-top: 8px; font-size: 12px; padding: 4px 11px; border-radius: 12px; line-height: 1.4; }
 .stance.agree { background: var(--agree-bg); color: var(--agree); } .stance.refine { background: var(--refine-bg); color: var(--refine); } .stance.disagree { background: var(--disagree-bg); color: var(--disagree); }
@@ -475,7 +482,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .sysrow details summary { cursor: pointer; }
 .sysrow details div { text-align: left; white-space: pre-wrap; margin-top: 6px; }
 
-.composer-wrap { padding: 0 32px 18px; max-width: 1360px; position: relative; width: 100%; margin: 0 auto; position: relative; z-index: 2; }
+.composer-wrap { padding: 0 32px 18px; max-width: var(--col); position: relative; width: 100%; margin: 0 auto; position: relative; z-index: 2; }
 .composer {
   display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 16px; border-radius: 22px;
   background: var(--glass-strong); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
@@ -759,7 +766,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .live-status .elapsed { margin-left: 2px; padding: 1px 7px; border-radius: 999px; background: var(--fill); color: var(--text-3); font-size: 11.5px; }
 
 /* Living answer: the chair's draft, pinned in the stage while the council debates */
-.living { max-width: 1360px; margin: 0 auto; padding: 0 32px 10px; }
+.living { max-width: var(--col); margin: 0 auto; padding: 0 32px 10px; }
 .living-head { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: baseline; gap: 10px; cursor: pointer;
   padding: 9px 14px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline); transition: background 0.2s; }
 .living-head:hover, .living-head:focus-visible { background: color-mix(in srgb, var(--blue) 5%, var(--card)); }
@@ -1195,6 +1202,12 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .rt-line-info { position: absolute; right: 36px; top: 6px; z-index: 5; }
 .rt.folded .rt-line-info { top: 50%; transform: translateY(-50%); }
 .rt-line-info .consensus-pill { margin: 0; }
+.rt-line-bar { position: absolute; top: 0; right: 36px; height: 56px; z-index: 5; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rt-line-bar .stage-time { position: static; transform: none; flex: none; }
+.rt-line-gap { flex: 1; }
+.rt-line-bar .consensus-pill { margin: 0; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.rt-line-bar .consensus-pill .cp-round { flex: none; }
+.rt-line-bar .consensus-pill em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rt-line-clock { position: absolute; left: 50%; top: 0; width: 0; height: 56px; z-index: 5; }
 .rt.narrow .rt-line-clock { left: 0; top: 56px; height: 36px; }
 .rt.narrow .rt-line-clock .stage-time { left: 0; transform: translateY(-50%); font-size: 14px; padding: 4px 11px; }
@@ -1238,3 +1251,25 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 @container (min-width: 1100px) { .bubble { font-size: 16px; line-height: 1.62; } }
 @container (min-width: 1300px) { .reading .bubble, .reading .bubble .md p { font-size: 18px; } }
 @container (min-width: 1500px) { .bubble { font-size: 16.5px; } }
+
+/* ---------------------------------------------------------------- quieter messages */
+/* Details on demand: a message shows who said it and their role; model, speed, times and the timestamp appear when
+   you point at it (or while it's being written, and always on touch screens) */
+.msg .who .meta, .msg .who .turn-time, .msg .who .ts { opacity: 0; transition: opacity 0.2s var(--ease); }
+.msg:hover .who .meta, .msg:hover .who .turn-time, .msg:hover .who .ts, .msg:focus-within .who .meta, .msg:focus-within .who .turn-time,
+.msg:focus-within .who .ts, .msg.live .who .meta, .msg.live .who .turn-time { opacity: 1; }
+@media (hover: none) { .msg .who .meta, .msg .who .turn-time, .msg .who .ts { opacity: 1; } }
+
+/* The stance is one quiet line: a colored dot and word, the position in grey */
+.stance, .stance.agree, .stance.refine, .stance.disagree { background: none; padding: 0; margin-top: 10px; color: var(--text-2); font-size: 12.5px; }
+.stance b { font-weight: 600; margin-right: 6px; }
+.stance.agree b { color: var(--agree); } .stance.agree .dot { background: var(--agree); }
+.stance.refine b { color: var(--refine); } .stance.refine .dot { background: var(--refine); }
+.stance.disagree b { color: var(--disagree); } .stance.disagree .dot { background: var(--disagree); }
+
+/* Beagle and the Coder look like every other message; a small label in their color says what the card is */
+.bubble.beagle, .bubble.coder { background: var(--card); box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline); }
+.kind-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font: 600 10.5px/1.5 var(--font); letter-spacing: 0.02em; vertical-align: 1px; }
+.bubble.beagle .kind-tag { color: color-mix(in srgb, var(--beagle) 80%, var(--text)); background: color-mix(in srgb, var(--beagle) 14%, transparent); }
+.bubble.coder .kind-tag { color: var(--text-2); background: var(--fill); }
+.reading .kind-tag { display: none; }

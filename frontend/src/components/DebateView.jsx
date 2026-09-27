@@ -179,8 +179,9 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches, scrolled }) {
     if (folded || tally || dissent.length > 0) roundPill = (
       <button className="consensus-pill" onClick={jump} title="Jump to this round">
         {folded && <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>}
-        {folded && <span className="cp-dots" aria-hidden="true">{stances.map((st, i) => <i key={i} className={`dot ${st ? st.toLowerCase() : 'idle'}`} />)}</span>}
-        {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
+        {/* Folded, the icons carry each stance: the pill only names who dissents */}
+        {folded ? dissent.length > 0 && <em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em>
+          : (tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
       </button>
     )
   }
@@ -255,11 +256,6 @@ function CheckIcon() {
 
 function LiveStatus({ state }) {
   const { debate, seats, messages } = state
-  const ticking = ['running', 'concluding'].includes(debate.status)
-  const now = useNow(ticking)
-  // Time since this question was asked (a follow-up starts its own clock)
-  const asked = askedAt(messages, debate)
-  const elapsed = ticking && asked ? formatElapsed(now - new Date(asked).getTime()) : null
   const streaming = messages.filter((m) => m.status === 'streaming')
   const seatName = (id) => seats.find((s) => s.id === id)?.handle
   const writer = streaming.find((m) => m.author_kind === 'seat')
@@ -275,11 +271,10 @@ function LiveStatus({ state }) {
   } else if (debate.status === 'paused') {
     text = `Paused after round ${debate.round}`
   } else if (debate.status === 'running' && debate.round > 0) {
-    const spoken = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done').length
     const who = writer ? `${seatName(writer.seat_id)} is writing…`
       : streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is searching…`
-      : 'next speaker is thinking…'
-    text = `Round ${debate.round} of ${debate.max_rounds} · ${spoken} of ${seats.length} spoken · ${who}`
+      : 'Next speaker is thinking…'
+    text = who // the round and who has spoken are in the bar at the top
   } else if (debate.status === 'running') {
     text = streaming.some((m) => m.author_kind === 'researcher') ? `${RESEARCHER} is researching before round 1…` : 'Getting started…'
   }
@@ -287,7 +282,7 @@ function LiveStatus({ state }) {
   return (
     <span className="live-status" role="status">
       <i className="live-dot" />{text}
-      {elapsed && <span className="elapsed" title="Time since you asked" aria-label={`${elapsed} since you asked`}>{elapsed}</span>}
+
     </span>
   )
 }

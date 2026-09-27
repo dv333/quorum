@@ -34,13 +34,13 @@ function layout(width, count, helpers, collapsed, narrow) {
     // One line; on a phone it squeezes to fit and the clock and tally drop to a second row
     const slots = count + helpers.length + (helpers.length ? 0.35 : 0)
     const step = narrow ? Math.min(42, (width - 8) / slots) : 42
-    const at = (i) => ({ x: 4 + 15 + i * step, y: LINE_H / 2, scale: 30 / ORB })
-    const rowEnd = 4 + slots * step
+    const at = (i) => ({ x: 15 + i * step, y: LINE_H / 2, scale: 30 / ORB })
+    const rowEnd = slots * step
     return {
       height: narrow ? LINE_H + 36 : LINE_H,
       seats: Array.from({ length: count }, (_, i) => at(i)),
       helpers: helpers.map((_, i) => at(count + i + 0.35)),
-      clockX: narrow ? null : Math.max(width / 2, rowEnd + 74), // centered, unless the line would run into it
+      barLeft: narrow ? null : rowEnd + 14, // the clock and round sit in the space after the icons
     }
   }
   const desk = helpers.length ? DESK_W + 20 : 0
@@ -201,8 +201,14 @@ export default function RoundTable({
         )
       })}
 
-      <div className="rt-line-info">{roundPill}</div>
-      {folded && <div className="rt-line-clock" style={L.clockX ? { left: L.clockX } : undefined}>{clock}</div>}
+      {folded && !narrow ? (
+        <div className="rt-line-bar" style={{ left: L.barLeft }}>{clock}<span className="rt-line-gap" />{roundPill}</div>
+      ) : (
+        <>
+          <div className="rt-line-info">{roundPill}</div>
+          {folded && <div className="rt-line-clock">{clock}</div>}
+        </>
+      )}
       {!narrow && (
         <button className="icon-btn rt-toggle" onClick={onToggle} aria-expanded={!folded}
           aria-label={folded ? 'Show the table' : 'Fold into a line'} title={folded ? 'Show the table' : 'Fold into a line'}>

@@ -21,7 +21,7 @@ export function MdLink({ node, href, children, ...props }) {
   if (cite && href?.startsWith('#cite-')) return cite(Number(href.slice(6)))
   if (href?.startsWith('#agent-')) {
     const name = href.slice(7)
-    return <span className="mention"><Orb handle={name} size="xs" />{name}</span>
+    return <span className="mention"><Orb handle={name} size="xs" /><span>{name}</span></span>
   }
   return <a href={href} {...props} target="_blank" rel="noreferrer noopener">{children}</a>
 }
@@ -122,7 +122,7 @@ export function StanceTag({ stance, position, parsed = true }) {
   return (
     <div className={`stance ${stance.toLowerCase()}`} title={parsed ? undefined : "The model didn't state a stance; treated as refining"}>
       <i className="dot" />
-      <span>{STANCE_WORD[stance] || stance}{position ? ` · ${position}` : ''}</span>
+      <span><b>{STANCE_WORD[stance] || stance}</b>{position && <span className="stance-pos">{position}</span>}</span>
     </div>
   )
 }
@@ -185,7 +185,7 @@ export function AgentMessage({ msg, seat, isChair, total }) {
   if (streaming) meta.push(body ? 'writing' : msg.thinking ? 'thinking' : 'getting ready')
   if (msg.status === 'stopped') meta.push('stopped')
   return (
-    <div className="msg">
+    <div className={`msg ${streaming ? 'live' : ''}`}>
       <AgentTip handle={seat?.handle} role={msg.meta?.role || seat?.role} model={seat?.model} chair={isChair}>
         <Orb handle={seat?.handle} speaking={streaming} chair={isChair} />
       </AgentTip>
@@ -243,15 +243,16 @@ const RESEARCH_KIND = { brief: 'opening brief', request: 'lookup', factcheck: 'f
 export function BeagleCard({ msg, model }) {
   const streaming = msg.status === 'streaming'
   const lastLog = msg.thinking?.trim().split('\n').pop()
-  const meta = [RESEARCH_KIND[msg.research_kind] || 'research', `web · ${modelShort(model)}`]
+  const kind = RESEARCH_KIND[msg.research_kind] || 'research'
+  const meta = [`web · ${modelShort(model)}`]
   if (msg.status === 'stopped') meta.push('stopped')
   return (
-    <div className="msg">
+    <div className={`msg ${streaming ? 'live' : ''}`}>
       <AgentTip handle={RESEARCHER} role="Web research" model={model}>
         <Orb handle={RESEARCHER} speaking={streaming} />
       </AgentTip>
       <div className="bubble beagle">
-        <div className="who">{RESEARCHER}<span>{meta.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
+        <div className="who">{RESEARCHER}<span className="kind-tag">{kind}</span><span className="meta">{meta.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
         {msg.requested_by && <div className="asked">Asked by {msg.requested_by}: “{msg.research_request}”</div>}
         {msg.status === 'error' ? <span className="error">{msg.content}</span>
           : msg.content ? <Markdown>{msg.content}</Markdown>
@@ -270,15 +271,16 @@ export function CoderCard({ msg }) {
   const lastLog = msg.thinking?.trim().split('\n').pop()
   const meta = msg.meta || {}
   const refs = meta.refs || { found: [], missing: [] }
-  const info = [msg.research_kind === 'codebrief' ? 'code brief' : 'answer', `${meta.label || 'coding agent'} · read-only`]
+  const kind = msg.research_kind === 'codebrief' ? 'code brief' : 'answer'
+  const info = [`${meta.label || 'coding agent'} · read-only`]
   if (msg.status === 'stopped') info.push('stopped')
   return (
-    <div className="msg">
+    <div className={`msg ${streaming ? 'live' : ''}`}>
       <AgentTip handle={CODER} role="Reads the repository (read-only)" model={meta.label}>
         <Orb handle={CODER} speaking={streaming} />
       </AgentTip>
       <div className="bubble coder">
-        <div className="who">{CODER}<span>{info.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
+        <div className="who">{CODER}<span className="kind-tag">{kind}</span><span className="meta">{info.join(' · ')}</span><span className="ts">{formatTime(msg.created_at)}</span>{!streaming && <CopyButton text={msg.content} />}</div>
         {msg.requested_by && <div className="asked">Asked by {msg.requested_by}: “{msg.research_request}”</div>}
         {msg.status === 'error' ? <span className="error">{msg.content}</span>
           : msg.content ? <Markdown>{msg.content}</Markdown>
