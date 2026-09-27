@@ -31,7 +31,7 @@
     {
       "id": "tests",
       "match": [
-        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested|(never|not|isn't|aren't) (actually )?tested|tests? (don't|do not|never) (check|cover|test)"
       ]
     }
   ]

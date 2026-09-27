@@ -20,7 +20,8 @@ Reviewers:
 Findings are the list items under High, Medium and Low headings (or starting with those words). A planted bug counts
 as found when any finding matches it, at any severity. On clean cases, every High or Medium finding that isn't an
 "acceptable" point is a false alarm. On cases with bugs, High and Medium findings that match nothing are listed as
-"unmatched" for a person to judge, since a reviewer can find real problems nobody planted. The report shows the
+"unmatched" for a person to judge, since a reviewer can find real problems nobody planted. A High finding on a clean
+change is always a false alarm: High means a must-fix bug, and there is none. The report shows the
 finding behind every match, so each one can be checked by hand.
 
 Run it where the reviewers can sign in: Claude Code and the Coder need your Claude login, so start Quorum (./start.sh)
@@ -185,8 +186,12 @@ def run_quorum(case: Dict[str, Any], repo: Path, mode: str) -> Dict[str, Any]:
 # ------------------------------------------------------------------ findings and scoring
 
 _ITEM = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*)")
+_NONE = re.compile(r"\s*(none|no (issues|findings|problems|bugs)|nothing)\b", re.I)
 _BOLD_LEAD = re.compile(r"^\s*\*\*(.{1,160}?)\*\*[:.]?\s*(\S.*)$")  # "**Title**: rest of the line"
-_LABEL = re.compile(r"\s*(fix(es)?|suggested fix|why|impact|example|note|evidence|risk|details?|how)\b", re.I)
+_LABEL = re.compile(
+    r"\s*(fix(es)?|suggested fix|why|impact|example|note|evidence|risk|details?|how|issue|problem|file|files|location|lines?)\b",
+    re.I,
+)
 _ROW = re.compile(r"^\s*\|(.*)\|\s*$")
 _HEADING = re.compile(r"^\s*(?:#{1,6}\s+(.*)|\*\*(.{1,160}?)\*\*:?\s*|([A-Z][\w &/()-]{0,60}):\s*)$")
 SEVERITY = [
@@ -232,6 +237,9 @@ def split_findings(answer: str) -> List[Dict[str, str]]:
             continue
         heading = _HEADING.match(line)
         item = _ITEM.match(line)
+        if not item and _NONE.match(re.sub(r"[*_`]", "", line)):
+            section, current = "skip", None  # "None." under a severity: what follows are concerns it ruled out
+            continue
         lead = None if heading or item else _BOLD_LEAD.match(line)
         if lead and current is not None and _LABEL.match(lead.group(1)):  # "**Fix:** ..." belongs to the finding
             current["text"] += " " + line.strip()
@@ -306,7 +314,9 @@ def score(case: Dict[str, Any], findings: List[Dict[str, str]]) -> Dict[str, Any
             found.setdefault(bug, f["text"])
         if hits or f["severity"] in ("low", "summary"):
             continue
-        if not any(matches(a, f["text"]) for a in case.get("acceptable", [])):
+        # a fair point excuses a Medium finding, but on a clean change a High one claims a must-fix bug that isn't there
+        high_on_clean = case.get("clean") and f["severity"] == "high"
+        if high_on_clean or not any(matches(a, f["text"]) for a in case.get("acceptable", [])):
             unmatched.append(f)
     total = len(case["bugs"])
     return {
@@ -322,6 +332,93 @@ def score(case: Dict[str, Any], findings: List[Dict[str, str]]) -> Dict[str, Any
 # ------------------------------------------------------------------ report
 
 
+def summarize(results: Dict[str, Any], cases: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Totals per reviewer over the cases it ran."""
+    out = []
+    for r in REVIEWERS:
+        ran = [c for c in cases if r in results["cases"].get(c["name"], {})]
+        if not ran:
+            continue
+        runs = [results["cases"][c["name"]][r] for c in ran]
+        ok = [x for x in runs if "error" not in x]
+        out.append(
+            {
+                "reviewer": r,
+                "model": next((x["model"] for x in ok), ""),
+                "planted": sum(len(c["bugs"]) for c in ran),
+                "found": sum(len(x["score"]["found"]) for x in ok),
+                "alarms": sum(len(x["score"]["false_alarms"]) for x in ok),
+                "clean_cases": sum(1 for c in ran if c.get("clean")),
+                "unmatched": sum(len(x["score"]["unmatched"]) for x in ok),
+                "seconds": sum(x["seconds"] for x in ok),
+                "per_review": sum(x["seconds"] for x in ok) / max(1, len(ok)),
+                "cost": sum(x.get("cost_usd", 0) for x in ok),
+                "reviews": len(ok),
+                "failed": len(runs) - len(ok),
+            }
+        )
+    return out
+
+
+CHART_LABELS = {
+    "lint": ("ruff", "linter, bug + security rules"),
+    "local": ("One local model", "the council's largest, alone"),
+    "claude": ("Claude Code", "frontier cloud model, alone"),
+    "quorum": ("Quorum", "8 local models + the Coder"),
+}
+
+
+def _minutes(seconds: float) -> str:
+    if seconds < 1:
+        return "under 1 s"
+    return f"{seconds:.0f} s" if seconds < 90 else f"{seconds / 60:.0f} min"
+
+
+def chart_svg(summary: List[Dict[str, Any]], dark: bool) -> str:
+    """Planted bugs found per reviewer as horizontal bars, with false alarms, time and cost beside each."""
+    fg, sub, track, grey, accent = (
+        ("#f5f5f7", "#98989d", "#2c2c2e", "#8e8e93", "#0a84ff")
+        if dark
+        else ("#1d1d1f", "#6e6e73", "#ececf0", "#aeaeb2", "#0071e3")
+    )
+    w, left, bar_w, row = 780, 220, 290, 56
+    planted = max((s["planted"] for s in summary), default=0)
+    h = 70 + row * len(summary) + 18
+    font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}" font-family="{font}">',
+        f'<text x="0" y="22" font-size="17" font-weight="600" fill="{fg}">Planted bugs found</text>',
+        f'<text x="0" y="44" font-size="13" fill="{sub}">{planted} bugs planted in real-looking changes; '
+        "false alarms counted on clean changes</text>",
+    ]
+    for i, s in enumerate(summary):
+        y = 70 + i * row
+        name, note = CHART_LABELS.get(s["reviewer"], (s["reviewer"], ""))
+        share = s["found"] / s["planted"] if s["planted"] else 0
+        color = accent if s["reviewer"] == "quorum" else grey
+        cost = "$0 API" if not s["cost"] else f"${s['cost'] / max(1, s['reviews']):.2f}"
+        if not s["clean_cases"]:
+            alarms = "false alarms: not measured yet"
+        elif not s["alarms"]:
+            alarms = "no false alarms"
+        else:
+            alarms = f"{s['alarms']} false alarm{'s' * (s['alarms'] != 1)}"
+        weight = "700" if s["reviewer"] == "quorum" else "600"
+        parts += [
+            f'<text x="0" y="{y + 17}" font-size="14" font-weight="{weight}" fill="{fg}">{name}</text>',
+            f'<text x="0" y="{y + 35}" font-size="11.5" fill="{sub}">{note}</text>',
+            f'<rect x="{left}" y="{y + 6}" width="{bar_w}" height="22" rx="6" fill="{track}"/>',
+            f'<rect x="{left}" y="{y + 6}" width="{max(4, bar_w * share):.1f}" height="22" rx="6" fill="{color}"/>',
+            f'<text x="{left + bar_w + 12}" y="{y + 22}" font-size="14" font-weight="{weight}" fill="{fg}">'
+            f"{share:.0%}</text>",
+            f'<text x="{left + bar_w + 66}" y="{y + 16}" font-size="12" fill="{sub}">{alarms}</text>',
+            f'<text x="{left + bar_w + 66}" y="{y + 32}" font-size="12" fill="{sub}">'
+            f"{_minutes(s['per_review'])} per review · {cost}</text>",
+        ]
+    parts.append("</svg>")
+    return "\n".join(parts) + "\n"
+
+
 def report(results: Dict[str, Any], cases: List[Dict[str, Any]]) -> str:
     reviewers = [r for r in REVIEWERS if any(r in results["cases"].get(c["name"], {}) for c in cases)]
     lines = [
@@ -334,19 +431,11 @@ def report(results: Dict[str, Any], cases: List[Dict[str, Any]]) -> str:
         "| Reviewer | Planted bugs found | False alarms on clean changes | Unmatched findings (to judge) | Time | Cost |",
         "|---|---|---|---|---|---|",
     ]
-    for r in reviewers:
-        runs = [results["cases"][c["name"]][r] for c in cases if r in results["cases"].get(c["name"], {})]
-        ok = [x for x in runs if "error" not in x]
-        planted = sum(len(case["bugs"]) for case in cases if r in results["cases"].get(case["name"], {}))
-        found = sum(len(x["score"]["found"]) for x in ok)
-        alarms = sum(len(x["score"]["false_alarms"]) for x in ok)
-        unmatched = sum(len(x["score"]["unmatched"]) for x in ok)
-        secs = sum(x["seconds"] for x in ok)
-        cost = sum(x.get("cost_usd", 0) for x in ok)
-        errors = f" ({len(runs) - len(ok)} failed)" if len(runs) != len(ok) else ""
+    for s in summarize(results, cases):
+        errors = f" ({s['failed']} failed)" if s["failed"] else ""
         lines.append(
-            f"| {r}{errors} | {found} of {planted} ({found / planted:.0%}) | {alarms} | {unmatched} | "
-            f"{secs / 60:.1f} min | ${cost:.2f} |"
+            f"| {s['reviewer']}{errors} | {s['found']} of {s['planted']} ({s['found'] / s['planted']:.0%}) | "
+            f"{s['alarms']} | {s['unmatched']} | {s['seconds'] / 60:.1f} min | ${s['cost']:.2f} |"
         )
     lines += ["", "Cost is API spend; local models cost $0 beyond electricity. Time is wall-clock for all cases.", ""]
     for c in cases:
@@ -450,6 +539,11 @@ def main() -> int:
     notes = out / "notes.md"  # by-hand judgments of unmatched findings, kept across reruns
     extra = f"\n{notes.read_text().strip()}\n" if notes.exists() else ""
     (out / "README.md").write_text(report(results, reported) + "\n" + extra)
+    # the chart's story: a linter, one local model, the same local models together, then a frontier model for scale
+    order = ["lint", "local", "quorum", "claude"]
+    summary = sorted(summarize(results, reported), key=lambda s: order.index(s["reviewer"]))
+    for dark in (False, True):
+        (out / f"chart-{'dark' if dark else 'light'}.svg").write_text(chart_svg(summary, dark))
     print(f"wrote {out / 'README.md'}")
     return 0
 

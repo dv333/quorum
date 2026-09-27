@@ -62,7 +62,7 @@ export default function Demo({ name }) {
           {done
             ? <button className="btn small" onClick={() => setRun((n) => n + 1)}>Replay</button>
             : <button className="btn small" onClick={() => { control.current.skip = true }}>Skip to answer</button>}
-          <a className="btn small primary" href="https://github.com/dv333/quorum#quick-start" target="_blank" rel="noreferrer">
+          <a className="btn small primary" href="https://github.com/dv333/quorum#get-started" target="_blank" rel="noreferrer">
             Run it yourself
           </a>
         </div>
