@@ -222,7 +222,11 @@ export default function App() {
   const mobileBar = (
     <div className="mobile-bar">
       <button className="icon-btn" onClick={() => setDrawer(true)} aria-label="Show questions">☰</button>
-      <div className="brand"><div className="mark"><span /><span /><span /></div><b>{config.app_name}</b></div>
+      <div className="brand">
+        <button className="brand-home" onClick={() => go('home')} aria-label={`${config.app_name} home`} title="Home">
+          <span className="mark"><span /><span /><span /></span><b>{config.app_name}</b>
+        </button>
+      </div>
       <button className="icon-btn" onClick={() => go('home')} aria-label="New conundrum">✎</button>
     </div>
   )

@@ -223,7 +223,9 @@ export default function Sidebar({ refreshKey, hiddenId, currentId, view, series,
   return (
     <aside className="sidebar" aria-label="Conundrums">
       <div className="brand">
-        <div className="mark"><span /><span /><span /></div><b>{appName}</b>
+        <button className="brand-home" onClick={onNew} aria-label={`${appName} home`} title="Home">
+          <span className="mark"><span /><span /><span /></span><b>{appName}</b>
+        </button>
         <div className="brand-actions">
           <button className={`icon-btn ${searching || query ? 'on' : ''}`} aria-label="Search conundrums" aria-expanded={searching || !!query}
             title="Search (⌘K)" onClick={() => (searching || query ? closeSearch() : openSearch())}>

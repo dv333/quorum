@@ -246,6 +246,10 @@ textarea.input { resize: vertical; }
 .mark.big.alive span { animation: breathe 5s ease-in-out infinite; }
 .mark.big.alive span:nth-child(2) { animation-delay: -1.6s; } .mark.big.alive span:nth-child(3) { animation-delay: -3.2s; }
 @keyframes breathe { 50% { transform: scale(1.08); } }
+.brand-home { all: unset; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; border-radius: 10px; padding: 3px 6px 3px 3px; margin: -3px -6px -3px -3px; transition: background 0.2s; }
+.brand-home:hover { background: var(--fill); }
+.brand-home:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 50%, transparent); outline-offset: 1px; }
+.brand-home .mark { display: block; }
 .brand-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .brand-actions .icon-btn { width: 30px; height: 30px; color: var(--text-2); }
 .brand-actions .icon-btn:hover { color: var(--text); }
