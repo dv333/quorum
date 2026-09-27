@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from backend import cli, mcp_server
+from backend import cli, coder, mcp_server
 
 
 def test_files_are_read_locally_capped_and_kept_inside_the_root(tmp_path, monkeypatch):
@@ -18,6 +18,44 @@ def test_files_are_read_locally_capped_and_kept_inside_the_root(tmp_path, monkey
     assert "File big.txt (truncated)" in text
     assert "(skipped blob.bin: binary)" in text and "(skipped missing.py: not found)" in text
     assert "outside" in text and "nope" not in text
+
+
+def test_asked_files_are_read_from_the_repository_the_caller_named(tmp_path, monkeypatch, backend):
+    repo = tmp_path / "Jax"
+    (repo / "Features").mkdir(parents=True)
+    (repo / "Features" / "spec.md").write_text("isEligible returns true when ...")
+    elsewhere = tmp_path / "server"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)  # the MCP server runs from its own checkout
+    monkeypatch.setattr(coder, "which", lambda: None)
+    backend["snaps"] += [snapshot("running")]
+    mcp_server.ask("Is this right?", files=[str(repo / "Features" / "spec.md")], repo_path=str(repo), wait_seconds=0)
+    question = backend["post"][0][1]["question"]
+    assert "isEligible returns true" in question and "skipped" not in question
+
+
+def test_attachments_share_one_budget_and_say_what_was_cut(tmp_path):
+    for name in ("a.md", "b.md", "c.md"):
+        (tmp_path / name).write_text(name[0] * 18_000)
+    text, manifest = mcp_server.attach(["a.md", "b.md", "c.md"], str(tmp_path), budget=30_000)
+    assert len(text) < 31_000 and text.startswith("Files attached (3):")
+    assert manifest == [
+        "a.md: included (18,000 characters)",
+        "b.md: cut to 12,000 characters",
+        "c.md: not included, over the 30,000-character limit for all files",
+    ]
+    assert "Attached files:\n- a.md: included" in mcp_server.with_manifest("Answer.", manifest)
+    assert mcp_server.with_manifest("Answer.", manifest[:1]) == "Answer."
+
+
+def test_with_a_coder_only_the_primary_file_goes_to_the_council(tmp_path):
+    (tmp_path / "spec.md").write_text("the requirement")
+    (tmp_path / "notes.md").write_text("n" * 50_000)
+    text, manifest = mcp_server.attach(["spec.md", "notes.md"], str(tmp_path), coder_reads=True)
+    assert "the requirement" in text and "nnnn" not in text
+    assert "- notes.md: in the repository; ask @Coder about it" in text
+    assert text.index("notes.md") < text.index("the requirement")  # the list comes first
+    assert manifest[1] == "notes.md: left for the Coder to read (50,000 characters)"
 
 
 def test_the_uncommitted_change_is_the_diff_under_review(tmp_path):

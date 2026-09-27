@@ -75,11 +75,18 @@ def ask_prompt(question: str, request: str, asked_by: Optional[str]) -> str:
     return ASK.format(question=question.strip()[:1500], request=request.strip(), asked_by=asked_by or "the user")
 
 
-def command(cli: str, prompt: str, repo: str) -> List[str]:
+# A reasoning effort every Codex version understands, for when the user's config names one this Codex doesn't
+CODEX_SAFE_EFFORT = "high"
+_BAD_CONFIG = re.compile(r"config\.toml|unknown variant|expected one of", re.I)
+
+
+def command(cli: str, prompt: str, repo: str, effort: Optional[str] = None) -> List[str]:
     if cli == "claude":
         return ["claude", "-p", prompt, "--allowedTools", CLAUDE_TOOLS, "--output-format", "text", "--max-turns", "20"]
     if cli == "codex":
-        return ["codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check", "-C", repo, prompt]
+        # effort overrides the user's config for this one run only; their config file is never changed
+        override = ["-c", f'model_reasoning_effort="{effort}"'] if effort else []
+        return ["codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check", *override, "-C", repo, prompt]
     raise CoderError(f"Unknown coding agent: {cli}")
 
 
@@ -106,9 +113,34 @@ async def run(cli: str, prompt: str, repo: str, timeout: float = TIMEOUT_S) -> T
     fails, times out, or changes the repository."""
     before = await _git_state(repo)
     started = time.monotonic()
+    code, out, detail = await _exec(command(cli, prompt, repo), repo, cli, timeout)
+    if code != 0 and cli == "codex" and _BAD_CONFIG.search(detail):
+        # An older Codex can't read a setting in the user's config (e.g. model_reasoning_effort = "ultra"): try once
+        # with a value it knows, for this run only
+        code, out, detail = await _exec(command(cli, prompt, repo, CODEX_SAFE_EFFORT), repo, cli, timeout)
+        if code != 0 and _BAD_CONFIG.search(detail):
+            raise CoderError(
+                f"Codex can't load its settings (~/.codex/config.toml): {detail[-200:]}. Fix that setting or update "
+                "Codex, or set QUORUM_CODER=claude to use Claude Code instead"
+            )
+    if code != 0:
+        if re.search(r"not logged in|/login|unauthori[sz]ed|authenticat", detail, re.I):
+            raise CoderError(f"{label(cli)} isn't signed in: run `{cli}` in a terminal and sign in, then ask again")
+        raise CoderError(f"{label(cli)} failed: {detail or f'exit code {code}'}")
+    after = await _git_state(repo)
+    if before is not None and after != before:
+        raise CoderError(f"{label(cli)} changed the repository, so its answer was discarded; check `git status`")
+    text = out.decode(errors="replace").strip()
+    if len(text) > MAX_ANSWER_CHARS:
+        text = text[:MAX_ANSWER_CHARS] + "…"
+    return text, {"cli": cli, "duration_ms": int((time.monotonic() - started) * 1000)}
+
+
+async def _exec(cmd: List[str], repo: str, cli: str, timeout: float) -> Tuple[int, bytes, str]:
+    """Run one command in the repo: its exit code, output, and the tail of its error text."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            *command(cli, prompt, repo),
+            *cmd,
             cwd=repo,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
@@ -125,18 +157,8 @@ async def run(cli: str, prompt: str, repo: str, timeout: float = TIMEOUT_S) -> T
     except asyncio.CancelledError:
         proc.kill()
         raise
-    if proc.returncode != 0:
-        detail = (err.decode(errors="replace").strip() or out.decode(errors="replace").strip())[-400:]
-        if re.search(r"not logged in|/login|unauthori[sz]ed|authenticat", detail, re.I):
-            raise CoderError(f"{label(cli)} isn't signed in: run `{cli}` in a terminal and sign in, then ask again")
-        raise CoderError(f"{label(cli)} failed: {detail or f'exit code {proc.returncode}'}")
-    after = await _git_state(repo)
-    if before is not None and after != before:
-        raise CoderError(f"{label(cli)} changed the repository, so its answer was discarded; check `git status`")
-    text = out.decode(errors="replace").strip()
-    if len(text) > MAX_ANSWER_CHARS:
-        text = text[:MAX_ANSWER_CHARS] + "…"
-    return text, {"cli": cli, "duration_ms": int((time.monotonic() - started) * 1000)}
+    detail = (err.decode(errors="replace").strip() or out.decode(errors="replace").strip())[-400:]
+    return proc.returncode, out, detail
 
 
 # ------------------------------------------------------------------ checking what it cites

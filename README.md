@@ -186,8 +186,9 @@ says who you're waiting on. Waiting never counts against an agent's time limit, 
 <summary><b>Can I use ChatGPT, Claude or Gemini models?</b></summary>
 
 Yes, as council members: add OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, Together, DeepSeek or any
-OpenAI-compatible API in *Settings* with your own key. Cloud models are never picked automatically. (ChatGPT itself
-can't call Quorum as a tool yet: it only connects to servers at a public web address.)
+OpenAI-compatible API in *Settings* with your own key. Cloud models are never picked automatically. ChatGPT itself
+isn't supported as an MCP client yet: it only connects to MCP servers at a public HTTPS address, and Quorum's server
+runs on your computer (stdio).
 </details>
 
 ## Features
@@ -384,12 +385,18 @@ Debates take minutes, so tools wait up to `wait_seconds` and otherwise return th
 it live; `mode: "quick"` (one round, three models) usually answers within one call. Files and diffs are read on your
 machine and never modified.
 
+With `repo_path`, files are read from that repository (and only from inside it), the same boundary the Coder gets.
+All attached files together are capped at 40,000 characters, the first file being the primary one; when a Coder is
+set up, only the primary file goes to the council and the rest are listed for the Coder to read when asked. The reply
+says which files were cut, skipped or left for the Coder. For big documents, attach the one that matters and ask one
+narrow question per conundrum.
+
 You don't need to keep Quorum open: when the engine isn't running, the first tool call starts it in the background
 (its log is `data/mcp-backend.log`; set `QUORUM_MCP_AUTOSTART=0` to turn this off). Run `./start.sh` when you want
 the app to watch debates live; tool results only link to it when it's open.
 
-**ChatGPT isn't supported yet.** ChatGPT connects only to MCP servers at a public HTTPS address, and Quorum's server
-runs on your computer over stdio. Design notes are in [docs/design/mcp-server.md](docs/design/mcp-server.md).
+**ChatGPT isn't supported yet:** it only connects to MCP servers at a public HTTPS address, and Quorum's server runs
+on your computer (stdio). Design notes are in [docs/design/mcp-server.md](docs/design/mcp-server.md).
 
 </details>
 
@@ -478,6 +485,9 @@ See [.env.example](.env.example) for the full list.
 
 The backend isn't running. Start everything with `./start.sh`. If port 8002 is taken, stop the other program or set
 `LLC_PORT` (and update `frontend/vite.config.js`).
+
+This message is expected if you started with `./start.sh --demo` but opened the normal app instead of
+http://localhost:5173/#demo.
 </details>
 
 <details>
