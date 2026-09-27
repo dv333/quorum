@@ -517,7 +517,16 @@ function WebSearchTab() {
   )
 }
 
-export default function Settings({ mobileBar, onRunSetup }) {
+export default function Settings({ mobileBar, onRunSetup, onClose }) {
+  // Esc goes back, unless it's closing something inside Settings (a field, a menu)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.target.closest?.('input, textarea, select, [role="dialog"]')) return
+      onClose?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
   const [tab, setTab] = useState(() => (window.location.hash.split('/')[1] || 'models'))
   const [inv, setInv] = useState(null)
   const [catalog, setCatalog] = useState([])
@@ -550,6 +559,13 @@ export default function Settings({ mobileBar, onRunSetup }) {
                 {inv && <> · {inv.system.label} · {formatGB(inv.system.usable_bytes)} available for local models</>}
               </p>
             </div>
+            {onClose && (
+              <button className="icon-btn settings-close" onClick={onClose} aria-label="Close Settings" title="Close (Esc)">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
           </div>
           <div className="tabs-line" role="tablist" aria-label="Settings sections">
             {TABS.map(([k, label]) => (

@@ -6,7 +6,7 @@ import { formatElapsed, useNow } from '../time'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
-import { AgentMessage, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
+import { AgentMessage, AgentTip, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
 const INTAKE = ['intake', 'clarifying', 'confirming']
 const focusComposer = () => window.dispatchEvent(new Event('quorum:focus-composer'))
@@ -141,15 +141,20 @@ function MiniSeats({ seats, stances, speakingSeatIds, debate, beagleBusy, search
         const status = picking ? 'choosing the chair' : speaking ? 'speaking' : st ? STANCE_LABEL[st] : 'waiting'
         const who = seat.role ? `${seat.handle}, ${seat.role}` : seat.handle
         return (
-          <span className={`mini-seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${who} · ${modelShort(seat.model)} · ${status}`}>
-            <Orb handle={seat.handle} speaking={speaking} chair={seat.handle === debate.chair_handle} />
+          <span className={`mini-seat ${speaking ? 'on' : ''}`} key={seat.id} aria-label={`${who} · ${modelShort(seat.model)} · ${status}`}>
+            <AgentTip handle={seat.handle} role={seat.role} model={seat.model} note={status} chair={seat.handle === debate.chair_handle} focusable>
+              <Orb handle={seat.handle} speaking={speaking} chair={seat.handle === debate.chair_handle} />
+            </AgentTip>
             {st && !speaking && <i className={`mini-st dot ${st.toLowerCase()}`} aria-hidden="true" />}
           </span>
         )
       })}
       {debate.research_enabled && (
-        <span className={`mini-seat ${beagleBusy ? 'on' : ''}`} title={`${RESEARCHER} · ${modelShort(debate.researcher_model)} · ${beagleBusy ? 'searching' : `${searches} searches`}`}>
-          <Orb handle={RESEARCHER} speaking={beagleBusy} />
+        <span className={`mini-seat ${beagleBusy ? 'on' : ''}`}>
+          <AgentTip handle={RESEARCHER} role="Web research" model={debate.researcher_model}
+            note={beagleBusy ? 'searching' : `${searches} search${searches === 1 ? '' : 'es'}`} focusable>
+            <Orb handle={RESEARCHER} speaking={beagleBusy} />
+          </AgentTip>
         </span>
       )}
     </div>
@@ -173,8 +178,10 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           const speaking = speakingSeatIds.has(seat.id) || picking
           const st = stances[i]
           return (
-            <div className={`seat ${speaking ? 'on' : ''}`} key={seat.id} title={`${seat.handle} · ${seat.model}`}>
-              <Orb handle={seat.handle} size="lg" speaking={speaking} chair={seat.handle === debate.chair_handle} />
+            <div className={`seat ${speaking ? 'on' : ''}`} key={seat.id}>
+              <AgentTip handle={seat.handle} role={seat.role} model={seat.model} chair={seat.handle === debate.chair_handle} focusable>
+                <Orb handle={seat.handle} size="lg" speaking={speaking} chair={seat.handle === debate.chair_handle} />
+              </AgentTip>
               <b>{seat.handle}</b>
               {seat.role && <small className="seat-role" title={seat.role_focus || seat.role}>{seat.role}</small>}
               <small className="mdl">({modelShort(seat.model)})</small>
@@ -185,8 +192,10 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
           )
         })}
         {debate.research_enabled && (
-          <div className={`seat ${beagleBusy ? 'on' : ''}`} title={`${RESEARCHER} · web search using ${debate.researcher_model}`}>
-            <Orb handle={RESEARCHER} size="lg" speaking={beagleBusy} />
+          <div className={`seat ${beagleBusy ? 'on' : ''}`}>
+            <AgentTip handle={RESEARCHER} role="Web research" model={debate.researcher_model} focusable>
+              <Orb handle={RESEARCHER} size="lg" speaking={beagleBusy} />
+            </AgentTip>
             <b>{RESEARCHER}</b>
             <small className="mdl">({modelShort(debate.researcher_model)})</small>
             <span className="st">{beagleBusy ? 'searching…' : `${searches} search${searches === 1 ? '' : 'es'}`}</span>
@@ -205,12 +214,12 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
         return (
           <button className="consensus-pill" onClick={jump} title="Jump to this round">
             <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>
-            <TotalTime since={askedAt(messages, debate)} />
             <span className="cp-dots" aria-hidden="true">{stances.map((s, i) => <i key={i} className={`dot ${s ? s.toLowerCase() : 'idle'}`} />)}</span>
             {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
           </button>
         )
       })()}
+      <TotalTime since={askedAt(messages, debate)} />
       <button className="icon-btn stage-toggle" onClick={toggleCompact} aria-expanded={!compact}
         aria-label={compact ? 'Show agent details' : 'Compact view'} title={compact ? 'Show agent details' : 'Compact view'}>
         <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
@@ -243,7 +252,14 @@ function TotalTime({ since }) {
   const now = useNow(!!since)
   if (!since) return null
   const total = formatElapsed(now - new Date(since).getTime())
-  return <span className="cp-time" title="Total time since you asked" aria-label={`${total} since you asked`}>{total}</span>
+  return (
+    <span className="stage-time" role="timer" title="Total time since you asked" aria-label={`${total} since you asked`}>
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <circle cx="10" cy="11" r="7" /><path d="M10 7.5V11l2.5 1.5M8 2.5h4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {total}
+    </span>
+  )
 }
 
 
