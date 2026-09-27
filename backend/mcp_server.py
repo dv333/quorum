@@ -428,9 +428,11 @@ def build_server():
         repo_path: str = "",
     ) -> str:
         """Ask Quorum's council of local models for a second opinion on a decision or question. files: paths to
-        include as context (read locally, size-capped). repo_path: a repository the council's Coder (Claude Code or
-        Codex, read-only) can read to answer questions about the code. mode: quick (one round, three models, usually
-        answers within one call), standard or deep. research: let the council search the web and check its claims.
+        include as context, the most important first (read locally, 40,000 characters in all; with repo_path they're
+        read from inside that repository, and with a Coder only the first goes to the council while the Coder reads
+        the rest on request). repo_path: a repository the council's Coder (Claude Code or Codex, read-only) can read
+        to answer questions about the code. Ask one narrow question per call. mode: quick (one round, three models,
+        usually answers within one call), standard or deep. research: let the council search the web and check its claims.
         Returns the answer, or the conundrum id and a link if it isn't done within wait_seconds (then call
         quorum_result)."""
         return await asyncio.to_thread(
