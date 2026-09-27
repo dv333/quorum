@@ -347,7 +347,9 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
 def search_is_down(e: Exception) -> bool:
     """Errors that won't fix themselves within a run: no server, no key, no credits or quota left."""
     msg = str(e).lower()
-    return any(s in msg for s in ("reach", "api key", "http 402", "credits", "quota", "http 401", "http 403"))
+    return any(
+        s in msg for s in ("reach", "api key", "http 402", "credits", "quota", "http 401", "http 403", "blocking")
+    )
 
 
 _OPEN_CHOICE = re.compile(r"\b(which|best|recommend)\b", re.I)
@@ -745,6 +747,7 @@ class DebateEngine:
         self.research_queue: List[Dict[str, Any]] = []
         self._requests_per_round: Dict[Tuple[int, int], int] = {}
         self._search_down: Optional[str] = None
+        self._search_notice = False  # the "search is unavailable" note was posted in this run
         self._research_pages: Dict[int, List[Dict[str, Any]]] = {}  # pages Beagle read, per topic, for the claim check
         self._shortlist: Dict[int, List[str]] = {}  # options the research names, for choice questions
         self._concluding = False
@@ -945,7 +948,8 @@ class DebateEngine:
         await self._cancel_task()
 
     def _start(self, coro: Awaitable[None]) -> None:
-        self._search_down = None  # retry web search on every new run
+        self._search_down = firecrawl.down()  # known down (no credits, unreachable): don't wait on it again
+        self._search_notice = False
         self.task = asyncio.create_task(self._guard(coro))
 
     async def _guard(self, coro: Awaitable[None]) -> None:
@@ -1754,6 +1758,21 @@ class DebateEngine:
             self._requests_per_round[key] = self._requests_per_round.get(key, 0) + 1
             self._queue_research(request, seat["handle"], "request")
 
+    def _note_search_failed(self, e: Exception) -> None:
+        if search_is_down(e):
+            self._search_down = str(e)  # don't retry every request in this run
+            firecrawl.mark_down(str(e))  # nor in the next conundrum, for a while
+
+    def _search_unavailable(self) -> None:
+        """Say once per run that the council goes on without web search, and why."""
+        if not self._search_notice:
+            self._search_notice = True
+            self._system_message(
+                f"Web search is unavailable ({self._search_down}), so the council answers without it. "
+                "Check Research in Settings.",
+                meta={"kind": "search_down"},
+            )
+
     async def _drain_research(self, round_no: int) -> None:
         while self.research_queue:
             item = self.research_queue.pop(0)
@@ -1836,6 +1855,9 @@ class DebateEngine:
         """Plan searches, run them through Firecrawl, and stream a cited brief. Returns the brief."""
         d = self.debate()
         kind = item["kind"]
+        if self._search_down:
+            self._search_unavailable()
+            return None
         row = self._insert_message(
             topic=d["topic"],
             round_no=round_no,
@@ -1849,8 +1871,6 @@ class DebateEngine:
         self.partials[msg_id] = {"content": "", "thinking": ""}
         ep_id, model = self._researcher_model(d)
         try:
-            if self._search_down:
-                raise firecrawl.SearchError(self._search_down)
             think = await self._thinking_flag(ep_id, model, False)
             question = self._question(d["topic"])
             plan = prompts.research_plan_messages(item["request"], question, RESEARCH_MAX_QUERIES)
@@ -1943,8 +1963,7 @@ class DebateEngine:
             )
             raise
         except firecrawl.SearchError as e:
-            if search_is_down(e):
-                self._search_down = str(e)  # don't retry every request in this run
+            self._note_search_failed(e)
             self._finish_message(
                 msg_id, status="error", content=f"Web search failed: {e}", thinking=self.partials[msg_id]["thinking"]
             )
@@ -2171,6 +2190,9 @@ class DebateEngine:
         count. Returns the ledger (also stored, and posted in the thread as Beagle's fact-check)."""
         d = self.debate()
         topic = d["topic"]
+        if self._search_down:
+            self._search_unavailable()
+            return []
         row = self._insert_message(
             topic=topic,
             round_no=round_no,
@@ -2183,8 +2205,6 @@ class DebateEngine:
         self.partials[msg_id] = {"content": "", "thinking": ""}
         ep_id, model = self._researcher_model(d)
         try:
-            if self._search_down:
-                raise firecrawl.SearchError(self._search_down)
             summary = self._latest_summary(topic)
             self._log(msg_id, "Listing the claims the answer relies on…")
             text = await self._complete(
@@ -2331,8 +2351,7 @@ class DebateEngine:
             self._finish_message(msg_id, status="stopped")
             raise
         except firecrawl.SearchError as e:
-            if search_is_down(e):
-                self._search_down = str(e)
+            self._note_search_failed(e)
             self._finish_message(msg_id, status="error", content=f"Web search failed: {e}")
         except Exception as e:
             log.warning("claim check failed: %s", e)

@@ -555,9 +555,28 @@ async def test_search_outage_is_reported_once_per_run_and_debate_continues():
     await eng.post_user_message("Q")
     await eng.task
     errors = [m for m in researcher_messages() if m["status"] == "error"]
-    assert errors and all("Web search failed" in m["content"] for m in errors)
+    assert len(errors) == 1 and "Web search failed" in errors[0]["content"]
     assert len(search.queries) == 1  # later requests skip the dead service
+    notes = db.query("SELECT content FROM messages WHERE content LIKE 'Web search is unavailable%'")
+    assert len(notes) == 1 and "Settings" in notes[0]["content"]
     assert eng.debate()["status"] == "paused" and len(client.turn_calls()) == 3
+
+
+async def test_the_next_conundrum_remembers_that_search_is_down():
+    from backend.firecrawl import SearchError
+
+    client = FakeClient(lambda h, r, m: reply("REFINE", text=f"@Researcher: question from {h} here"))
+    search = FakeSearch(fail=SearchError("Firecrawl error (HTTP 402): Insufficient credits"))
+    eng = make_debate(client, research=True, autopilot=False, search=search)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert len(search.queries) == 1
+    db.execute("DELETE FROM seats")
+    db.execute("DELETE FROM debates")
+    later = make_debate(client, research=True, autopilot=False, search=search)
+    await later.post_user_message("Another question")
+    await later.task
+    assert len(search.queries) == 1  # not tried again: out of credits until the settings change
 
 
 async def test_empty_chair_answer_is_retried_then_reported():
