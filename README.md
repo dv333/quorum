@@ -443,7 +443,10 @@ Everything works out of the box. To change defaults, copy `.env.example` to `.en
 | `LLC_MAX_ROUNDS` | `3` | Rounds when the chair doesn't size the debate itself |
 | `LLC_NUM_CTX` | `8192` | Context window per model |
 | `LLC_MEMORY_RESERVE_GB` | `8` | Memory kept free for your OS and apps |
-| `LLC_REQUEST_TIMEOUT` | `600` | Seconds per model turn |
+| `LLC_REQUEST_TIMEOUT` | `600` | Seconds to wait for a model's next words before giving up |
+| `LLC_TURN_MAX_SECONDS` | `240` | Longest an agent's turn may take; what it wrote is kept, and a model that fails sits out the rest of the debate |
+| `LLC_TURN_MAX_TOKENS` | `4096` | Most an agent may write in one turn, thinking included |
+| `LLC_THINK_LATER_ROUNDS` | `0` | `1` lets agents think in every round, not only round 1 (slower) |
 
 See [.env.example](.env.example) for the full list.
 

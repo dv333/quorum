@@ -82,9 +82,10 @@ class ChatClient:
         think: Optional[bool] = None,
         num_ctx: Optional[int] = None,
         keep_alive: Optional[Any] = None,
+        num_predict: Optional[int] = None,
     ) -> AsyncIterator[Chunk]:
         if endpoint.kind == "ollama":
-            gen = self._stream_ollama(endpoint, model, messages, think, num_ctx, keep_alive)
+            gen = self._stream_ollama(endpoint, model, messages, think, num_ctx, keep_alive, num_predict)
         else:
             gen = self._stream_openai(endpoint, model, messages)
         async for chunk in gen:
@@ -98,12 +99,19 @@ class ChatClient:
                 parts.append(chunk.text)
         return "".join(parts)
 
-    async def _stream_ollama(self, ep, model, messages, think, num_ctx, keep_alive) -> AsyncIterator[Chunk]:
+    async def _stream_ollama(
+        self, ep, model, messages, think, num_ctx, keep_alive, num_predict=None
+    ) -> AsyncIterator[Chunk]:
         payload: Dict[str, Any] = {"model": model, "messages": messages, "stream": True}
         if think is not None:
             payload["think"] = think
+        options: Dict[str, Any] = {}
         if num_ctx:
-            payload["options"] = {"num_ctx": num_ctx}
+            options["num_ctx"] = num_ctx
+        if num_predict:
+            options["num_predict"] = num_predict  # thinking and reply together: a looping model stops here
+        if options:
+            payload["options"] = options
         if keep_alive is not None:
             payload["keep_alive"] = keep_alive
 

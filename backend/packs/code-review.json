@@ -21,6 +21,6 @@
       "qwen2.5-coder:14b",
       "qwen2.5-coder:7b"
     ],
-    "seats": 4
+    "seats": 5
   }
 }

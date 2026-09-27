@@ -240,7 +240,7 @@ BOTTOM LINE: <one sentence>
 - <key point>
 - <key point>
 - <key point>
-CHANGED: <one short sentence: what changed since your previous draft and whose argument changed it, or "First draft." if there is no previous draft>
+CHANGED: <one short sentence: what changed since your previous draft and whose argument changed it; "First draft." if there is no previous draft; "No change." if this round gave you no reason to change it>
 
 Keep it under 90 words. Change only what the debate gave you a reason to change.""",
         },
