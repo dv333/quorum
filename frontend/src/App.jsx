@@ -11,7 +11,7 @@ import { ResourceSheet } from './components/Resources'
 import Sidebar, { ComposeIcon, SidebarIcon } from './components/Sidebar'
 
 function sameLive(a, b) {
-  return a.length === b.length && a.every((d, i) => d.id === b[i].id && d.status === b[i].status && d.round === b[i].round && d.title === b[i].title)
+  return a.length === b.length && a.every((d, i) => d.id === b[i].id && d.status === b[i].status && d.round === b[i].round && d.title === b[i].title && d.interrupted === b[i].interrupted)
 }
 
 // Statuses worth watching: live debates and ones waiting for your answer
@@ -260,6 +260,7 @@ export default function App() {
         <ErrorBoundary resetKey={`${route.view}/${route.id}`}>
         {route.view === 'home' && (
           <Home config={config} mobileBar={mobileBar} onOpenSettings={() => go('settings')}
+            interrupted={live.filter((d) => d.interrupted && d.status === 'paused')} onInterruptedChanged={loadDebates}
             onCreated={(id) => { loadDebates(); refreshSidebar(); go('debate', id) }} />
         )}
         {route.view === 'debate' && route.id && (

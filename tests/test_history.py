@@ -88,3 +88,15 @@ async def test_answered_conundrums_say_how_long_the_answer_took():
     )
     rows = await main.list_debates(limit=2, before=None, after=None, q=None, ids=None, status=None, exclude=None)
     assert rows[0]["took_seconds"] == 672 and rows[1]["took_seconds"] is None
+
+
+async def test_a_restart_marks_live_conundrums_until_resumed_or_dismissed():
+    from backend import engine
+
+    engine.recover_after_restart()
+    rows = await main.list_debates(limit=None, before=None, after=None, q=None, ids="d03", status=None, exclude=None)
+    assert rows[0]["status"] == "paused" and rows[0]["interrupted"] == 1
+    await main.dismiss_interrupted()
+    rows = await main.list_debates(limit=None, before=None, after=None, q=None, ids="d03", status=None, exclude=None)
+    assert rows[0]["status"] == "paused" and rows[0]["interrupted"] == 0
+    engine._engines.clear()

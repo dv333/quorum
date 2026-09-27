@@ -611,6 +611,73 @@ async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_r
     assert len(client.turn_calls()) == turns  # no extra round
 
 
+async def test_a_restart_mid_turn_marks_the_debate_and_resume_asks_that_agent_again():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.gates["Koala"] = asyncio.Event()  # Koala is mid-turn, with nothing written yet, when Quorum restarts
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+    eng.task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await eng.task
+    db.execute("UPDATE debates SET status = 'running'")  # the process died: the status was never updated
+    del client.gates["Koala"]
+    engine_mod._engines.clear()
+    engine_mod.recover_after_restart()
+    d = db.query_one("SELECT * FROM debates")
+    assert d["status"] == "paused" and d["interrupted"] == 1
+    assert (
+        "Quorum restarted while this was running" in db.query("SELECT content FROM messages ORDER BY id")[-1]["content"]
+    )
+    eng = engine_mod.get_engine("d1")
+    eng.client, eng.meta_lookup, eng.plan_lookup = client, fake_meta, fake_plan
+    await eng.continue_()
+    await eng.task
+    assert eng.debate()["status"] == "concluded" and eng.debate()["interrupted"] == 0
+    assert len(client.turn_calls("Koala")) == 2  # cut off before it said anything, so it speaks again
+    assert len(client.turn_calls("Otter")) == 1
+    engine_mod._engines.clear()
+
+
+async def test_streamed_text_is_saved_while_it_arrives(monkeypatch):
+    monkeypatch.setattr(engine_mod, "CHECKPOINT_SECONDS", 0)
+    client = FakeClient(lambda h, r, m: reply("REFINE", text="A long reply " * 5))
+    eng = make_debate(client, seats=2, max_rounds=1)
+    saved = []
+    real_update = db.update
+
+    def spy(table, row_id, **fields):
+        if table == "messages" and set(fields) == {"content", "thinking"}:
+            saved.append(fields["content"])
+        return real_update(table, row_id, **fields)
+
+    monkeypatch.setattr(engine_mod.db, "update", spy)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert len(saved) > 3 and saved[1].startswith("A long") and len(saved[-1]) > len(saved[1])
+
+
+async def test_an_answer_that_did_not_finish_is_written_again_after_a_restart():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    # As if Quorum restarted while the chair was writing
+    db.execute("DELETE FROM verdicts")
+    db.execute("UPDATE debates SET status = 'concluding', answer_pending = 'consensus'")
+    engine_mod._engines.clear()
+    engine_mod.recover_after_restart()
+    turns = len(client.turn_calls())
+    eng = engine_mod.get_engine("d1")
+    eng.client, eng.meta_lookup, eng.plan_lookup = client, fake_meta, fake_plan
+    await eng.continue_()
+    await eng.task
+    d = eng.debate()
+    assert d["status"] == "concluded" and d["answer_pending"] is None
+    assert len(client.turn_calls()) == turns and len(db.query("SELECT * FROM verdicts")) == 1
+    engine_mod._engines.clear()
+
+
 async def test_the_failure_note_names_what_timed_out(monkeypatch):
     client = FakeClient(lambda h, r, m: reply("AGREE"))
     eng = make_debate(client, seats=2, max_rounds=1)

@@ -67,6 +67,9 @@ INTAKE_WAITING = ("clarifying", "confirming")
 STOPPED = ("paused", "cancelled", "failed")  # stopped before an answer; any of them can be resumed
 
 
+CHECKPOINT_SECONDS = 5.0  # how often streamed text is saved while it arrives
+
+
 def estimate_tokens(text: str) -> int:
     return len(text) // 3 + 1
 
@@ -747,13 +750,9 @@ class DebateEngine:
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
-        self.waiting: Optional[str] = None
-        self._answer_failed: Optional[str] = (
-            None  # why the debate ended, when the chair then couldn't write the answer  # set while a model call waits its turn behind another debate
-        )
-        self._ctx_by_model: Dict[
-            str, int
-        ] = {}  # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
+        self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
+        # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
+        self._ctx_by_model: Dict[str, int] = {}
 
     # ------------------------------------------------------------------ state
 
@@ -866,7 +865,7 @@ class DebateEngine:
                     self._start(self._research_only(status))
                     return
                 topic = d["topic"] + 1
-                self._set(topic=topic, round=0, status="intake")
+                self._set(topic=topic, round=0, status="intake", answer_pending=None, interrupted=0)
                 self._insert_message(topic=topic, round_no=0, author_kind="user", content=content)
                 self._start(self._intake())
                 return
@@ -903,8 +902,10 @@ class DebateEngine:
         """Resume a paused, cancelled or failed debate where it stopped."""
         async with self._cmd_lock:
             if self.debate()["status"] in STOPPED and not self.is_running():
-                if self._answer_failed:  # the debate was done and only the answer failed: try the answer again
-                    self._start(self._conclude(self._answer_failed))
+                self._set(interrupted=0)
+                pending = self.debate()["answer_pending"]
+                if pending:  # the debate was done and only the answer didn't finish: write the answer again
+                    self._start(self._conclude(pending))
                     return
                 self._set(status="running")
                 self._start(self._run_rounds())
@@ -1166,7 +1167,12 @@ class DebateEngine:
                 d = self.debate()
                 await self._drain_research(d["round"])  # opening brief, or requests made while paused
                 round_no = d["round"]
-                spoken = {m["seat_id"] for m in self._round_messages(d["topic"], round_no)} | set(self._benched)
+                # A reply cut off before it said anything (a restart mid-turn) doesn't count: that agent speaks again
+                spoken = {
+                    m["seat_id"]
+                    for m in self._round_messages(d["topic"], round_no)
+                    if m["status"] != "stopped" or m["content"].strip()
+                } | set(self._benched)
                 if round_no == 0 or all(s["id"] in spoken for s in seats):
                     round_no += 1
                     self._set(round=round_no)
@@ -1268,8 +1274,13 @@ class DebateEngine:
         stats: Dict[str, Any] = {}
         ep = self._endpoint(endpoint_id)
         splitter = ThinkSplitter()  # defensive: route any inline <think> text to the thinking channel
+        saved = time.monotonic()
 
         def emit(content: str, thinking: str) -> None:
+            nonlocal saved
+            if time.monotonic() - saved >= CHECKPOINT_SECONDS:  # a restart keeps what was written so far
+                saved = time.monotonic()
+                db.update("messages", msg_id, content=partial["content"], thinking=partial["thinking"])
             if thinking:
                 partial["thinking"] += thinking
                 self.bus.publish({"type": "message_delta", "id": msg_id, "thinking": thinking})
@@ -2793,7 +2804,8 @@ class DebateEngine:
         self._concluding = True
         try:
             await self._refresh_mode()
-            self._set(status="concluding")
+            # Kept until the answer is written, so a failed, stopped or interrupted answer can be written again
+            self._set(status="concluding", answer_pending=reason)
             d = self.debate()
             topic = d["topic"]
             question = self._question(topic)
@@ -2883,13 +2895,12 @@ class DebateEngine:
                 self._finish_message(row["id"], status="error", content=f"The chair ({d['chair_model']}) failed: {e}")
                 # No answer is no answer: say so, with what timed out, instead of showing the debate as answered
                 self.partials.pop(row["id"], None)
-                self._answer_failed = reason
                 self._system_message(self._failure_note(d, str(e)))
                 self._set(status="failed")
                 return
             finally:
                 self.partials.pop(row["id"], None)
-            self._answer_failed = None
+            self._set(answer_pending=None)
             await self._audit_answer(row["id"], claims, studies)
             if is_code_debate(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
@@ -2987,7 +2998,12 @@ async def drop_engine(debate_id: str) -> None:
 
 
 def recover_after_restart() -> None:
-    """Debates interrupted by a server restart resume as paused (research-only lookups return to concluded)."""
+    """Debates interrupted by a server restart resume as paused (research-only lookups return to concluded), marked
+    as interrupted so the app can offer to resume them."""
     db.execute("UPDATE messages SET status = 'stopped' WHERE status = 'streaming'")
     db.execute("UPDATE debates SET status = 'concluded' WHERE status = 'researching'")
-    db.execute("UPDATE debates SET status = 'paused' WHERE status IN ('running', 'voting', 'concluding', 'intake')")
+    live = db.query("SELECT id FROM debates WHERE status IN ('running', 'voting', 'concluding', 'intake')")
+    for row in live:
+        eng = get_engine(row["id"])
+        eng._set(status="paused", interrupted=1)
+        eng._system_message("Quorum restarted while this was running. Resume to pick up where it stopped.")

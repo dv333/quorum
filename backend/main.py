@@ -377,7 +377,7 @@ async def list_debates(
 
 def _debate_rows(where: str, params: List[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
     rows = db.query(
-        "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, "
+        "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, d.interrupted, "
         "(SELECT COUNT(*) FROM seats s WHERE s.debate_id = d.id) AS seat_count, "
         "(SELECT m.created_at FROM messages m WHERE m.debate_id = d.id AND m.topic = d.topic AND m.author_kind = 'user' "
         " ORDER BY m.id LIMIT 1) AS asked_at, "
@@ -613,6 +613,13 @@ async def post_intake_confirm(debate_id: str):
 async def post_continue(debate_id: str):
     _require_debate(debate_id)
     await get_engine(debate_id).continue_()
+    return {"ok": True}
+
+
+@app.post("/api/debates/interrupted/dismiss")
+async def dismiss_interrupted():
+    """Stop offering to resume the conundrums a restart interrupted; they stay paused."""
+    db.execute("UPDATE debates SET interrupted = 0 WHERE interrupted = 1")
     return {"ok": True}
 
 

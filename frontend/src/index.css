@@ -332,6 +332,10 @@ textarea.input { resize: vertical; }
 
 /* ---------------------------------------------------------------- home */
 .home { flex: 1; overflow-y: auto; display: flex; flex-direction: column; align-items: center; padding: 8vh 24px 40px; }
+.interrupted { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 640px;
+  margin: 0 0 4vh; padding: 10px 14px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline), 0 1px 3px rgba(0, 0, 0, 0.06);
+  font-size: 14px; color: var(--text-2); animation: rise .25s ease both; }
+.interrupted > span { flex: 1 1 240px; }
 .home-hero { display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 680px; margin: auto 0; }
 .home h1 { font: 700 48px/1.05 var(--display); letter-spacing: -0.03em; margin: 18px 0 0; }
 .tagline { font: 400 20px var(--display); color: var(--text-2); margin: 8px 0 34px; letter-spacing: -0.01em; }

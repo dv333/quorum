@@ -152,6 +152,8 @@ CREATE INDEX IF NOT EXISTS idx_debates_created ON debates(created_at);
 MIGRATIONS = [
     # 1 when the caller asked for a number of rounds: the chair's intake then leaves it alone
     ("debates", "rounds_fixed", "INTEGER NOT NULL DEFAULT 0"),
+    ("debates", "interrupted", "INTEGER NOT NULL DEFAULT 0"),  # paused by a server restart, not by the user
+    ("debates", "answer_pending", "TEXT"),  # why the debate ended, until its answer is written
     ("debates", "research_enabled", "INTEGER NOT NULL DEFAULT 0"),
     ("debates", "researcher_endpoint_id", "INTEGER"),
     ("debates", "researcher_model", "TEXT"),
