@@ -8,7 +8,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import db
-from .config import AUTO_COUNCIL_MAX, AUTO_COUNCIL_MIN, DEFAULT_NUM_CTX, HANDLES
+from .config import AUTO_COUNCIL_MAX, AUTO_COUNCIL_MIN, DEFAULT_NUM_CTX, HANDLES, SLOW_TURN_SECONDS
 from .hardware import GB, detect_system, estimate_model_bytes, fit_label, plan_council
 from .providers import Endpoint, endpoint_status, list_models, loaded_models
 
@@ -186,6 +186,34 @@ def _suits(model: str, prefer: List[str]) -> bool:
     return any(p in name for p in prefer)
 
 
+def turn_seconds(limit: int = 400) -> Dict[str, float]:
+    """Each model's typical (median) debate turn in seconds, from recent debates on this machine."""
+    rows = db.query(
+        "SELECT model, duration_ms FROM usage WHERE kind = 'turn' AND duration_ms > 0 ORDER BY id DESC LIMIT ?", [limit]
+    )
+    by_model: Dict[str, List[float]] = {}
+    for r in rows:
+        by_model.setdefault(r["model"], []).append(r["duration_ms"] / 1000)
+    out = {}
+    for model, secs in by_model.items():
+        if len(secs) >= 3:
+            secs.sort()
+            out[model] = secs[len(secs) // 2]
+    return out
+
+
+def drop_slow(candidates: List[Dict[str, Any]], keep: int, speeds: Dict[str, float]) -> List[Dict[str, Any]]:
+    """Leave out models whose turns take far longer than the rest (over SLOW_TURN_SECONDS and twice the typical turn),
+    as long as `keep` models remain: one slow model can take a third of a debate's time."""
+    known = sorted(speeds[m["model"]] for m in candidates if m["model"] in speeds)
+    if not known:
+        return candidates
+    typical = known[len(known) // 2]
+    slow = [m for m in candidates if speeds.get(m["model"], 0) > max(SLOW_TURN_SECONDS, 2 * typical)]
+    fast = [m for m in candidates if m not in slow]
+    return fast if len(fast) >= keep else candidates
+
+
 def pick_council_for_pack(
     models: List[Dict[str, Any]], usable_bytes: int, prefs: Optional[Dict[str, Any]]
 ) -> Tuple[List[Dict[str, Any]], List[str]]:
@@ -199,9 +227,11 @@ def pick_council_for_pack(
         return pick_council(models, usable_bytes), []
     candidates = pick_council(models, usable_bytes, max_size=len(models), min_size=0)
     specialists = [m for m in candidates if _suits(m["model"], prefs["prefer"])]
-    if not specialists:
-        return pick_council(models, usable_bytes), []
     size = prefs.get("seats", 4)
+    if not specialists:
+        # No specialist installed: still a council of the pack's size, the largest models that aren't far slower
+        chosen = drop_slow(candidates, min(size, len(candidates)), turn_seconds())[:size]
+        return pick_council(chosen, usable_bytes, max_size=size), []
     chosen = specialists[:size]
     chosen += [m for m in candidates if m not in chosen][: max(0, size - len(chosen))]
     chosen.sort(key=lambda m: m["est_bytes"] or 0, reverse=True)  # the largest member still picks the chair

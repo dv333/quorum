@@ -28,7 +28,12 @@ from .config import (
     RESEARCH_MAX_SOURCES,
     RESEARCH_SOURCES_PER_CLAIM,
     CODER_REQUESTS_PER_ROUND,
+    ANSWER_MAX_SECONDS,
+    ANSWER_MAX_TOKENS,
     REVIEW_MAX_ADDED,
+    THINK_AFTER_FIRST_ROUND,
+    TURN_MAX_SECONDS,
+    TURN_MAX_TOKENS,
     REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
@@ -469,6 +474,10 @@ def _ledger_markdown(claims: List[Dict[str, Any]], sources: List[Dict[str, str]]
     return "\n".join(lines)
 
 
+# The chair's draft note when a round changed nothing ("No change.", "Nothing changed", "Unchanged: ...")
+NO_CHANGE_RE = re.compile(
+    r"\s*[*_\"']*(no (material |substantive |real )?changes?|nothing( changed)?|unchanged)\b", re.I
+)
 _EVIDENCE_Q = re.compile(r"\b(evidence|studies|study|research|trials?|meta-?analys\w*|scientific|science)\b", re.I)
 _FILLER = set(
     "what does do did the a an of for to in on and or vs versus is are be say says show shows about how which better "
@@ -717,6 +726,10 @@ class DebateEngine:
         self._shortlist: Dict[int, List[str]] = {}  # options the research names, for choice questions
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
+        self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
+        self._ctx_by_model: Dict[
+            str, int
+        ] = {}  # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
 
     # ------------------------------------------------------------------ state
 
@@ -1113,11 +1126,11 @@ class DebateEngine:
                 d = self.debate()
                 await self._drain_research(d["round"])  # opening brief, or requests made while paused
                 round_no = d["round"]
-                spoken = {m["seat_id"] for m in self._round_messages(d["topic"], round_no)}
+                spoken = {m["seat_id"] for m in self._round_messages(d["topic"], round_no)} | set(self._benched)
                 if round_no == 0 or all(s["id"] in spoken for s in seats):
                     round_no += 1
                     self._set(round=round_no)
-                    pending = seats
+                    pending = [s for s in seats if s["id"] not in self._benched]
                 else:  # resume a round that was stopped midway
                     pending = [s for s in seats if s["id"] not in spoken]
 
@@ -1151,6 +1164,15 @@ class DebateEngine:
 
                 await self._maybe_summarize(round_no)
                 await self._write_draft(round_no)
+                # Nobody disagrees and the round didn't change the chair's draft: more rounds would only repeat it
+                if (
+                    round_no >= MIN_ROUNDS_FOR_CONSENSUS
+                    and finished
+                    and not any(m["stance"] == "DISAGREE" for m in finished)
+                    and self._draft_unchanged(d["topic"], round_no)
+                ):
+                    reason = "converged"
+                    break
                 if not self.debate()["autopilot"]:
                     self._set(status="paused")
                     return
@@ -1160,6 +1182,13 @@ class DebateEngine:
                 self.bus.publish({"type": "debate_updated", "debate": self.debate()})
             raise
         await self._conclude(reason)
+
+    def _draft_unchanged(self, topic: int, round_no: int) -> bool:
+        """The chair's draft after this round says nothing changed."""
+        drafts = self._drafts(topic)
+        return (
+            bool(drafts) and drafts[-1]["round"] == round_no and bool(NO_CHANGE_RE.match(drafts[-1]["changed"] or ""))
+        )
 
     async def _thinking_flag(self, endpoint_id: int, model: str, wanted: Optional[bool]) -> Optional[bool]:
         """Only send 'think' to Ollama models that advertise the capability."""
@@ -1185,7 +1214,13 @@ class DebateEngine:
         actor: str,
         kind: str,
     ) -> Dict[str, Any]:
-        """Stream a reply into an existing message row, publishing deltas. Records usage; returns stats."""
+        """Stream a reply into an existing message row, publishing deltas. Records usage; returns stats.
+
+        A turn is limited in time and output (thinking included), with room for that output in the context window, so a
+        model that loops stops instead of stalling the debate; what it wrote before the limit is kept (stats "cut")."""
+        max_seconds, max_tokens = (
+            (TURN_MAX_SECONDS, TURN_MAX_TOKENS) if kind == "turn" else (ANSWER_MAX_SECONDS, ANSWER_MAX_TOKENS)
+        )
         started = time.monotonic()
         partial = self.partials.setdefault(msg_id, {"content": "", "thinking": ""})
         stats: Dict[str, Any] = {}
@@ -1200,17 +1235,32 @@ class DebateEngine:
                 partial["content"] += content
                 self.bus.publish({"type": "message_delta", "id": msg_id, "content": content})
 
-        async for chunk in self.client.stream(
-            ep, model, messages, think=think, num_ctx=self._num_ctx(messages), keep_alive=keep_alive
-        ):
-            if chunk.kind == "content":
-                emit(*splitter.feed(chunk.text))
-            elif chunk.kind == "thinking":
-                emit("", chunk.text)
-            elif chunk.kind == "done":
-                stats = chunk.stats
+        async def consume() -> None:
+            nonlocal stats
+            async for chunk in self.client.stream(
+                ep,
+                model,
+                messages,
+                think=think,
+                num_ctx=self._num_ctx(messages, max_tokens, model),
+                keep_alive=keep_alive,
+                num_predict=max_tokens,
+            ):
+                if chunk.kind == "content":
+                    emit(*splitter.feed(chunk.text))
+                elif chunk.kind == "thinking":
+                    emit("", chunk.text)
+                elif chunk.kind == "done":
+                    stats = chunk.stats
+
+        cut = False
+        try:
+            await asyncio.wait_for(consume(), max_seconds)
+        except asyncio.TimeoutError:
+            cut = True
+            log.warning("%s (%s) hit the %ss limit", actor, model, int(max_seconds))
         emit(*splitter.flush())
-        stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000)}
+        stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000), "cut": cut}
         stats["prompt_tokens"] = self._record(actor, model, kind, stats, messages)
         return stats
 
@@ -1227,13 +1277,27 @@ class DebateEngine:
         """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded."""
         started = time.monotonic()
         parts, stats = [], {}
-        async for chunk in self.client.stream(
-            self._endpoint(endpoint_id), model, messages, think=think, num_ctx=self._num_ctx(messages)
-        ):
-            if chunk.kind == "content":
-                parts.append(chunk.text)
-            elif chunk.kind == "done":
-                stats = chunk.stats
+
+        async def consume() -> None:
+            nonlocal stats
+            async for chunk in self.client.stream(
+                self._endpoint(endpoint_id),
+                model,
+                messages,
+                think=think,
+                num_ctx=self._num_ctx(messages, ANSWER_MAX_TOKENS, model),
+                num_predict=ANSWER_MAX_TOKENS,
+            ):
+                if chunk.kind == "content":
+                    parts.append(chunk.text)
+                elif chunk.kind == "done":
+                    stats = chunk.stats
+
+        try:
+            await asyncio.wait_for(consume(), ANSWER_MAX_SECONDS)
+        except asyncio.TimeoutError:
+            self._record(actor, model, f"{kind}-timeout", {"duration_ms": int((time.monotonic() - started) * 1000)})
+            raise RuntimeError(f"{actor} ({model}) took longer than {int(ANSWER_MAX_SECONDS // 60)} minutes") from None
         stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000)}
         self._record(actor, model, kind, stats, messages, topic=topic)
         return "".join(parts)
@@ -1291,6 +1355,7 @@ class DebateEngine:
                     "calls": 0,
                     "searches": 0,
                     "pages": 0,
+                    "lost_ms": 0,  # time spent on calls that failed or ran out of time, with nothing to show
                 },
             )
             if r["model"] not in a["models"]:
@@ -1298,12 +1363,14 @@ class DebateEngine:
             for k in ("duration_ms", "prompt_tokens", "output_tokens", "searches", "pages"):
                 a[k] += r[k]
             a["calls"] += 0 if r["kind"] == "search" else 1
+            if r["kind"].endswith(("-failed", "-timeout")):
+                a["lost_ms"] += r["duration_ms"]
         for a in actors.values():
             gen_s = a["duration_ms"] / 1000
             a["tok_per_s"] = round(a["output_tokens"] / gen_s, 1) if gen_s and a["output_tokens"] else None
         totals = {
             k: sum(a[k] for a in actors.values())
-            for k in ("duration_ms", "prompt_tokens", "output_tokens", "searches", "pages", "calls")
+            for k in ("duration_ms", "prompt_tokens", "output_tokens", "searches", "pages", "calls", "lost_ms")
         }
         return {"actors": list(actors.values()), "totals": totals}
 
@@ -1471,9 +1538,13 @@ class DebateEngine:
         )
         msg_id = row["id"]
         self.partials[msg_id] = {"content": "", "thinking": ""}
+        started = time.monotonic()
+        messages: List[Dict[str, str]] = []
         try:
             messages = self._turn_context(seat, round_no, exclude_id=msg_id)
-            think = await self._thinking_flag(seat["endpoint_id"], seat["model"], bool(seat["thinking_enabled"]))
+            # Think in round 1, where the independent views form; rebuttals answer without it (much faster)
+            wanted = bool(seat["thinking_enabled"]) and (round_no == 1 or THINK_AFTER_FIRST_ROUND)
+            think = await self._thinking_flag(seat["endpoint_id"], seat["model"], wanted)
             stats = await self._stream_into(
                 msg_id,
                 seat["endpoint_id"],
@@ -1486,8 +1557,27 @@ class DebateEngine:
             )
             partial = self.partials[msg_id]
             content = strip_thinking(partial["content"])
+            if not content.strip() and think and partial["thinking"].strip():
+                # It spent its whole turn thinking: one more try, answering straight away
+                self._log(msg_id, "(thought until the limit; answering without thinking)")
+                partial["content"] = ""
+                stats = await self._stream_into(
+                    msg_id,
+                    seat["endpoint_id"],
+                    seat["model"],
+                    messages,
+                    await self._thinking_flag(seat["endpoint_id"], seat["model"], False),
+                    self._keep_alive(seat, upcoming),
+                    seat["handle"],
+                    "turn",
+                )
+                content = strip_thinking(partial["content"])
             if not content.strip():
-                raise RuntimeError("returned an empty reply")
+                raise RuntimeError(
+                    f"no reply within {int(TURN_MAX_SECONDS // 60)} minutes"
+                    if stats.get("cut")
+                    else "returned an empty reply"
+                )
             st = parse_stance(content)
             self._finish_message(
                 msg_id,
@@ -1520,8 +1610,21 @@ class DebateEngine:
             raise
         except Exception as e:
             log.warning("seat %s (%s) failed: %s", seat["handle"], seat["model"], e)
+            # The lost time shows in the metrics, and the seat sits out: a model that failed once usually fails again,
+            # and each failure can cost many minutes
+            self._record(
+                seat["handle"],
+                seat["model"],
+                "turn-failed",
+                {"duration_ms": int((time.monotonic() - started) * 1000)},
+                messages,
+            )
+            self._benched[seat["id"]] = str(e)
             self._finish_message(
-                msg_id, author_kind="system", status="error", content=f"{seat['handle']} ({seat['model']}) failed: {e}"
+                msg_id,
+                author_kind="system",
+                status="error",
+                content=f"{seat['handle']} ({seat['model']}) failed: {e}. {seat['handle']} sits out the rest of this debate.",
             )
         finally:
             self.partials.pop(msg_id, None)
@@ -1807,14 +1910,19 @@ class DebateEngine:
     def _handles(self) -> Dict[int, str]:
         return {s["id"]: s["handle"] for s in self.seats()}
 
-    def _num_ctx(self, messages: List[Dict[str, str]]) -> int:
-        """The debate's context size, grown in 4K steps (up to MAX_NUM_CTX) when the prompt would leave too little
-        room for the reply; otherwise a long answer prompt silently cuts the answer short."""
+    def _num_ctx(
+        self, messages: List[Dict[str, str]], reserve: int = REPLY_RESERVE_TOKENS, model: Optional[str] = None
+    ) -> int:
+        """The debate's context size, grown in 4K steps (up to MAX_NUM_CTX) so the prompt leaves room for the whole
+        output (thinking included): when output runs past the window, Ollama drops the start of the prompt and the
+        model loses the question. Per model it never shrinks, since a new size makes Ollama reload the model."""
         base = self.debate()["num_ctx"]
-        need = sum(estimate_tokens(m["content"]) for m in messages) + REPLY_RESERVE_TOKENS
-        if need <= base:
-            return base
-        return max(base, min(MAX_NUM_CTX, -(-need // 4096) * 4096))
+        need = sum(estimate_tokens(m["content"]) for m in messages) + reserve
+        size = base if need <= base else max(base, min(MAX_NUM_CTX, -(-need // 4096) * 4096))
+        if model:
+            size = max(size, self._ctx_by_model.get(model, 0))
+            self._ctx_by_model[model] = size
+        return size
 
     def _budget(self) -> int:
         return int(self.debate()["num_ctx"] * CONTEXT_BUDGET_FRACTION)

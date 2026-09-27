@@ -55,6 +55,9 @@ function headline(verdict, finalStances, seatsCount, factChecked, chairName) {
   } else if (verdict.reason === 'consensus') {
     text = `All ${seatsCount} agreed in round ${verdict.rounds}`
     tone = 'agree'
+  } else if (verdict.reason === 'converged') {
+    text = `Settled after ${plural(verdict.rounds, 'round')}: the last one changed nothing`
+    tone = agreeN === seatsCount ? 'agree' : 'refine'
   } else if (verdict.reason === 'manual') {
     text = `You called it after ${plural(verdict.rounds, 'round')}`
     tone = agreeN === seatsCount ? 'agree' : 'refine'
@@ -98,7 +101,7 @@ function Behind({ metrics, seats, chairHandle, rounds }) {
           const models = a.models.filter((m) => m !== 'firecrawl').map(modelShort).join(', ')
           const detail = a.actor === RESEARCHER
             ? `${formatDuration(a.duration_ms)} · ${formatTokens(a.prompt_tokens + a.output_tokens)} tok · ${a.searches} searches`
-            : `${formatDuration(a.duration_ms)} · ${formatTokens(a.prompt_tokens + a.output_tokens)} tok${a.tok_per_s ? ` · ${Math.round(a.tok_per_s)} t/s` : ''}`
+            : `${formatDuration(a.duration_ms)} · ${formatTokens(a.prompt_tokens + a.output_tokens)} tok${a.tok_per_s ? ` · ${Math.round(a.tok_per_s)} t/s` : ''}${a.lost_ms ? ` · ${formatDuration(a.lost_ms)} lost to a failed turn` : ''}`
           return (
             <FragmentRow key={a.actor} actor={a.actor} chair={a.actor === chairHandle} models={models}
               width={(100 * a.duration_ms) / max} detail={detail}

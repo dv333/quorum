@@ -5,6 +5,8 @@ import re
 import pytest
 
 from backend import db
+from backend import engine as engine_mod
+from backend import inventory
 from backend.config import HANDLES, SEAT_COLORS
 from backend.engine import DebateEngine
 from backend.providers import ChatClient, Chunk
@@ -35,6 +37,7 @@ class FakeClient(ChatClient):
         self.revise_reply = "BOTTOM LINE: revised answer"
         self.verdict_reply = "VERDICT TEXT"
         self.review_gap_reply = '{"missing": []}'
+        self.draft_reply = None  # None: the verdict reply
         self.review_add_reply = "BOTTOM LINE: add back"
 
     def calls_with(self, marker):
@@ -65,6 +68,8 @@ class FakeClient(ChatClient):
             content, thinking = self.verify_reply(messages), ""
         elif sys.startswith("You audit an AI council"):
             content, thinking = self.audit_reply, ""
+        elif "keep a short draft" in sys and self.draft_reply is not None:
+            content, thinking = self.draft_reply, ""
         elif sys.startswith("You check an AI council's code review"):
             content, thinking = self.review_gap_reply, ""
         elif sys.startswith("You finish an AI council's code review"):
@@ -887,3 +892,112 @@ async def test_expert_rewrite_asks_for_a_diagram_only_at_expert_level():
     assert "Mermaid" not in client.calls[-1][1][1]["content"]
     await eng.rewrite_level(vid, "expert")
     assert 'add a "## Diagram" section' in client.calls[-1][1][1]["content"]
+
+
+# ------------------------------------------------------------ turn limits and speed
+
+
+async def test_a_turn_that_runs_too_long_is_stopped_and_the_seat_sits_out(monkeypatch):
+    monkeypatch.setattr(engine_mod, "TURN_MAX_SECONDS", 0.05)
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.gates["Koala"] = asyncio.Event()  # Koala never finishes: a model looping in its thinking
+    eng = make_debate(client, seats=3, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    errors = db.query("SELECT content FROM messages WHERE author_kind = 'system' AND status = 'error'")
+    assert len(errors) == 1 and "sits out the rest of this debate" in errors[0]["content"]
+    assert len(client.turn_calls("Koala")) == 1  # not asked again in round 2
+    assert len(client.turn_calls("Otter")) == 2
+    failed = db.query("SELECT * FROM usage WHERE kind = 'turn-failed'")
+    assert failed and failed[0]["actor"] == "Koala"
+
+
+async def test_turns_cap_their_output_and_leave_room_for_it(monkeypatch):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    _, kw = client.turn_calls("Otter")[0]
+    assert kw["num_predict"] == engine_mod.TURN_MAX_TOKENS
+    assert kw["num_ctx"] >= engine_mod.TURN_MAX_TOKENS
+
+
+async def test_agents_think_in_round_one_only():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    eng = make_debate(client, seats=3, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    thinks = [kw.get("think") for _, kw in client.turn_calls("Otter")]
+    assert thinks == [True, False]
+
+
+async def test_a_turn_spent_thinking_gets_one_answer_without_thinking():
+    def turn(h, r, m):
+        return ("", "thinking and thinking") if h == "Otter" and not turn.retried.get(h) else reply("AGREE")
+
+    turn.retried = {}
+    client = FakeClient(turn)
+    orig = client.stream
+
+    async def stream(endpoint, model, messages, **kw):
+        agent = AGENT_RE.search(messages[0]["content"])
+        if agent and kw.get("think") is False:
+            turn.retried[agent.group(1)] = True
+        async for chunk in orig(endpoint, model, messages, **kw):
+            yield chunk
+
+    client.stream = stream
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    otter = [m for m in db.query("SELECT * FROM messages WHERE author_kind = 'seat'") if m["seat_id"] == 1]
+    assert turn.retried.get("Otter") and otter and otter[0]["status"] == "done" and "My view." in otter[0]["content"]
+    assert not db.query("SELECT * FROM messages WHERE author_kind = 'system' AND status = 'error'")
+
+
+async def test_the_debate_stops_when_a_round_changes_nothing():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.draft_reply = "BOTTOM LINE: x\n- a\nCHANGED: No change."
+    eng = make_debate(client, seats=3, max_rounds=5)
+    await eng.post_user_message("Q")
+    await eng.task
+    verdict = db.query_one("SELECT * FROM verdicts")
+    assert verdict["reason"] == "converged" and verdict["rounds"] == 2
+
+
+async def test_a_disagreement_keeps_the_debate_going_even_if_the_draft_held():
+    client = FakeClient(lambda h, r, m: reply("DISAGREE" if h == "Otter" else "REFINE"))
+    client.draft_reply = "BOTTOM LINE: x\n- a\nCHANGED: No change."
+    eng = make_debate(client, seats=3, max_rounds=3)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert db.query_one("SELECT reason FROM verdicts")["reason"] == "max_rounds"
+
+
+def test_a_models_context_window_never_shrinks_mid_debate():
+    eng = make_debate(FakeClient(lambda h, r, m: reply("AGREE")), num_ctx=8192)
+    big = [{"role": "user", "content": "x " * 40000}]
+    small = [{"role": "user", "content": "hi"}]
+    grown = eng._num_ctx(big, 4096, "m")
+    assert grown > 8192 and eng._num_ctx(small, 4096, "m") == grown
+    assert eng._num_ctx(small, 4096, "other") == 8192
+
+
+def test_reviews_leave_out_models_far_slower_than_the_rest():
+    council = [{"model": m} for m in ("big-slow", "a", "b", "c", "d", "e")]
+    speeds = {"big-slow": 160, "a": 60, "b": 26, "c": 24, "d": 35, "e": 46}
+    assert [m["model"] for m in inventory.drop_slow(council, 5, speeds)] == ["a", "b", "c", "d", "e"]
+    assert len(inventory.drop_slow(council, 6, speeds)) == 6  # not enough others: keep everyone
+    assert inventory.drop_slow(council, 5, {"a": 200, "b": 190}) == council  # all slow alike: nothing stands out
+
+
+async def test_metrics_show_time_lost_to_failed_turns(monkeypatch):
+    monkeypatch.setattr(engine_mod, "TURN_MAX_SECONDS", 0.05)
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.gates["Koala"] = asyncio.Event()
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    m = eng.metrics(1)
+    koala = next(a for a in m["actors"] if a["actor"] == "Koala")
+    assert koala["lost_ms"] > 0 and m["totals"]["lost_ms"] == koala["lost_ms"]
