@@ -958,6 +958,60 @@ async def test_a_turn_that_runs_too_long_is_stopped_and_the_seat_sits_out(monkey
     assert failed and failed[0]["actor"] == "Koala"
 
 
+async def test_a_server_error_gets_one_more_try_without_thinking():
+    tries = {"Koala": 0}
+
+    def turn(h, r, m):
+        if h == "Koala" and r == 1:
+            tries["Koala"] += 1
+            if tries["Koala"] == 1:
+                raise RuntimeError("output does not match the expected peg")
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert not db.query("SELECT * FROM messages WHERE status = 'error'")
+    koala = client.turn_calls("Koala")
+    assert len(koala) == 2 and koala[0][1]["think"] is True and koala[1][1]["think"] is False
+    msg = db.query_one("SELECT m.* FROM messages m JOIN seats s ON s.id = m.seat_id WHERE s.handle = 'Koala'")
+    assert msg["status"] == "done" and "trying once more without thinking" in msg["thinking"]
+
+
+async def test_an_empty_reply_gets_one_more_try():
+    tries = []
+
+    def turn(h, r, m):
+        if h == "Koala":
+            tries.append(r)
+            if len(tries) == 1:
+                return "", ""
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert not db.query("SELECT * FROM messages WHERE status = 'error'")
+    assert len(client.turn_calls("Koala")) == 2
+
+
+async def test_a_seat_that_fails_twice_sits_out():
+    def turn(h, r, m):
+        if h == "Koala":
+            raise RuntimeError("HTTP 500")
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, seats=3, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    errors = db.query("SELECT content FROM messages WHERE author_kind = 'system' AND status = 'error'")
+    assert len(errors) == 1 and "sits out the rest of this debate" in errors[0]["content"]
+    assert len(client.turn_calls("Koala")) == 2  # one try and one retry in round 1, none in round 2
+
+
 async def test_a_turn_waiting_behind_another_debate_keeps_its_full_time(monkeypatch):
     monkeypatch.setattr(engine_mod, "TURN_MAX_SECONDS", 0.2)
     client = FakeClient(lambda h, r, m: reply("REFINE"))

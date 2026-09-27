@@ -1616,32 +1616,41 @@ class DebateEngine:
             # Think in round 1, where the independent views form; rebuttals answer without it (much faster)
             wanted = bool(seat["thinking_enabled"]) and (round_no == 1 or THINK_AFTER_FIRST_ROUND)
             think = await self._thinking_flag(seat["endpoint_id"], seat["model"], wanted)
-            stats = await self._stream_into(
-                msg_id,
-                seat["endpoint_id"],
-                seat["model"],
-                messages,
-                think,
-                self._keep_alive(seat, upcoming),
-                seat["handle"],
-                "turn",
-            )
             partial = self.partials[msg_id]
-            content = strip_thinking(partial["content"])
-            if not content.strip() and think and partial["thinking"].strip():
-                # It spent its whole turn thinking: one more try, answering straight away
-                self._log(msg_id, "(thought until the limit; answering without thinking)")
-                partial["content"] = ""
-                stats = await self._stream_into(
+
+            async def attempt(flag: Optional[Union[bool, str]]) -> Dict[str, Any]:
+                return await self._stream_into(
                     msg_id,
                     seat["endpoint_id"],
                     seat["model"],
                     messages,
-                    await self._thinking_flag(seat["endpoint_id"], seat["model"], False),
+                    flag,
                     self._keep_alive(seat, upcoming),
                     seat["handle"],
                     "turn",
                 )
+
+            retried = False
+            try:
+                stats = await attempt(think)
+            except Exception as e:
+                # A server error, or a reply the server couldn't parse (deepseek-r1's thinking sometimes trips
+                # Ollama's parser): one more try, answering straight away
+                log.warning("seat %s (%s) failed, retrying: %s", seat["handle"], seat["model"], e)
+                self._restart_reply(msg_id, f"({e}; trying once more without thinking)")
+                retried = True
+                stats = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False))
+            content = strip_thinking(partial["content"])
+            thought_too_long = think and partial["thinking"].strip()
+            if not content.strip() and not retried and (thought_too_long or not stats.get("cut")):
+                # It spent its whole turn thinking, or sent nothing at all: one more try, answering straight away
+                self._restart_reply(
+                    msg_id,
+                    "(thought until the limit; answering without thinking)"
+                    if thought_too_long
+                    else "(empty reply; trying once more)",
+                )
+                stats = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False))
                 content = strip_thinking(partial["content"])
             if not content.strip():
                 raise RuntimeError(
@@ -1797,6 +1806,14 @@ class DebateEngine:
         finally:
             db.update("debates", self.id, status=previous_status)
             self.bus.publish({"type": "debate_updated", "debate": self.debate()})
+
+    def _restart_reply(self, msg_id: int, note: str) -> None:
+        """Clear a reply before a second try, keeping a note of why in its thinking."""
+        partial = self.partials[msg_id]
+        partial["content"] = ""
+        partial["thinking"] += note + "\n"
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        self.bus.publish({"type": "message_updated", "message": serialize_message(row, partial)})
 
     def _log(self, msg_id: int, line: str) -> None:
         text = line + "\n"
