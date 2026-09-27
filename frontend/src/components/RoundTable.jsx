@@ -13,7 +13,7 @@ const STANCE = {
   DISAGREE: { label: 'disagrees', icon: 'M4.5 4.5l7 7m0-7-7 7' },
 }
 const ORB = 48 // px, the orb at the table; it shrinks to 30 in the line
-const LINE_H = 56
+export const LINE_H = 56 // the height of the table folded into a line
 const DESK_W = 212
 
 function StanceBadge({ stance }) {

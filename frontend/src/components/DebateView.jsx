@@ -6,7 +6,7 @@ import { formatElapsed, useNow } from '../time'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
-import RoundTable from './RoundTable'
+import RoundTable, { LINE_H } from './RoundTable'
 import { AgentMessage, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
 const INTAKE = ['intake', 'clarifying', 'confirming']
@@ -120,6 +120,15 @@ function Thread({ items, seatsById, debate, onIntake }) {
 
 // The stage's compact view is a per-viewer preference; storage can be unavailable (private windows)
 // The table folds into a line while you read further down, or always if you choose; the choice is remembered
+/** Whether the round table is folded into a line, given the scroll position: it folds past 90px and opens again near the
+ * top, with room between so it doesn't flicker. Folding makes the page shorter by `shrink` (the table's height less the
+ * line's), so it only folds when the reader is still past the top afterwards; otherwise the page springs back up, the
+ * table opens, and it folds again with every streamed word. */
+export function tableFolds(was, top, maxTop, shrink) {
+  if (was) return top > 8
+  return top > 90 && maxTop - shrink > 90
+}
+
 function useFoldedTable(scrolled) {
   const [pref, setPref] = useState(() => {
     try { return localStorage.getItem('quorum.table') || 'table' } catch { return 'table' }
@@ -546,8 +555,9 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
         onScroll={(e) => {
           const el = e.currentTarget
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
-          const top = el.scrollTop // the table folds past 90px and opens again near the top (no flicker in between)
-          setScrolled((was) => (was ? top > 8 : top > 90))
+          const table = el.querySelector('.rt:not(.folded)') // its target height, even mid-animation
+          const shrink = table ? Math.max(0, (parseFloat(table.style.height) || table.offsetHeight) - LINE_H) : 0
+          setScrolled((was) => tableFolds(was, el.scrollTop, el.scrollHeight - el.clientHeight, shrink))
           const card = answerRef.current?.firstElementChild
           let next = null
           if (live && !stickRef.current) next = 'latest'
