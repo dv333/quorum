@@ -1018,7 +1018,8 @@ class DebateEngine:
             rounds = int(choice.get("rounds"))
             # Questions about what the evidence says need at least one round of rebuttal
             floor = 2 if _EVIDENCE_Q.search(self._question(d["topic"])) else 1
-            self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
+            if not d.get("rounds_fixed"):  # a number of rounds the caller asked for (quick, deep) stands
+                self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
         except (TypeError, ValueError):
             pass
         if action == "direct" and is_code_debate(question, d["pack"], d.get("repo_path")):

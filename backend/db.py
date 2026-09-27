@@ -150,6 +150,8 @@ CREATE INDEX IF NOT EXISTS idx_debates_created ON debates(created_at);
 
 # Columns added after v1; applied to existing databases on connect
 MIGRATIONS = [
+    # 1 when the caller asked for a number of rounds: the chair's intake then leaves it alone
+    ("debates", "rounds_fixed", "INTEGER NOT NULL DEFAULT 0"),
     ("debates", "research_enabled", "INTEGER NOT NULL DEFAULT 0"),
     ("debates", "researcher_endpoint_id", "INTEGER"),
     ("debates", "researcher_model", "TEXT"),
