@@ -11,7 +11,7 @@ import logging
 import re
 import time
 from datetime import date
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 from . import coder, db, firecrawl, inventory, prompts
@@ -472,6 +472,23 @@ def _ledger_markdown(claims: List[Dict[str, Any]], sources: List[Dict[str, str]]
             line += f" “{c['quote']}”" + (f" [{n}]" if n else "")
         lines.append(line)
     return "\n".join(lines)
+
+
+_FINDING_LINE = re.compile(r"^\s*(?:[-*+•]|\d+[.)]|\|)\s*\S|^\s*\*\*[^*]{3,}\*\*")
+_CITES_CODE = re.compile(r"[\w./-]+\.\w{1,5}:\d+")
+
+
+def finding_lines(text: str) -> List[str]:
+    """The lines of an agent's message that read like findings: list items, table rows, bold-titled points and lines
+    citing file:line, without the stance lines, table rules and short fragments."""
+    out = []
+    for line in text.splitlines():
+        s = line.strip()
+        if len(s) < 25 or re.match(r"(STANCE|POSITION)\s*:", s, re.I) or re.fullmatch(r"[|:\-\s]+", s):
+            continue
+        if _FINDING_LINE.match(line) or _CITES_CODE.search(s):
+            out.append(s[:400])
+    return out
 
 
 # The chair's draft note when a round changed nothing ("No change.", "Nothing changed", "Unchanged: ...")
@@ -1190,8 +1207,9 @@ class DebateEngine:
             bool(drafts) and drafts[-1]["round"] == round_no and bool(NO_CHANGE_RE.match(drafts[-1]["changed"] or ""))
         )
 
-    async def _thinking_flag(self, endpoint_id: int, model: str, wanted: Optional[bool]) -> Optional[bool]:
-        """Only send 'think' to Ollama models that advertise the capability."""
+    async def _thinking_flag(self, endpoint_id: int, model: str, wanted: Optional[bool]) -> Optional[Union[bool, str]]:
+        """Only send 'think' to Ollama models that advertise the capability. gpt-oss can't turn thinking off (it
+        ignores false and reasons at length), so "off" means its lowest effort for it."""
         ep = self._endpoint(endpoint_id)
         if ep.kind != "ollama":
             return None
@@ -1201,6 +1219,8 @@ class DebateEngine:
             meta = None
         if not meta or not meta.get("thinking"):
             return None
+        if wanted is False and model.lower().startswith("gpt-oss"):
+            return "low"
         return wanted
 
     async def _stream_into(
@@ -2482,20 +2502,31 @@ class DebateEngine:
             return
         d = self.debate()
         handles = self._handles()
-        debate = [
-            m
-            for m in self._verbatim(row["topic"], 0)
-            if m["author_kind"] in ("seat", "researcher") and m["status"] == "done" and m["content"]
-        ]
-        parts: List[List[Dict[str, Any]]] = [[]]
-        for m in debate:
-            if parts[-1] and sum(len(x["content"]) for x in parts[-1]) + len(m["content"]) > REVIEW_PART_CHARS:
-                parts.append([])
-            parts[-1].append(m)
+        # Only what reads like a finding (list items, table rows, titled points, lines citing file:line), each once:
+        # the whole transcript took one slow call per 12K characters
+        lines: List[str] = []
+        seen_lines = set()
+        for m in self._verbatim(row["topic"], 0):
+            if m["author_kind"] not in ("seat", "researcher") or m["status"] != "done" or not m["content"]:
+                continue
+            who = handles.get(m["seat_id"], "Coder") if m["author_kind"] == "seat" else "Coder"
+            for line in finding_lines(m["content"]):
+                key = re.sub(r"\W+", " ", line.lower()).strip()[:120]
+                if key not in seen_lines:
+                    seen_lines.add(key)
+                    lines.append(f"- {who}: {line}")
+        parts: List[str] = [""]
+        for line in lines:
+            if parts[-1] and len(parts[-1]) + len(line) > REVIEW_PART_CHARS:
+                parts.append("")
+            parts[-1] += line + "\n"
         auditor, a_ep, a_model = self._auditor(d)
         think = await self._thinking_flag(a_ep, a_model, False)
         missing: List[Dict[str, str]] = []
         seen = set()
+        self.bus.publish(
+            {"type": "debate_updated", "debate": {"phase": f"{auditor} is checking the review against the debate…"}}
+        )
         for part in parts:
             if not part:
                 continue
@@ -2505,7 +2536,7 @@ class DebateEngine:
                     "review-check",
                     a_ep,
                     a_model,
-                    prompts.review_gap_messages(row["content"], prompts.render_transcript(part, handles)),
+                    prompts.review_gap_messages(row["content"], part),
                     think,
                 )
                 found = parse_json_loose(text).get("missing") or []
@@ -2525,6 +2556,12 @@ class DebateEngine:
         meta["review"] = {"checked": True, "missing": missing, "auditor": auditor}
         content = row["content"]
         if missing:
+            self.bus.publish(
+                {
+                    "type": "debate_updated",
+                    "debate": {"phase": f"{self._chair_label(d)} is adding what the review missed…"},
+                }
+            )
             try:
                 revised = strip_thinking(
                     await self._complete(
@@ -2547,6 +2584,7 @@ class DebateEngine:
             except Exception as e:
                 log.warning("review revision failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
+        self.bus.publish({"type": "debate_updated", "debate": {"phase": None}})
 
     # ----------------------------------------------------------------- why?
 

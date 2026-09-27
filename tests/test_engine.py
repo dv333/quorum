@@ -1001,3 +1001,50 @@ async def test_metrics_show_time_lost_to_failed_turns(monkeypatch):
     m = eng.metrics(1)
     koala = next(a for a in m["actors"] if a["actor"] == "Koala")
     assert koala["lost_ms"] > 0 and m["totals"]["lost_ms"] == koala["lost_ms"]
+
+
+def test_finding_lines_keep_the_points_and_drop_the_chatter():
+    text = """I agree with Otter.
+
+**High**
+1. SQL injection: `customer_id` is %-formatted into the query.
+| File | Line | Issue |
+|---|---|---|
+| `db.py` | 25 | The search term is f-stringed into LIKE |
+The route converter was dropped at api.py:14, so ids arrive as strings.
+Short.
+
+STANCE: AGREE
+POSITION: Fix the injection first, it is the worst of them."""
+    lines = engine_mod.finding_lines(text)
+    assert lines == [
+        "1. SQL injection: `customer_id` is %-formatted into the query.",
+        "| `db.py` | 25 | The search term is f-stringed into LIKE |",
+        "The route converter was dropped at api.py:14, so ids arrive as strings.",
+    ]
+
+
+async def test_gpt_oss_gets_low_effort_where_thinking_is_off():
+    eng = make_debate(FakeClient(lambda h, r, m: reply("AGREE")))
+    assert await eng._thinking_flag(1, "gpt-oss:20b", False) == "low"
+    assert await eng._thinking_flag(1, "gpt-oss:20b", True) is True
+    assert await eng._thinking_flag(1, "qwen3:14b", False) is False
+
+
+async def test_the_review_check_is_one_call_and_says_what_it_is_doing():
+    client = FakeClient(lambda h, r, m: reply("AGREE", text="- The <int:> converter was removed (api.py:14)."))
+    client.verdict_reply = REVIEW
+    eng = make_debate(client, max_rounds=2)
+    phases = []
+    publish = eng.bus.publish
+
+    def spy(event):
+        if event.get("type") == "debate_updated" and "phase" in event.get("debate", {}):
+            phases.append(event["debate"]["phase"])
+        publish(event)
+
+    eng.bus.publish = spy
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    assert len(client.calls_with("You check an AI council's code review")) == 1
+    assert phases and "checking the review" in phases[0] and phases[-1] is None

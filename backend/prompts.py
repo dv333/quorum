@@ -808,10 +808,10 @@ def review_gap_messages(answer: str, transcript: str) -> List[Dict[str, str]]:
             "content": f"""The council's final review:
 {answer}
 
-Part of the debate it came from:
+What the agents raised during the debate (who said it, then the point):
 {transcript}
 
-List the defects in the change that an agent raised in this part of the debate but the final review leaves out: a bug,
+List the defects in the change that an agent raised above but the final review leaves out: a bug,
 a security or data-loss risk, a breaking change, or missing protection (a timeout, validation, error handling, a lock)
 that the change introduced. Skip anything the review already covers in other words, anything it explicitly rules out,
 anything another agent convincingly refuted, and style, naming or praise. Return JSON only:

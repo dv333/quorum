@@ -275,7 +275,10 @@ function LiveStatus({ state }) {
   const writer = streaming.find((m) => m.author_kind === 'seat')
   let text
   if (debate.status === 'concluding') {
-    text = streaming.some((m) => m.research_kind === 'factcheck') ? `${RESEARCHER} is fact-checking the answer…`
+    const answered = messages.some((m) => m.author_kind === 'chair' && m.topic === debate.topic && m.status === 'done')
+    text = debate.phase ? debate.phase
+      : streaming.some((m) => m.research_kind === 'factcheck') ? `${RESEARCHER} is fact-checking the answer…`
+      : answered ? 'Checking the answer…'
       : `${debate.chair_handle || 'The chair'} is writing the answer…`
   } else if (debate.status === 'paused') {
     text = `Paused after round ${debate.round}`
