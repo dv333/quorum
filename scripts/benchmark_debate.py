@@ -99,18 +99,34 @@ def bottom_line(content: str) -> str:
 
 
 def ask_single(q: Dict[str, Any], model: str) -> Dict[str, Any]:
-    body = {
+    """The model alone. Like an agent in Quorum, it gets one more try without thinking when it sends no answer (a
+    thinking model can use its whole context thinking), so the comparison is fair."""
+    started = time.monotonic()
+    text, retried = _chat(model, q["question"] + FORMAT, think=None), False
+    if not text:
+        text, retried = _chat(model, q["question"] + FORMAT, think=False), True
+    return {
         "model": model,
-        "messages": [{"role": "user", "content": q["question"] + FORMAT}],
+        "text": text,
+        "correct": graded(q, text),
+        "seconds": round(time.monotonic() - started, 1),
+        "retried": retried,
+    }
+
+
+def _chat(model: str, prompt: str, think: Optional[bool]) -> str:
+    body: Dict[str, Any] = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
         "stream": False,
         "options": {"num_ctx": 8192, "temperature": 0.2},
     }
+    if think is not None:
+        body["think"] = think
     req = urllib.request.Request(f"{OLLAMA}/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
-    started = time.monotonic()
     with urllib.request.urlopen(req, timeout=900) as r:
         text = json.load(r)["message"]["content"]
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
-    return {"model": model, "text": text, "correct": graded(q, text), "seconds": round(time.monotonic() - started, 1)}
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
 
 
 def ask_quorum(q: Dict[str, Any]) -> Dict[str, Any]:
@@ -268,6 +284,7 @@ def main() -> None:
     ap.add_argument("--report", action="store_true", help="only write the report from results.json")
     ap.add_argument("--no-single", action="store_true", help="skip the single-model baseline")
     ap.add_argument("--out", default=str(OUT), help="folder for results.json and the report")
+    ap.add_argument("--redo-empty", action="store_true", help="ask the single model again where it sent no answer")
     args = ap.parse_args()
     questions = json.loads(QUESTIONS.read_text())["questions"]
     out = Path(args.out)
@@ -281,6 +298,8 @@ def main() -> None:
             if wanted and q["id"] not in wanted:
                 continue
             r = results.setdefault(q["id"], {})
+            if args.redo_empty and not r.get("single", {}).get("text", "x").strip():
+                r.pop("single")
             print(q["id"], flush=True)
             if model and "single" not in r:
                 r["single"] = ask_single(q, model)
