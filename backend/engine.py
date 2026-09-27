@@ -35,6 +35,8 @@ from .config import (
     THINK_AFTER_FIRST_ROUND,
     TURN_MAX_SECONDS,
     TURN_MAX_TOKENS,
+    BRIEF_TURN_TOKENS,
+    SLOW_TURN_SECONDS,
     REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
@@ -67,16 +69,24 @@ INTAKE_WAITING = ("clarifying", "confirming")
 STOPPED = ("paused", "cancelled", "failed")  # stopped before an answer; any of them can be resumed
 
 
+CHECKPOINT_SECONDS = 5.0  # how often streamed text is saved while it arrives
+
+
 def estimate_tokens(text: str) -> int:
     return len(text) // 3 + 1
 
 
 class EventBus:
+    """Live events for everyone watching a debate. A watcher that stops reading (a sleeping laptop, a stalled tab) is
+    dropped once it falls QUEUE_LIMIT events behind; its stream ends and the app reconnects to a fresh snapshot."""
+
+    QUEUE_LIMIT = 5000
+
     def __init__(self) -> None:
         self._subscribers: List[asyncio.Queue] = []
 
     def subscribe(self) -> asyncio.Queue:
-        q: asyncio.Queue = asyncio.Queue()
+        q: asyncio.Queue = asyncio.Queue(maxsize=self.QUEUE_LIMIT)
         self._subscribers.append(q)
         return q
 
@@ -86,7 +96,21 @@ class EventBus:
 
     def publish(self, event: Dict[str, Any]) -> None:
         for q in list(self._subscribers):
-            q.put_nowait(event)
+            try:
+                q.put_nowait(event)
+            except asyncio.QueueFull:
+                self.unsubscribe(q)
+                while not q.empty():
+                    q.get_nowait()
+                q.put_nowait(None)  # tells the stream to end
+
+    def watched(self) -> bool:
+        return bool(self._subscribers)
+
+
+# Changes the conundrum list shows (status, round, title), for the app's sidebar
+APP_BUS = EventBus()
+_LISTED = {"status", "round", "title", "topic", "interrupted"}
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +368,9 @@ def check_studies(raw: List[Any], pages: List[Dict[str, Any]], limit: int = 5) -
 def search_is_down(e: Exception) -> bool:
     """Errors that won't fix themselves within a run: no server, no key, no credits or quota left."""
     msg = str(e).lower()
-    return any(s in msg for s in ("reach", "api key", "http 402", "credits", "quota", "http 401", "http 403"))
+    return any(
+        s in msg for s in ("reach", "api key", "http 402", "credits", "quota", "http 401", "http 403", "blocking")
+    )
 
 
 _OPEN_CHOICE = re.compile(r"\b(which|best|recommend)\b", re.I)
@@ -742,18 +768,15 @@ class DebateEngine:
         self.research_queue: List[Dict[str, Any]] = []
         self._requests_per_round: Dict[Tuple[int, int], int] = {}
         self._search_down: Optional[str] = None
+        self._search_notice = False  # the "search is unavailable" note was posted in this run
         self._research_pages: Dict[int, List[Dict[str, Any]]] = {}  # pages Beagle read, per topic, for the claim check
         self._shortlist: Dict[int, List[str]] = {}  # options the research names, for choice questions
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
-        self.waiting: Optional[str] = None
-        self._answer_failed: Optional[str] = (
-            None  # why the debate ended, when the chair then couldn't write the answer  # set while a model call waits its turn behind another debate
-        )
-        self._ctx_by_model: Dict[
-            str, int
-        ] = {}  # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
+        self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
+        # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
+        self._ctx_by_model: Dict[str, int] = {}
 
     # ------------------------------------------------------------------ state
 
@@ -784,6 +807,8 @@ class DebateEngine:
     def _set(self, **fields: Any) -> None:
         db.update("debates", self.id, **fields)
         self.bus.publish({"type": "debate_updated", "debate": self.debate()})
+        if _LISTED & fields.keys():
+            APP_BUS.publish({"type": "debate_changed", "id": self.id})
 
     def _insert_message(
         self,
@@ -866,7 +891,7 @@ class DebateEngine:
                     self._start(self._research_only(status))
                     return
                 topic = d["topic"] + 1
-                self._set(topic=topic, round=0, status="intake")
+                self._set(topic=topic, round=0, status="intake", answer_pending=None, interrupted=0)
                 self._insert_message(topic=topic, round_no=0, author_kind="user", content=content)
                 self._start(self._intake())
                 return
@@ -903,8 +928,10 @@ class DebateEngine:
         """Resume a paused, cancelled or failed debate where it stopped."""
         async with self._cmd_lock:
             if self.debate()["status"] in STOPPED and not self.is_running():
-                if self._answer_failed:  # the debate was done and only the answer failed: try the answer again
-                    self._start(self._conclude(self._answer_failed))
+                self._set(interrupted=0)
+                pending = self.debate()["answer_pending"]
+                if pending:  # the debate was done and only the answer didn't finish: write the answer again
+                    self._start(self._conclude(pending))
                     return
                 self._set(status="running")
                 self._start(self._run_rounds())
@@ -944,7 +971,8 @@ class DebateEngine:
         await self._cancel_task()
 
     def _start(self, coro: Awaitable[None]) -> None:
-        self._search_down = None  # retry web search on every new run
+        self._search_down = firecrawl.down()  # known down (no credits, unreachable): don't wait on it again
+        self._search_notice = False
         self.task = asyncio.create_task(self._guard(coro))
 
     async def _guard(self, coro: Awaitable[None]) -> None:
@@ -1018,7 +1046,8 @@ class DebateEngine:
             rounds = int(choice.get("rounds"))
             # Questions about what the evidence says need at least one round of rebuttal
             floor = 2 if _EVIDENCE_Q.search(self._question(d["topic"])) else 1
-            self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
+            if not d.get("rounds_fixed"):  # a number of rounds the caller asked for (quick, deep) stands
+                self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
         except (TypeError, ValueError):
             pass
         if action == "direct" and is_code_debate(question, d["pack"], d.get("repo_path")):
@@ -1165,7 +1194,12 @@ class DebateEngine:
                 d = self.debate()
                 await self._drain_research(d["round"])  # opening brief, or requests made while paused
                 round_no = d["round"]
-                spoken = {m["seat_id"] for m in self._round_messages(d["topic"], round_no)} | set(self._benched)
+                # A reply cut off before it said anything (a restart mid-turn) doesn't count: that agent speaks again
+                spoken = {
+                    m["seat_id"]
+                    for m in self._round_messages(d["topic"], round_no)
+                    if m["status"] != "stopped" or m["content"].strip()
+                } | set(self._benched)
                 if round_no == 0 or all(s["id"] in spoken for s in seats):
                     round_no += 1
                     self._set(round=round_no)
@@ -1255,20 +1289,27 @@ class DebateEngine:
         keep_alive: Any,
         actor: str,
         kind: str,
+        max_tokens: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Stream a reply into an existing message row, publishing deltas. Records usage; returns stats.
 
         A turn is limited in time and output (thinking included), with room for that output in the context window, so a
         model that loops stops instead of stalling the debate; what it wrote before the limit is kept (stats "cut")."""
-        max_seconds, max_tokens = (
+        max_seconds, limit = (
             (TURN_MAX_SECONDS, TURN_MAX_TOKENS) if kind == "turn" else (ANSWER_MAX_SECONDS, ANSWER_MAX_TOKENS)
         )
+        max_tokens = min(max_tokens or limit, limit)
         partial = self.partials.setdefault(msg_id, {"content": "", "thinking": ""})
         stats: Dict[str, Any] = {}
         ep = self._endpoint(endpoint_id)
         splitter = ThinkSplitter()  # defensive: route any inline <think> text to the thinking channel
+        saved = time.monotonic()
 
         def emit(content: str, thinking: str) -> None:
+            nonlocal saved
+            if time.monotonic() - saved >= CHECKPOINT_SECONDS:  # a restart keeps what was written so far
+                saved = time.monotonic()
+                db.update("messages", msg_id, content=partial["content"], thinking=partial["thinking"])
             if thinking:
                 partial["thinking"] += thinking
                 self.bus.publish({"type": "message_delta", "id": msg_id, "thinking": thinking})
@@ -1597,6 +1638,23 @@ class DebateEngine:
         )
         return text
 
+    def _slow_seats(self, topic: int) -> set:
+        """Seats whose turns so far take far longer than the council's typical turn (over SLOW_TURN_SECONDS and
+        twice the median). Local calls run one at a time, so a round lasts as long as all its turns together."""
+        rows = db.query(
+            "SELECT seat_id, duration_ms FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'seat' "
+            "AND status = 'done' AND duration_ms IS NOT NULL",
+            [self.id, topic],
+        )
+        by_seat: Dict[int, List[int]] = {}
+        for r in rows:
+            by_seat.setdefault(r["seat_id"], []).append(r["duration_ms"])
+        medians = {sid: sorted(ms)[len(ms) // 2] for sid, ms in by_seat.items()}
+        if len(medians) < 3:
+            return set()
+        typical = sorted(medians.values())[len(medians) // 2]
+        return {sid for sid, ms in medians.items() if ms > max(SLOW_TURN_SECONDS * 1000, 2 * typical)}
+
     async def _seat_turn(self, seat: Dict[str, Any], round_no: int, upcoming: Optional[Dict[str, Any]]) -> None:
         d = self.debate()
         row = self._insert_message(
@@ -1615,33 +1673,47 @@ class DebateEngine:
             messages = self._turn_context(seat, round_no, exclude_id=msg_id)
             # Think in round 1, where the independent views form; rebuttals answer without it (much faster)
             wanted = bool(seat["thinking_enabled"]) and (round_no == 1 or THINK_AFTER_FIRST_ROUND)
+            brief = round_no > 1 and seat["id"] in self._slow_seats(d["topic"])
+            if brief:
+                self._log(msg_id, "(a brief reply: this model's turns take far longer than the rest)")
+                wanted = False
             think = await self._thinking_flag(seat["endpoint_id"], seat["model"], wanted)
-            stats = await self._stream_into(
-                msg_id,
-                seat["endpoint_id"],
-                seat["model"],
-                messages,
-                think,
-                self._keep_alive(seat, upcoming),
-                seat["handle"],
-                "turn",
-            )
             partial = self.partials[msg_id]
-            content = strip_thinking(partial["content"])
-            if not content.strip() and think and partial["thinking"].strip():
-                # It spent its whole turn thinking: one more try, answering straight away
-                self._log(msg_id, "(thought until the limit; answering without thinking)")
-                partial["content"] = ""
-                stats = await self._stream_into(
+
+            async def attempt(flag: Optional[Union[bool, str]]) -> Dict[str, Any]:
+                return await self._stream_into(
                     msg_id,
                     seat["endpoint_id"],
                     seat["model"],
                     messages,
-                    await self._thinking_flag(seat["endpoint_id"], seat["model"], False),
+                    flag,
                     self._keep_alive(seat, upcoming),
                     seat["handle"],
                     "turn",
+                    BRIEF_TURN_TOKENS if brief else None,
                 )
+
+            retried = False
+            try:
+                stats = await attempt(think)
+            except Exception as e:
+                # A server error, or a reply the server couldn't parse (deepseek-r1's thinking sometimes trips
+                # Ollama's parser): one more try, answering straight away
+                log.warning("seat %s (%s) failed, retrying: %s", seat["handle"], seat["model"], e)
+                self._restart_reply(msg_id, f"({e}; trying once more without thinking)")
+                retried = True
+                stats = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False))
+            content = strip_thinking(partial["content"])
+            thought_too_long = think and partial["thinking"].strip()
+            if not content.strip() and not retried and (thought_too_long or not stats.get("cut")):
+                # It spent its whole turn thinking, or sent nothing at all: one more try, answering straight away
+                self._restart_reply(
+                    msg_id,
+                    "(thought until the limit; answering without thinking)"
+                    if thought_too_long
+                    else "(empty reply; trying once more)",
+                )
+                stats = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False))
                 content = strip_thinking(partial["content"])
             if not content.strip():
                 raise RuntimeError(
@@ -1733,6 +1805,21 @@ class DebateEngine:
             self._requests_per_round[key] = self._requests_per_round.get(key, 0) + 1
             self._queue_research(request, seat["handle"], "request")
 
+    def _note_search_failed(self, e: Exception) -> None:
+        if search_is_down(e):
+            self._search_down = str(e)  # don't retry every request in this run
+            firecrawl.mark_down(str(e))  # nor in the next conundrum, for a while
+
+    def _search_unavailable(self) -> None:
+        """Say once per run that the council goes on without web search, and why."""
+        if not self._search_notice:
+            self._search_notice = True
+            self._system_message(
+                f"Web search is unavailable ({self._search_down}), so the council answers without it. "
+                "Check Research in Settings.",
+                meta={"kind": "search_down"},
+            )
+
     async def _drain_research(self, round_no: int) -> None:
         while self.research_queue:
             item = self.research_queue.pop(0)
@@ -1798,6 +1885,14 @@ class DebateEngine:
             db.update("debates", self.id, status=previous_status)
             self.bus.publish({"type": "debate_updated", "debate": self.debate()})
 
+    def _restart_reply(self, msg_id: int, note: str) -> None:
+        """Clear a reply before a second try, keeping a note of why in its thinking."""
+        partial = self.partials[msg_id]
+        partial["content"] = ""
+        partial["thinking"] += note + "\n"
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        self.bus.publish({"type": "message_updated", "message": serialize_message(row, partial)})
+
     def _log(self, msg_id: int, line: str) -> None:
         text = line + "\n"
         self.partials[msg_id]["thinking"] += text
@@ -1807,6 +1902,9 @@ class DebateEngine:
         """Plan searches, run them through Firecrawl, and stream a cited brief. Returns the brief."""
         d = self.debate()
         kind = item["kind"]
+        if self._search_down:
+            self._search_unavailable()
+            return None
         row = self._insert_message(
             topic=d["topic"],
             round_no=round_no,
@@ -1820,8 +1918,6 @@ class DebateEngine:
         self.partials[msg_id] = {"content": "", "thinking": ""}
         ep_id, model = self._researcher_model(d)
         try:
-            if self._search_down:
-                raise firecrawl.SearchError(self._search_down)
             think = await self._thinking_flag(ep_id, model, False)
             question = self._question(d["topic"])
             plan = prompts.research_plan_messages(item["request"], question, RESEARCH_MAX_QUERIES)
@@ -1914,8 +2010,7 @@ class DebateEngine:
             )
             raise
         except firecrawl.SearchError as e:
-            if search_is_down(e):
-                self._search_down = str(e)  # don't retry every request in this run
+            self._note_search_failed(e)
             self._finish_message(
                 msg_id, status="error", content=f"Web search failed: {e}", thinking=self.partials[msg_id]["thinking"]
             )
@@ -2142,6 +2237,9 @@ class DebateEngine:
         count. Returns the ledger (also stored, and posted in the thread as Beagle's fact-check)."""
         d = self.debate()
         topic = d["topic"]
+        if self._search_down:
+            self._search_unavailable()
+            return []
         row = self._insert_message(
             topic=topic,
             round_no=round_no,
@@ -2154,8 +2252,6 @@ class DebateEngine:
         self.partials[msg_id] = {"content": "", "thinking": ""}
         ep_id, model = self._researcher_model(d)
         try:
-            if self._search_down:
-                raise firecrawl.SearchError(self._search_down)
             summary = self._latest_summary(topic)
             self._log(msg_id, "Listing the claims the answer relies on…")
             text = await self._complete(
@@ -2302,8 +2398,7 @@ class DebateEngine:
             self._finish_message(msg_id, status="stopped")
             raise
         except firecrawl.SearchError as e:
-            if search_is_down(e):
-                self._search_down = str(e)
+            self._note_search_failed(e)
             self._finish_message(msg_id, status="error", content=f"Web search failed: {e}")
         except Exception as e:
             log.warning("claim check failed: %s", e)
@@ -2775,7 +2870,8 @@ class DebateEngine:
         self._concluding = True
         try:
             await self._refresh_mode()
-            self._set(status="concluding")
+            # Kept until the answer is written, so a failed, stopped or interrupted answer can be written again
+            self._set(status="concluding", answer_pending=reason)
             d = self.debate()
             topic = d["topic"]
             question = self._question(topic)
@@ -2865,13 +2961,12 @@ class DebateEngine:
                 self._finish_message(row["id"], status="error", content=f"The chair ({d['chair_model']}) failed: {e}")
                 # No answer is no answer: say so, with what timed out, instead of showing the debate as answered
                 self.partials.pop(row["id"], None)
-                self._answer_failed = reason
                 self._system_message(self._failure_note(d, str(e)))
                 self._set(status="failed")
                 return
             finally:
                 self.partials.pop(row["id"], None)
-            self._answer_failed = None
+            self._set(answer_pending=None)
             await self._audit_answer(row["id"], claims, studies)
             if is_code_debate(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
@@ -2954,12 +3049,29 @@ def waiting_text(actor: str, holder: Caller, debate_id: str) -> str:
 # ---------------------------------------------------------------------------
 
 _engines: Dict[str, DebateEngine] = {}
+_last_used: Dict[str, float] = {}
+ENGINE_IDLE_SECONDS = 600  # an answered debate nobody watches is let go after this; it's rebuilt when opened again
 
 
 def get_engine(debate_id: str) -> DebateEngine:
+    _evict_idle(exclude=debate_id)
     if debate_id not in _engines:
         _engines[debate_id] = DebateEngine(debate_id)
+    _last_used[debate_id] = time.monotonic()
     return _engines[debate_id]
+
+
+def _evict_idle(exclude: str) -> None:
+    """Drop engines for answered debates that nobody watches and nothing ran on for a while. Paused and failed ones
+    stay: they keep what the Researcher read and any lookups queued for when they resume."""
+    cutoff = time.monotonic() - ENGINE_IDLE_SECONDS
+    for debate_id, eng in list(_engines.items()):
+        if debate_id == exclude or _last_used.get(debate_id, 0) > cutoff or eng.is_running() or eng.bus.watched():
+            continue
+        row = db.query_one("SELECT status FROM debates WHERE id = ?", [debate_id])
+        if row is None or row["status"] in ("concluded", "idle"):
+            _engines.pop(debate_id, None)
+            _last_used.pop(debate_id, None)
 
 
 async def drop_engine(debate_id: str) -> None:
@@ -2969,7 +3081,12 @@ async def drop_engine(debate_id: str) -> None:
 
 
 def recover_after_restart() -> None:
-    """Debates interrupted by a server restart resume as paused (research-only lookups return to concluded)."""
+    """Debates interrupted by a server restart resume as paused (research-only lookups return to concluded), marked
+    as interrupted so the app can offer to resume them."""
     db.execute("UPDATE messages SET status = 'stopped' WHERE status = 'streaming'")
     db.execute("UPDATE debates SET status = 'concluded' WHERE status = 'researching'")
-    db.execute("UPDATE debates SET status = 'paused' WHERE status IN ('running', 'voting', 'concluding', 'intake')")
+    live = db.query("SELECT id FROM debates WHERE status IN ('running', 'voting', 'concluding', 'intake')")
+    for row in live:
+        eng = get_engine(row["id"])
+        eng._set(status="paused", interrupted=1)
+        eng._system_message("Quorum restarted while this was running. Resume to pick up where it stopped.")

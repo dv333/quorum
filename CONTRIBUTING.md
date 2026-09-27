@@ -21,7 +21,7 @@ uv run pytest            # backend tests (no models needed)
 uv run python scripts/replay.py --all   # replay known failures against your running Quorum (real models, slow)
 uvx ruff check backend tests
 uvx ruff format backend tests
-cd frontend && npm run build
+cd frontend && npm run lint && npm test && npm run build   # frontend lint, tests (no backend needed), build
 ```
 
 - Keep pull requests focused; one change per PR is easiest to review.

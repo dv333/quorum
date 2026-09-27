@@ -1,10 +1,12 @@
 """Firecrawl client for the Researcher: web search with page content, self-hosted or cloud."""
 
 import asyncio
+import hashlib
+import json
 import time
 import re
 from urllib.parse import urlsplit
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -14,6 +16,37 @@ from .config import FIRECRAWL_API_KEY, FIRECRAWL_CLOUD_URL, FIRECRAWL_URL, RESEA
 
 class SearchError(Exception):
     pass
+
+
+# A search service that's down stays down for a while: remember it across conundrums so each one doesn't wait on it
+DOWN_RETRY_SECONDS = 600
+_LASTING = ("api key", "http 401", "http 402", "http 403", "credits", "quota")  # fixed only by changing the settings
+
+
+def _signature(s: Dict[str, str]) -> str:
+    return hashlib.sha256(f"{s['mode']}|{s['url']}|{s['api_key']}".encode()).hexdigest()[:16]
+
+
+def mark_down(error: str) -> None:
+    """Remember that search failed: until the settings change for a missing key or credits, else for 10 minutes."""
+    lasting = any(x in error.lower() for x in _LASTING)
+    until = 0 if lasting else time.time() + DOWN_RETRY_SECONDS
+    db.set_setting("search_down", json.dumps({"error": error, "until": until, "sig": _signature(settings())}))
+
+
+def down() -> Optional[str]:
+    """Why search is known to be down with the current settings, or None."""
+    row = db.loads(db.get_setting("search_down"), None)
+    if not row or row.get("sig") != _signature(settings()):
+        return None
+    if row.get("until") and time.time() > row["until"]:
+        return None
+    return row.get("error") or "web search is unavailable"
+
+
+def mark_up() -> None:
+    if db.get_setting("search_down"):
+        db.set_setting("search_down", "")
 
 
 def settings() -> Dict[str, str]:
@@ -47,6 +80,9 @@ async def status() -> Dict[str, Any]:
     """Whether web research can run. Cloud is 'ready' when a key is set (checking would spend credits)."""
     s = settings()
     info = public_settings()
+    known = down()
+    if known:
+        return {**info, "ready": False, "error": known}
     if s["mode"] == "cloud":
         return {
             **info,
@@ -209,6 +245,7 @@ async def _search(query: str, limit: int, focus: str = "") -> List[Dict[str, str
             "the search engine returned nothing at all; it may be blocking automated searches for a while "
             "(try again later, or use Firecrawl cloud in Settings)"
         )
+    mark_up()
     results = body.get("web", []) if isinstance(body, dict) else (body or [])  # v2 shape, or v1's flat list
     out = []
     for item in results:

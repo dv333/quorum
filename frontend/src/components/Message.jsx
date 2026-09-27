@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm'
 
 // Models write "~$12k" for approximations; only ~~double~~ tildes should strike through
 const GFM = [[remarkGfm, { singleTilde: false }]]
-import { createContext, useContext, useEffect, useId, useRef, useState } from 'react'
+import { createContext, memo, useContext, useDeferredValue, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CODER, RESEARCHER, agentFor, formatTime, linkMentions, modelShort } from '../agents'
 
@@ -26,15 +26,20 @@ export function MdLink({ node, href, children, ...props }) {
   return <a href={href} {...props} target="_blank" rel="noreferrer noopener">{children}</a>
 }
 
-export function Markdown({ children, className = '' }) {
+const MD_COMPONENTS = { a: MdLink }
+
+// Markdown is parsed again whenever its text changes; while a reply streams in, that work waits behind typing,
+// scrolling and clicks instead of blocking them
+export const Markdown = memo(function Markdown({ children, className = '' }) {
+  const text = useDeferredValue(children)
   return (
     <div className={`md ${className}`}>
-      <ReactMarkdown remarkPlugins={GFM} components={{ a: MdLink }}>
-        {linkMentions(children)}
+      <ReactMarkdown remarkPlugins={GFM} components={MD_COMPONENTS}>
+        {linkMentions(text)}
       </ReactMarkdown>
     </div>
   )
-}
+})
 
 export async function copyText(text) {
   try {
@@ -177,7 +182,7 @@ function TurnTime({ msg, total }) {
 
 const seatTotalHint = (total) => `${formatElapsed(total)} for this agent across the debate`
 
-export function AgentMessage({ msg, seat, isChair, total }) {
+export const AgentMessage = memo(function AgentMessage({ msg, seat, isChair, total }) {
   const streaming = msg.status === 'streaming'
   const body = visibleBody(msg)
   const meta = [modelShort(seat?.model)]
@@ -199,9 +204,9 @@ export function AgentMessage({ msg, seat, isChair, total }) {
       </div>
     </div>
   )
-}
+})
 
-export function UserMessage({ msg }) {
+export const UserMessage = memo(function UserMessage({ msg }) {
   return (
     <div className="msg me">
       <div className="bubble">
@@ -210,7 +215,7 @@ export function UserMessage({ msg }) {
       </div>
     </div>
   )
-}
+})
 
 const FAV_COLORS = ['#5e5ce6', '#30b0c7', '#34c759', '#ff9f0a', '#ff375f', '#a2845e', '#32ade6', '#bf5af2']
 
@@ -238,7 +243,7 @@ export function SourceChips({ sources }) {
 
 const RESEARCH_KIND = { brief: 'opening brief', request: 'lookup', factcheck: 'fact-check' }
 
-export function BeagleCard({ msg, model }) {
+export const BeagleCard = memo(function BeagleCard({ msg, model }) {
   const streaming = msg.status === 'streaming'
   const lastLog = msg.thinking?.trim().split('\n').pop()
   const meta = [RESEARCH_KIND[msg.research_kind] || 'research', `web · ${modelShort(model)}`]
@@ -260,10 +265,10 @@ export function BeagleCard({ msg, model }) {
       </div>
     </div>
   )
-}
+})
 
 // The Coder: Claude Code or Codex reading the repository read-only, with its file:line citations checked
-export function CoderCard({ msg }) {
+export const CoderCard = memo(function CoderCard({ msg }) {
   const streaming = msg.status === 'streaming'
   const lastLog = msg.thinking?.trim().split('\n').pop()
   const meta = msg.meta || {}
@@ -290,9 +295,9 @@ export function CoderCard({ msg }) {
       </div>
     </div>
   )
-}
+})
 
-export function SystemRow({ msg }) {
+export const SystemRow = memo(function SystemRow({ msg }) {
   if (msg.meta?.kind === 'roles') {
     return (
       <div className="roles-row" aria-label="Roles the chair assigned">
@@ -306,7 +311,7 @@ export function SystemRow({ msg }) {
     )
   }
   return <div className={`sysrow ${msg.status === 'error' ? 'error' : ''}`}>{msg.content}</div>
-}
+})
 
 // The chair's clarifying interview: a question with tap-to-answer chips, or a summary of assumptions
 export function ModeratorMessage({ msg, active, onAnswer, onConfirm, onAddDetails }) {

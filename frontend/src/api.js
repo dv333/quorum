@@ -52,6 +52,7 @@ export const api = {
   setupStatus: () => request('/setup/status'),
   startFirecrawl: () => request('/setup/firecrawl', { method: 'POST' }),
   continueDebate: (id) => request(`/debates/${id}/continue`, { method: 'POST' }),
+  dismissInterrupted: () => request('/debates/interrupted/dismiss', { method: 'POST' }),
   stopDebate: (id) => request(`/debates/${id}/stop`, { method: 'POST' }),
   cancelDebate: (id) => request(`/debates/${id}/cancel`, { method: 'POST' }),
   concludeDebate: (id) => request(`/debates/${id}/conclude`, { method: 'POST' }),

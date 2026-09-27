@@ -53,7 +53,7 @@ export function tidy(code) {
     .trim()
   // Quoted text used as a node ("Check budget" --> "Buy") isn't valid Mermaid: give each one an id
   const ids = new Map()
-  return cleaned.replace(/(^|[^\[({|"\w])"([^"\n]+)"/gm, (match, pre, label) => {
+  return cleaned.replace(/(^|[^[({|"\w])"([^"\n]+)"/gm, (match, pre, label) => {
     if (!ids.has(label)) ids.set(label, `n${ids.size + 1}`)
     return `${pre}${ids.get(label)}["${label}"]`
   })

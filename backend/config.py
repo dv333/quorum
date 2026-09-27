@@ -86,6 +86,8 @@ ANSWER_MAX_TOKENS = _env_int("LLC_ANSWER_MAX_TOKENS", 6144)
 THINK_AFTER_FIRST_ROUND = _env_int("LLC_THINK_LATER_ROUNDS", 0) == 1
 # A model whose turns take this long, and more than twice the council's typical turn, sits out code reviews
 SLOW_TURN_SECONDS = _env_float("LLC_SLOW_TURN_SECONDS", 120.0)
+# After round 1, such a model keeps its seat with shorter replies: its voice stays, without holding up every round
+BRIEF_TURN_TOKENS = _env_int("LLC_BRIEF_TURN_TOKENS", 1024)
 REVIEW_PART_CHARS = 12000  # debate text per check when a code review's answer is checked for dropped findings
 REVIEW_MAX_ADDED = 8  # findings added back to one review, at most
 CODER_REQUESTS_PER_ROUND = 2  # questions for the Coder (Claude Code or Codex) per round; each costs cloud tokens

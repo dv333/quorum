@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api, formatGB } from '../api'
 import { RESEARCHER, modelShort } from '../agents'
 import { THEMES, getTheme, setTheme } from '../theme'

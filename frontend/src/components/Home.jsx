@@ -21,7 +21,7 @@ function defaultsFrom(config, auto, research) {
   }
 }
 
-export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
+export default function Home({ config, onCreated, onOpenSettings, mobileBar, interrupted = [], onInterruptedChanged }) {
   const [auto, setAuto] = useState(null)
   const [models, setModels] = useState([])
   const [question, setQuestion] = useState('')
@@ -141,6 +141,7 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
     <>
       {mobileBar}
       <div className="home">
+        <Interrupted list={interrupted} onChanged={onInterruptedChanged} />
         <div className="home-hero">
           <div className="mark big alive"><span /><span /><span /></div>
           <h1>{config.app_name}</h1>
@@ -214,5 +215,32 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar }) {
           onReset={() => { setCustom(null); setEditing(null) }} />
       )}
     </>
+  )
+}
+
+// Conundrums a restart of Quorum stopped midway: resume them in one click, or leave them paused
+function Interrupted({ list, onChanged }) {
+  const [busy, setBusy] = useState(false)
+  if (!list.length) return null
+  const act = async (fn) => {
+    setBusy(true)
+    try { await fn() } catch { /* the sidebar shows what happened */ }
+    setBusy(false)
+    onChanged?.()
+  }
+  const one = list.length === 1
+  const name = list[0].title || list[0].question || 'A conundrum'
+  const short = name.length > 70 ? `${name.slice(0, 68).trimEnd()}…` : name
+  return (
+    <div className="interrupted" role="status">
+      <span>
+        {one ? <>“{short}” stopped</> : <>{list.length} conundrums stopped</>} when Quorum restarted.
+      </span>
+      <button className="btn small blue" disabled={busy}
+        onClick={() => act(() => Promise.all(list.map((d) => api.continueDebate(d.id))))}>
+        {one ? 'Resume' : 'Resume all'}
+      </button>
+      <button className="btn small" disabled={busy} onClick={() => act(api.dismissInterrupted)}>Dismiss</button>
+    </div>
   )
 }

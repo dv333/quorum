@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timezone
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +30,7 @@ from .config import (
     SEAT_COLORS,
 )
 from .hardware import estimate_model_bytes, fit_label
-from .engine import drop_engine, get_engine, recover_after_restart
+from .engine import APP_BUS, drop_engine, get_engine, recover_after_restart
 from .providers import ProviderError, delete_model, lookup_model, pull_model
 
 
@@ -377,7 +377,7 @@ async def list_debates(
 
 def _debate_rows(where: str, params: List[Any], limit: Optional[int]) -> List[Dict[str, Any]]:
     rows = db.query(
-        "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, "
+        "SELECT d.id, d.title, d.created_at, d.status, d.round, d.topic, d.interrupted, "
         "(SELECT COUNT(*) FROM seats s WHERE s.debate_id = d.id) AS seat_count, "
         "(SELECT m.created_at FROM messages m WHERE m.debate_id = d.id AND m.topic = d.topic AND m.author_kind = 'user' "
         " ORDER BY m.id LIMIT 1) AS asked_at, "
@@ -504,6 +504,8 @@ async def create_debate(body: CreateDebate):
     )
     if body.repo_path:
         db.update("debates", debate_id, repo_path=repo)
+    if "max_rounds" in body.model_fields_set:  # asked for explicitly (MCP quick or deep, the CLI): keep it
+        db.update("debates", debate_id, rounds_fixed=1)
     for i, seat in enumerate(seats):
         db.execute(
             "INSERT INTO seats (debate_id, handle, endpoint_id, model, color, thinking_enabled, position) "
@@ -553,7 +555,7 @@ async def patch_debate(debate_id: str, body: UpdateDebate):
     if body.title is not None and body.title.strip():
         eng._set(title=body.title.strip())
     if body.max_rounds is not None:
-        eng._set(max_rounds=body.max_rounds)
+        eng._set(max_rounds=body.max_rounds, rounds_fixed=1)
     if body.research_enabled is not None:
         eng._set(research_enabled=int(body.research_enabled))
     if body.autopilot is not None:
@@ -614,6 +616,13 @@ async def post_continue(debate_id: str):
     return {"ok": True}
 
 
+@app.post("/api/debates/interrupted/dismiss")
+async def dismiss_interrupted():
+    """Stop offering to resume the conundrums a restart interrupted; they stay paused."""
+    db.execute("UPDATE debates SET interrupted = 0 WHERE interrupted = 1")
+    return {"ok": True}
+
+
 @app.post("/api/debates/{debate_id}/stop")
 async def post_stop(debate_id: str):
     _require_debate(debate_id)
@@ -635,26 +644,41 @@ async def post_conclude(debate_id: str):
     return {"ok": True}
 
 
+@app.get("/api/events")
+async def app_events():
+    """Which conundrums changed status, round or title, as it happens, so the sidebar doesn't poll."""
+    return StreamingResponse(
+        _stream(APP_BUS, None),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def _stream(bus: Any, first: Optional[Callable[[], Dict[str, Any]]]) -> AsyncIterator[str]:
+    q = bus.subscribe()
+    try:
+        if first is not None:  # taken after subscribing, so no event falls between it and the stream
+            yield f"data: {json.dumps(first())}\n\n"
+        while True:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=15)
+                if event is None:  # fell too far behind: end the stream, and the app reconnects
+                    return
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+    finally:
+        bus.unsubscribe(q)
+
+
 @app.get("/api/debates/{debate_id}/events")
 async def debate_events(debate_id: str):
     _require_debate(debate_id)
     eng = get_engine(debate_id)
-
-    async def gen() -> AsyncIterator[str]:
-        q = eng.bus.subscribe()
-        try:
-            yield f"data: {json.dumps({'type': 'snapshot', 'state': eng.snapshot()})}\n\n"
-            while True:
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=15)
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
-        finally:
-            eng.bus.unsubscribe(q)
-
     return StreamingResponse(
-        gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        _stream(eng.bus, lambda: {"type": "snapshot", "state": eng.snapshot()}),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

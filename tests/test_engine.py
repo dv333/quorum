@@ -555,9 +555,28 @@ async def test_search_outage_is_reported_once_per_run_and_debate_continues():
     await eng.post_user_message("Q")
     await eng.task
     errors = [m for m in researcher_messages() if m["status"] == "error"]
-    assert errors and all("Web search failed" in m["content"] for m in errors)
+    assert len(errors) == 1 and "Web search failed" in errors[0]["content"]
     assert len(search.queries) == 1  # later requests skip the dead service
+    notes = db.query("SELECT content FROM messages WHERE content LIKE 'Web search is unavailable%'")
+    assert len(notes) == 1 and "Settings" in notes[0]["content"]
     assert eng.debate()["status"] == "paused" and len(client.turn_calls()) == 3
+
+
+async def test_the_next_conundrum_remembers_that_search_is_down():
+    from backend.firecrawl import SearchError
+
+    client = FakeClient(lambda h, r, m: reply("REFINE", text=f"@Researcher: question from {h} here"))
+    search = FakeSearch(fail=SearchError("Firecrawl error (HTTP 402): Insufficient credits"))
+    eng = make_debate(client, research=True, autopilot=False, search=search)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert len(search.queries) == 1
+    db.execute("DELETE FROM seats")
+    db.execute("DELETE FROM debates")
+    later = make_debate(client, research=True, autopilot=False, search=search)
+    await later.post_user_message("Another question")
+    await later.task
+    assert len(search.queries) == 1  # not tried again: out of credits until the settings change
 
 
 async def test_empty_chair_answer_is_retried_then_reported():
@@ -609,6 +628,73 @@ async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_r
     await eng.task
     assert eng.debate()["status"] == "concluded" and len(db.query("SELECT * FROM verdicts")) == 1
     assert len(client.turn_calls()) == turns  # no extra round
+
+
+async def test_a_restart_mid_turn_marks_the_debate_and_resume_asks_that_agent_again():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.gates["Koala"] = asyncio.Event()  # Koala is mid-turn, with nothing written yet, when Quorum restarts
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+    eng.task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await eng.task
+    db.execute("UPDATE debates SET status = 'running'")  # the process died: the status was never updated
+    del client.gates["Koala"]
+    engine_mod._engines.clear()
+    engine_mod.recover_after_restart()
+    d = db.query_one("SELECT * FROM debates")
+    assert d["status"] == "paused" and d["interrupted"] == 1
+    assert (
+        "Quorum restarted while this was running" in db.query("SELECT content FROM messages ORDER BY id")[-1]["content"]
+    )
+    eng = engine_mod.get_engine("d1")
+    eng.client, eng.meta_lookup, eng.plan_lookup = client, fake_meta, fake_plan
+    await eng.continue_()
+    await eng.task
+    assert eng.debate()["status"] == "concluded" and eng.debate()["interrupted"] == 0
+    assert len(client.turn_calls("Koala")) == 2  # cut off before it said anything, so it speaks again
+    assert len(client.turn_calls("Otter")) == 1
+    engine_mod._engines.clear()
+
+
+async def test_streamed_text_is_saved_while_it_arrives(monkeypatch):
+    monkeypatch.setattr(engine_mod, "CHECKPOINT_SECONDS", 0)
+    client = FakeClient(lambda h, r, m: reply("REFINE", text="A long reply " * 5))
+    eng = make_debate(client, seats=2, max_rounds=1)
+    saved = []
+    real_update = db.update
+
+    def spy(table, row_id, **fields):
+        if table == "messages" and set(fields) == {"content", "thinking"}:
+            saved.append(fields["content"])
+        return real_update(table, row_id, **fields)
+
+    monkeypatch.setattr(engine_mod.db, "update", spy)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert len(saved) > 3 and saved[1].startswith("A long") and len(saved[-1]) > len(saved[1])
+
+
+async def test_an_answer_that_did_not_finish_is_written_again_after_a_restart():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    # As if Quorum restarted while the chair was writing
+    db.execute("DELETE FROM verdicts")
+    db.execute("UPDATE debates SET status = 'concluding', answer_pending = 'consensus'")
+    engine_mod._engines.clear()
+    engine_mod.recover_after_restart()
+    turns = len(client.turn_calls())
+    eng = engine_mod.get_engine("d1")
+    eng.client, eng.meta_lookup, eng.plan_lookup = client, fake_meta, fake_plan
+    await eng.continue_()
+    await eng.task
+    d = eng.debate()
+    assert d["status"] == "concluded" and d["answer_pending"] is None
+    assert len(client.turn_calls()) == turns and len(db.query("SELECT * FROM verdicts")) == 1
+    engine_mod._engines.clear()
 
 
 async def test_the_failure_note_names_what_timed_out(monkeypatch):
@@ -779,6 +865,18 @@ async def test_question_budget_forces_a_summary():
         for m in db.query("SELECT meta_json FROM messages WHERE author_kind = 'moderator' ORDER BY id")
     ]
     assert kinds == ["question", "question", "question", "summary"]
+
+
+async def test_the_chair_sizes_the_debate_unless_the_caller_set_the_rounds():
+    for fixed, expected in [(0, 4), (1, 1)]:
+        db.connect(":memory:")
+        client = FakeClient(lambda h, r, m: reply("REFINE"))
+        client.intake_replies = ['{"action": "clear", "rounds": 4}']
+        eng = make_debate(client, max_rounds=1)
+        db.update("debates", "d1", rounds_fixed=fixed)
+        await eng.post_user_message("Which laptop should I buy?")
+        await eng.task
+        assert eng.debate()["max_rounds"] == expected, fixed
 
 
 async def test_skip_interview_uses_answers_so_far():
@@ -956,6 +1054,82 @@ async def test_a_turn_that_runs_too_long_is_stopped_and_the_seat_sits_out(monkey
     assert len(client.turn_calls("Otter")) == 2
     failed = db.query("SELECT * FROM usage WHERE kind = 'turn-failed'")
     assert failed and failed[0]["actor"] == "Koala"
+
+
+async def test_a_server_error_gets_one_more_try_without_thinking():
+    tries = {"Koala": 0}
+
+    def turn(h, r, m):
+        if h == "Koala" and r == 1:
+            tries["Koala"] += 1
+            if tries["Koala"] == 1:
+                raise RuntimeError("output does not match the expected peg")
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert not db.query("SELECT * FROM messages WHERE status = 'error'")
+    koala = client.turn_calls("Koala")
+    assert len(koala) == 2 and koala[0][1]["think"] is True and koala[1][1]["think"] is False
+    msg = db.query_one("SELECT m.* FROM messages m JOIN seats s ON s.id = m.seat_id WHERE s.handle = 'Koala'")
+    assert msg["status"] == "done" and "trying once more without thinking" in msg["thinking"]
+
+
+async def test_an_empty_reply_gets_one_more_try():
+    tries = []
+
+    def turn(h, r, m):
+        if h == "Koala":
+            tries.append(r)
+            if len(tries) == 1:
+                return "", ""
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, seats=3, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert not db.query("SELECT * FROM messages WHERE status = 'error'")
+    assert len(client.turn_calls("Koala")) == 2
+
+
+async def test_a_seat_that_fails_twice_sits_out():
+    def turn(h, r, m):
+        if h == "Koala":
+            raise RuntimeError("HTTP 500")
+        return reply("REFINE")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, seats=3, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    errors = db.query("SELECT content FROM messages WHERE author_kind = 'system' AND status = 'error'")
+    assert len(errors) == 1 and "sits out the rest of this debate" in errors[0]["content"]
+    assert len(client.turn_calls("Koala")) == 2  # one try and one retry in round 1, none in round 2
+
+
+async def test_a_much_slower_seat_keeps_its_seat_with_brief_replies_after_round_1(monkeypatch):
+    monkeypatch.setattr(engine_mod, "SLOW_TURN_SECONDS", 0.0)
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.gates["Koala"] = asyncio.Event()
+    eng = make_debate(client, seats=4, max_rounds=2)
+
+    async def slow_koala():
+        await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+        await asyncio.sleep(0.1)  # far longer than the others' turns
+        client.gates["Koala"].set()
+
+    slow = asyncio.create_task(slow_koala())
+    await eng.post_user_message("Q")
+    await eng.task
+    await slow
+    koala = client.turn_calls("Koala")
+    assert len(koala) == 2  # it still speaks in round 2
+    assert koala[0][1]["num_predict"] == engine_mod.TURN_MAX_TOKENS
+    assert koala[1][1]["num_predict"] == engine_mod.BRIEF_TURN_TOKENS and koala[1][1]["think"] is False
+    assert all(kw["num_predict"] == engine_mod.TURN_MAX_TOKENS for _, kw in client.turn_calls("Otter"))
 
 
 async def test_a_turn_waiting_behind_another_debate_keeps_its_full_time(monkeypatch):
@@ -1194,3 +1368,54 @@ async def test_metrics_total_the_time_spent_writing_for_the_speed():
     totals = eng.metrics(1)["totals"]
     writing = db.query_one("SELECT SUM(duration_ms) AS ms FROM usage WHERE output_tokens > 0")["ms"] or 0
     assert totals["gen_ms"] == writing and totals["duration_ms"] >= writing + 90000
+
+
+# ------------------------------------------------------------ memory
+
+
+def test_a_watcher_that_stops_reading_is_dropped_and_told_to_reconnect(monkeypatch):
+    monkeypatch.setattr(engine_mod.EventBus, "QUEUE_LIMIT", 3)
+    bus = engine_mod.EventBus()
+    stalled, reading = bus.subscribe(), bus.subscribe()
+    for i in range(5):
+        bus.publish({"i": i})
+        reading.get_nowait()
+    assert bus._subscribers == [reading]
+    assert stalled.get_nowait() is None and stalled.empty()  # only the "end the stream" marker is left
+
+
+async def test_answered_debates_nobody_watches_are_let_go(monkeypatch):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client)
+    engine_mod._engines["d1"] = eng
+    await eng.post_user_message("Q")
+    await eng.task
+    for debate_id, status in [("d2", "paused"), ("d3", "concluded")]:
+        db.execute(
+            "INSERT INTO debates (id, title, created_at, chair_endpoint_id, chair_model, max_rounds, num_ctx, status) "
+            "VALUES (?, 't', ?, 1, 'm', 2, 8192, ?)",
+            [debate_id, db.now(), status],
+        )
+        engine_mod.get_engine(debate_id)
+    watched = engine_mod.get_engine("d3").bus.subscribe()
+    monkeypatch.setattr(engine_mod, "ENGINE_IDLE_SECONDS", -1)
+    engine_mod.get_engine("d4")
+    assert set(engine_mod._engines) == {"d2", "d3", "d4"}  # d1 is answered and unwatched; d2 can still resume
+    engine_mod.get_engine("d3").bus.unsubscribe(watched)
+    engine_mod._engines.clear()
+
+
+async def test_the_sidebar_hears_when_a_conundrum_changes_status_but_not_every_token():
+    q = engine_mod.APP_BUS.subscribe()
+    try:
+        client = FakeClient(lambda h, r, m: reply("AGREE"))
+        eng = make_debate(client)
+        await eng.post_user_message("Q")
+        await eng.task
+        events = []
+        while not q.empty():
+            events.append(q.get_nowait())
+        assert events and all(e == {"type": "debate_changed", "id": "d1"} for e in events)
+        assert len(events) < 20  # status and round changes, not streamed text
+    finally:
+        engine_mod.APP_BUS.unsubscribe(q)

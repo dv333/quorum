@@ -13,7 +13,22 @@ function upsert(list, item) {
   return next
 }
 
-function reducer(state, event) {
+// Streamed text arrives a few characters at a time; the pieces that arrive within one frame are applied together
+function applyDeltas(messages, items) {
+  const add = new Map()
+  for (const d of items) {
+    const a = add.get(d.id) || { content: '', thinking: '' }
+    a.content += d.content || ''
+    a.thinking += d.thinking || ''
+    add.set(d.id, a)
+  }
+  return messages.map((m) => {
+    const a = add.get(m.id)
+    return a ? { ...m, content: m.content + a.content, body: (m.body || '') + a.content, thinking: m.thinking + a.thinking } : m
+  })
+}
+
+export function reducer(state, event) {
   switch (event.type) {
     case 'reset':
       return empty
@@ -25,19 +40,9 @@ function reducer(state, event) {
     case 'message_updated':
       return { ...state, messages: upsert(state.messages, event.message) }
     case 'message_delta':
-      return {
-        ...state,
-        messages: state.messages.map((m) =>
-          m.id === event.id
-            ? {
-                ...m,
-                content: m.content + (event.content || ''),
-                body: (m.body || '') + (event.content || ''),
-                thinking: m.thinking + (event.thinking || ''),
-              }
-            : m,
-        ),
-      }
+      return { ...state, messages: applyDeltas(state.messages, [event]) }
+    case 'deltas':
+      return { ...state, messages: applyDeltas(state.messages, event.items) }
     case 'claims_created':
       return { ...state, claims: [...state.claims.filter((c) => c.topic !== event.topic), ...event.claims] }
     case 'seats_updated':
@@ -73,10 +78,28 @@ export function useDebate(debateId) {
     let retry = null
     let delay = 1000
     let closed = false
+    // Text deltas wait for the next frame and are applied together; any other event applies them first, in order
+    let pending = []
+    let frame = null
+    const flush = () => {
+      frame = null
+      if (pending.length) dispatch({ type: 'deltas', items: pending })
+      pending = []
+    }
+    const receive = (event) => {
+      if (event.type === 'message_delta') {
+        pending.push(event)
+        if (frame === null) frame = requestAnimationFrame(flush)
+        return
+      }
+      if (frame !== null) cancelAnimationFrame(frame)
+      flush()
+      dispatch(event)
+    }
     const connect = () => {
       source = new EventSource(`/api/debates/${debateId}/events`)
       source.onopen = () => { delay = 1000 }
-      source.onmessage = (e) => dispatch(JSON.parse(e.data))
+      source.onmessage = (e) => receive(JSON.parse(e.data))
       // EventSource retries network drops by itself, but gives up for good on an HTTP error
       // (for example while the backend restarts behind the dev proxy). Reconnect ourselves;
       // the server sends a fresh snapshot on every connection.
@@ -88,7 +111,7 @@ export function useDebate(debateId) {
       }
     }
     connect()
-    return () => { closed = true; clearTimeout(retry); source?.close() }
+    return () => { closed = true; clearTimeout(retry); if (frame !== null) cancelAnimationFrame(frame); source?.close() }
   }, [debateId, replay])
 
   return state
