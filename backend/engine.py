@@ -747,7 +747,10 @@ class DebateEngine:
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
-        self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
+        self.waiting: Optional[str] = None
+        self._answer_failed: Optional[str] = (
+            None  # why the debate ended, when the chair then couldn't write the answer  # set while a model call waits its turn behind another debate
+        )
         self._ctx_by_model: Dict[
             str, int
         ] = {}  # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
@@ -900,6 +903,9 @@ class DebateEngine:
         """Resume a paused, cancelled or failed debate where it stopped."""
         async with self._cmd_lock:
             if self.debate()["status"] in STOPPED and not self.is_running():
+                if self._answer_failed:  # the debate was done and only the answer failed: try the answer again
+                    self._start(self._conclude(self._answer_failed))
+                    return
                 self._set(status="running")
                 self._start(self._run_rounds())
 
@@ -2746,6 +2752,25 @@ class DebateEngine:
                 )
         return out
 
+    def _failure_note(self, d: Dict[str, Any], error: str) -> str:
+        """Why there's no answer: the chair's error, every role that timed out or failed, and what to try next."""
+        rows = db.query(
+            "SELECT actor, model, kind, duration_ms FROM usage WHERE debate_id = ? AND topic = ? "
+            "AND (kind LIKE '%-timeout' OR kind LIKE '%-failed') ORDER BY id",
+            [self.id, d["topic"]],
+        )
+        lost: Dict[str, List[str]] = {}
+        for r in rows:
+            what = r["kind"].rsplit("-", 1)[0]
+            lost.setdefault(f"{r['actor']} ({r['model']})", []).append(what)
+        roles = "; ".join(f"{who}: {', '.join(sorted(set(k)))}" for who, k in lost.items())
+        return (
+            f"No answer: {self._chair_label(d)} ({d['chair_model']}) {error}."
+            + (f" Timed out or failed: {roles}." if roles else "")
+            + " Try a narrower question, fewer or smaller files, or quick mode; or press Resume to have the chair"
+            " try the answer again."
+        )
+
     async def _conclude(self, reason: str) -> None:
         self._concluding = True
         try:
@@ -2838,8 +2863,15 @@ class DebateEngine:
                 raise
             except Exception as e:
                 self._finish_message(row["id"], status="error", content=f"The chair ({d['chair_model']}) failed: {e}")
+                # No answer is no answer: say so, with what timed out, instead of showing the debate as answered
+                self.partials.pop(row["id"], None)
+                self._answer_failed = reason
+                self._system_message(self._failure_note(d, str(e)))
+                self._set(status="failed")
+                return
             finally:
                 self.partials.pop(row["id"], None)
+            self._answer_failed = None
             await self._audit_answer(row["id"], claims, studies)
             if is_code_debate(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])

@@ -119,3 +119,32 @@ async def test_a_signed_out_coder_says_how_to_fix_it(tmp_path, monkeypatch):
     monkeypatch.setattr(coder, "command", lambda cli, prompt, repo: [sys.executable, "-c", script])
     with pytest.raises(coder.CoderError, match="isn't signed in: run `claude`"):
         await coder.run("claude", "q", str(tmp_path))
+
+
+BAD_CONFIG = "import sys; sys.stderr.write('Error loading config.toml: unknown variant `ultra`, expected one of `low`, `high`'); sys.exit(1)"
+
+
+async def test_codex_that_cant_read_the_users_config_is_retried_with_a_supported_effort(tmp_path, monkeypatch):
+    git_repo(tmp_path)
+    runs = []
+
+    def command(cli, prompt, repo, effort=None):
+        runs.append(effort)
+        return [sys.executable, "-c", BAD_CONFIG if effort is None else "print('answer at a.py:1')"]
+
+    monkeypatch.setattr(coder, "command", command)
+    text, _ = await coder.run("codex", "q", str(tmp_path))
+    assert text == "answer at a.py:1" and runs == [None, coder.CODEX_SAFE_EFFORT]
+
+
+async def test_codex_config_that_still_fails_says_how_to_fix_it(tmp_path, monkeypatch):
+    git_repo(tmp_path)
+    monkeypatch.setattr(coder, "command", lambda cli, prompt, repo, effort=None: [sys.executable, "-c", BAD_CONFIG])
+    with pytest.raises(coder.CoderError, match=r"can't load its settings .*QUORUM_CODER=claude"):
+        await coder.run("codex", "q", str(tmp_path))
+
+
+def test_the_codex_effort_override_is_for_this_run_only():
+    cmd = coder.command("codex", "q", "/repo", effort="high")
+    assert cmd[cmd.index("-c") + 1] == 'model_reasoning_effort="high"' and cmd[-1] == "q"
+    assert "-c" not in coder.command("codex", "q", "/repo")

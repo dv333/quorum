@@ -25,6 +25,9 @@ from . import cli
 MAX_DIFF_CHARS = 60_000
 MAX_FILE_CHARS = 20_000
 MAX_FILES = 12
+# All attached files together: every agent rereads them on every turn, and local models slow down (and run out of
+# time) on very long prompts. About 10k tokens.
+MAX_TOTAL_CHARS = 40_000
 MAX_WAIT = 280  # seconds a single tool call may wait for an answer
 LIVE = ("intake", "clarifying", "confirming", "running", "paused", "concluding", "researching")
 MODES = {
@@ -60,32 +63,61 @@ def _within(path: Path, root: Path) -> bool:
         return False
 
 
-def read_files(paths: List[str], root: str = ".") -> str:
-    """The files' contents as fenced blocks for the council, size-capped; paths are relative to root (or absolute
-    inside it). Missing, binary and outside-root files are noted, not read."""
+def read_files(paths: List[str], root: str = ".", budget: int = MAX_TOTAL_CHARS) -> str:
+    """The files' contents as fenced blocks for the council, size-capped (see attach)."""
+    return attach(paths, root, budget)[0]
+
+
+def attach(
+    paths: List[str], root: str = ".", budget: int = MAX_TOTAL_CHARS, coder_reads: bool = False
+) -> Tuple[str, List[str]]:
+    """The files for the council, and a manifest line per file saying what happened to it.
+
+    Paths are relative to root, or absolute inside it; anything outside root, missing or binary is skipped. The first
+    file is the primary one and is read first; the rest share what's left of the budget, so the total stays under
+    `budget` characters. With coder_reads (a coding agent can read root), only the primary file is included and the
+    others are listed for the Coder to read when the council asks. The list of files comes first, so an agent that
+    only sees the start of the question still knows what's there."""
     base = Path(root).expanduser()
-    blocks = []
-    for raw in paths[:MAX_FILES]:
+    left = budget
+    listing, blocks, manifest = [], [], []
+    for i, raw in enumerate(paths[:MAX_FILES]):
         p = Path(raw).expanduser()
         p = p if p.is_absolute() else base / p
         if not _within(p, base):
-            blocks.append(f"(skipped {raw}: outside {base})")
+            manifest.append(f"{raw}: skipped, outside {base}")
             continue
         if not p.is_file():
-            blocks.append(f"(skipped {raw}: not found)")
+            manifest.append(f"{raw}: skipped, not found")
             continue
         data = p.read_bytes()[: MAX_FILE_CHARS * 4]
         if b"\0" in data[:4096]:
-            blocks.append(f"(skipped {raw}: binary)")
+            manifest.append(f"{raw}: skipped, binary")
             continue
-        text = data.decode("utf-8", errors="replace")
-        cut = len(text) > MAX_FILE_CHARS
-        text = text[:MAX_FILE_CHARS]
         rel = os.path.relpath(p, base)
+        text = data.decode("utf-8", errors="replace")
+        if coder_reads and i > 0:
+            listing.append(f"- {rel}: in the repository; ask @Coder about it")
+            manifest.append(f"{rel}: left for the Coder to read ({len(text):,} characters)")
+            continue
+        room = min(MAX_FILE_CHARS, left)
+        if room < 500:
+            listing.append(f"- {rel}: not included (over the {budget:,}-character limit for attachments)")
+            manifest.append(f"{rel}: not included, over the {budget:,}-character limit for all files")
+            continue
+        cut = len(text) > room
+        text = text[:room]
+        left -= len(text)
+        listing.append(f"- {rel}{' (primary)' if i == 0 and len(paths) > 1 else ''}{' (cut)' if cut else ''}")
+        manifest.append(
+            f"{rel}: cut to {len(text):,} characters" if cut else f"{rel}: included ({len(text):,} characters)"
+        )
         blocks.append(f"File {rel}{' (truncated)' if cut else ''}:\n```\n{text}\n```")
     if len(paths) > MAX_FILES:
-        blocks.append(f"({len(paths) - MAX_FILES} more files not included)")
-    return "\n\n".join(blocks)
+        manifest.append(f"{len(paths) - MAX_FILES} more files not included (at most {MAX_FILES})")
+    head = f"Files attached ({len(listing)}):\n" + "\n".join(listing) if len(listing) > 1 else ""
+    skipped = [f"(skipped {m.replace(': skipped, ', ': ', 1)})" for m in manifest if ": skipped, " in m]
+    return "\n\n".join(x for x in [head, *skipped, *blocks] if x), manifest
 
 
 def git_diff(repo: str = ".", base: str = "HEAD") -> str:
@@ -295,10 +327,15 @@ def ask(
     wait_seconds: int = 45,
     repo_path: str = "",
 ) -> str:
-    context = read_files(files or [], root)
+    # Files come from the repository the caller named, when there is one: the same read-only boundary the Coder gets
+    from . import coder
+
+    context, manifest = attach(
+        files or [], repo_path or root, coder_reads=bool(repo_path) and coder.which() is not None
+    )
     debate_id = start(f"{question.strip()}\n\n{context}".strip(), mode, research, repo_path=repo_path or None)
     snap, done = wait(debate_id, wait_seconds)
-    return respond(debate_id, snap, done)
+    return with_manifest(respond(debate_id, snap, done), manifest)
 
 
 def review(
@@ -312,14 +349,14 @@ def review(
     wait_seconds: int = 45,
 ) -> str:
     diff = git_diff(repo_path, base) if base else ""
-    context = read_files(files or [], repo_path)
+    context, manifest = attach(files or [], repo_path)
     if not diff and not context:
         return "Nothing to review: no uncommitted changes and no files given."
     debate_id = start(
         review_question(diff, context, focus, task), mode, research, pack="code-review", repo_path=repo_path
     )
     snap, done = wait(debate_id, wait_seconds)
-    return respond(debate_id, snap, done)
+    return with_manifest(respond(debate_id, snap, done), manifest)
 
 
 def challenge(
@@ -333,6 +370,13 @@ def challenge(
     debate_id = start(challenge_question(claim, read_files(files or [], root)), mode, research)
     snap, done = wait(debate_id, wait_seconds)
     return respond(debate_id, snap, done)
+
+
+def with_manifest(text: str, manifest: List[str]) -> str:
+    """The reply, with what happened to each attached file when any was cut, skipped or left for the Coder."""
+    if all(": included (" in m for m in manifest):
+        return text
+    return text + "\n\nAttached files:\n" + "\n".join(f"- {m}" for m in manifest)
 
 
 def result(conundrum_id: str, wait_seconds: int = 45, level: str = "standard") -> str:
@@ -384,9 +428,11 @@ def build_server():
         repo_path: str = "",
     ) -> str:
         """Ask Quorum's council of local models for a second opinion on a decision or question. files: paths to
-        include as context (read locally, size-capped). repo_path: a repository the council's Coder (Claude Code or
-        Codex, read-only) can read to answer questions about the code. mode: quick (one round, three models, usually
-        answers within one call), standard or deep. research: let the council search the web and check its claims.
+        include as context, the most important first (read locally, 40,000 characters in all; with repo_path they're
+        read from inside that repository, and with a Coder only the first goes to the council while the Coder reads
+        the rest on request). repo_path: a repository the council's Coder (Claude Code or Codex, read-only) can read
+        to answer questions about the code. Ask one narrow question per call. mode: quick (one round, three models,
+        usually answers within one call), standard or deep. research: let the council search the web and check its claims.
         Returns the answer, or the conundrum id and a link if it isn't done within wait_seconds (then call
         quorum_result)."""
         return await asyncio.to_thread(

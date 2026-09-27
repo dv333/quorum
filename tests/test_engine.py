@@ -578,8 +578,52 @@ async def test_empty_chair_answer_is_retried_then_reported():
     chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert chair["status"] == "error" and "empty answer twice" in chair["content"]
     assert len(client.calls_with("chair of an AI council")) == 2
-    assert eng.debate()["status"] == "concluded"
     assert client.calls_with("chair of an AI council")[0] and client.calls[-1][2]["think"] is False
+    # No answer is reported as a failure, not as an answered debate
+    assert eng.debate()["status"] == "failed"
+    assert not db.query("SELECT * FROM verdicts")
+    note = db.query("SELECT content FROM messages WHERE author_kind = 'system' ORDER BY id DESC")[0]["content"]
+    assert note.startswith("No answer:") and "empty answer twice" in note and "Resume" in note
+
+
+async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_round():
+    class FlakyChair(FakeClient):
+        failed = 0
+
+        async def stream(self, endpoint, model, messages, **kw):
+            if "chair of an AI council" in messages[0]["content"] and self.failed < 2:
+                self.failed += 1
+                self.calls.append((model, messages, kw))
+                yield Chunk("done", stats={})
+                return
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = FlakyChair(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert eng.debate()["status"] == "failed"
+    turns = len(client.turn_calls())
+    await eng.continue_()
+    await eng.task
+    assert eng.debate()["status"] == "concluded" and len(db.query("SELECT * FROM verdicts")) == 1
+    assert len(client.turn_calls()) == turns  # no extra round
+
+
+async def test_the_failure_note_names_what_timed_out(monkeypatch):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, seats=2, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    for actor, model, kind in [("Koala", "gemma3:12b", "turn-timeout"), ("Panda", "qwen3.8", "summary-timeout")]:
+        db.execute(
+            "INSERT INTO usage (debate_id, topic, actor, model, kind, prompt_tokens, output_tokens, duration_ms, searches, "
+            "pages, created_at) VALUES ('d1', 1, ?, ?, ?, 0, 0, 240000, 0, 0, ?)",
+            [actor, model, kind, db.now()],
+        )
+    note = eng._failure_note(eng.debate(), "took longer than 10 minutes")
+    assert "Koala (gemma3:12b): turn" in note and "Panda (qwen3.8): summary" in note and "quick mode" in note
 
 
 # ---------------------------------------------------------------- chair pick, metrics, levels
