@@ -17,9 +17,19 @@ function typing(message, at) {
   }
 }
 
+// Moves every timestamp by `ms`, so a recording replays as if it were asked just now (the clock starts at 0s)
+function shifted(value, ms) {
+  if (Array.isArray(value)) return value.map((v) => shifted(v, ms))
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [
+    k, k === 'created_at' && typeof v === 'string' ? new Date(new Date(v).getTime() + ms).toISOString() : shifted(v, ms),
+  ]))
+}
+
 // The events of a recorded snapshot, each with its time in ms from the start: { start, events: [{ t, event }] }
-export function timeline(recording) {
-  const snap = recording.snapshot
+export function timeline(recording, now = Date.now()) {
+  const asked = recording.snapshot.messages.find((m) => m.author_kind === 'user')?.created_at
+  const snap = asked ? shifted(recording.snapshot, now - new Date(asked).getTime()) : recording.snapshot
   const verdict = snap.verdicts[snap.verdicts.length - 1]
   const answer = snap.messages.find((m) => m.id === verdict?.message_id)
   const intro = snap.messages.filter((m) => m.round === 0 && m.author_kind !== 'researcher')

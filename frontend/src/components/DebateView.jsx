@@ -6,12 +6,11 @@ import { formatElapsed, useNow } from '../time'
 import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
-import { AgentMessage, AgentTip, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
+import RoundTable from './RoundTable'
+import { AgentMessage, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
 const INTAKE = ['intake', 'clarifying', 'confirming']
 const focusComposer = () => window.dispatchEvent(new Event('quorum:focus-composer'))
-
-const STANCE_LABEL = { AGREE: 'agrees', REFINE: 'refining', DISAGREE: 'disagrees' }
 
 function latestStances(messages, topic, seats) {
   return seats.map((seat) => {
@@ -120,113 +119,60 @@ function Thread({ items, seatsById, debate, onIntake }) {
 }
 
 // The stage's compact view is a per-viewer preference; storage can be unavailable (private windows)
-function useCompactStage() {
-  const [compact, setCompact] = useState(() => {
-    try { return localStorage.getItem('quorum.stage') !== 'full' } catch { return true }
+// The table folds into a line while you read further down, or always if you choose; the choice is remembered
+function useFoldedTable(scrolled) {
+  const [pref, setPref] = useState(() => {
+    try { return localStorage.getItem('quorum.table') || 'table' } catch { return 'table' }
   })
-  const toggle = () => setCompact((c) => {
-    try { localStorage.setItem('quorum.stage', c ? 'full' : 'compact') } catch { /* keep it for this visit */ }
-    return !c
-  })
-  return [compact, toggle]
+  const [forceOpen, setForceOpen] = useState(false)
+  useEffect(() => { if (!scrolled) setForceOpen(false) }, [scrolled])
+  const save = (v) => {
+    setPref(v)
+    try { localStorage.setItem('quorum.table', v) } catch { /* keep it for this visit */ }
+  }
+  const folded = pref === 'line' || (scrolled && !forceOpen)
+  const toggle = () => {
+    if (!folded) { save('line'); setForceOpen(false); return }
+    if (pref === 'line') save('table')
+    if (scrolled) setForceOpen(true)
+  }
+  return [folded, toggle]
 }
 
-function MiniSeats({ seats, stances, speakingSeatIds, debate, beagleBusy, searches }) {
-  return (
-    <div className="mini-seats">
-      {seats.map((seat, i) => {
-        const picking = i === 0 && debate.chair_mode === 'auto' && !debate.chair_handle && debate.status === 'running'
-        const speaking = speakingSeatIds.has(seat.id) || picking
-        const st = stances[i]
-        const status = picking ? 'choosing the chair' : speaking ? 'speaking' : st ? STANCE_LABEL[st] : 'waiting'
-        const who = seat.role ? `${seat.handle}, ${seat.role}` : seat.handle
-        return (
-          <span className={`mini-seat ${speaking ? 'on' : ''}`} key={seat.id} aria-label={`${who} · ${modelShort(seat.model)} · ${status}`}>
-            <AgentTip handle={seat.handle} role={seat.role} model={seat.model} note={status} chair={seat.handle === debate.chair_handle} focusable>
-              <Orb handle={seat.handle} speaking={speaking} chair={seat.handle === debate.chair_handle} />
-            </AgentTip>
-            {st && !speaking && <i className={`mini-st dot ${st.toLowerCase()}`} aria-hidden="true" />}
-          </span>
-        )
-      })}
-      {debate.research_enabled && (
-        <span className={`mini-seat ${beagleBusy ? 'on' : ''}`}>
-          <AgentTip handle={RESEARCHER} role="Web research" model={debate.researcher_model}
-            note={beagleBusy ? 'searching' : `${searches} search${searches === 1 ? '' : 'es'}`} focusable>
-            <Orb handle={RESEARCHER} speaking={beagleBusy} />
-          </AgentTip>
-        </span>
-      )}
-    </div>
-  )
-}
-
-function Stage({ state, speakingSeatIds, beagleBusy, searches }) {
+function Stage({ state, speakingSeatIds, beagleBusy, searches, scrolled }) {
   const { debate, seats, messages } = state
   const stances = latestStances(messages, debate.topic, seats)
-  const [compact, toggleCompact] = useCompactStage()
+  const [folded, toggleFolded] = useFoldedTable(scrolled)
+  const coding = (m) => m.author_kind === 'researcher' && ['code', 'codebrief'].includes(m.research_kind)
+  const coderBusy = messages.some((m) => m.status === 'streaming' && coding(m))
+  const coderAnswers = messages.filter((m) => m.status === 'done' && coding(m) && m.research_kind === 'code').length
+  let roundPill = null
+  if (debate.round > 0) {
+    const done = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done')
+    const dissent = done.filter((m) => m.stance === 'DISAGREE').map((m) => seats.find((s) => s.id === m.seat_id)?.handle)
+    const n = (st) => done.filter((m) => m.stance === st).length
+    const tally = done.length === 0 ? ''
+      : n('AGREE') === done.length ? `all ${done.length} agree`
+      : [n('AGREE') && `${n('AGREE')} agree`, n('REFINE') && `${n('REFINE')} refine`].filter(Boolean).join(' · ')
+    const jump = () => document.getElementById(`round-${debate.topic}-${debate.round}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // At the table the round is on the table itself: the pill only carries the tally, once there is one
+    if (folded || tally || dissent.length > 0) roundPill = (
+      <button className="consensus-pill" onClick={jump} title="Jump to this round">
+        {folded && <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>}
+        {folded && <span className="cp-dots" aria-hidden="true">{stances.map((st, i) => <i key={i} className={`dot ${st ? st.toLowerCase() : 'idle'}`} />)}</span>}
+        {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
+      </button>
+    )
+  }
+  const since = askedAt(messages, debate)
   return (
     <div className="stage-wrap">
-    <div className={`stage ${compact ? 'compact' : ''}`}>
-      {compact ? (
-        <MiniSeats seats={seats} stances={stances} speakingSeatIds={speakingSeatIds} debate={debate} beagleBusy={beagleBusy} searches={searches} />
-      ) : (
-      <div className="seats">
-        {seats.map((seat, i) => {
-          // In automatic mode the first (largest) member picks the chair before round 1
-          const picking = i === 0 && debate.chair_mode === 'auto' && !debate.chair_handle && debate.status === 'running'
-          const speaking = speakingSeatIds.has(seat.id) || picking
-          const st = stances[i]
-          return (
-            <div className={`seat ${speaking ? 'on' : ''}`} key={seat.id}>
-              <AgentTip handle={seat.handle} role={seat.role} model={seat.model} chair={seat.handle === debate.chair_handle} focusable>
-                <Orb handle={seat.handle} size="lg" speaking={speaking} chair={seat.handle === debate.chair_handle} />
-              </AgentTip>
-              <b>{seat.handle}</b>
-              {seat.role && <small className="seat-role" title={seat.role_focus || seat.role}>{seat.role}</small>}
-              <small className="mdl">({modelShort(seat.model)})</small>
-              <span className="st">
-                {picking ? 'choosing chair…' : speaking ? 'speaking…' : st ? <><i className={`dot ${st.toLowerCase()}`} /> {STANCE_LABEL[st]}</> : <><i className="dot idle" /> waiting</>}
-              </span>
-            </div>
-          )
-        })}
-        {debate.research_enabled && (
-          <div className={`seat ${beagleBusy ? 'on' : ''}`}>
-            <AgentTip handle={RESEARCHER} role="Web research" model={debate.researcher_model} focusable>
-              <Orb handle={RESEARCHER} size="lg" speaking={beagleBusy} />
-            </AgentTip>
-            <b>{RESEARCHER}</b>
-            <small className="mdl">({modelShort(debate.researcher_model)})</small>
-            <span className="st">{beagleBusy ? 'searching…' : `${searches} search${searches === 1 ? '' : 'es'}`}</span>
-          </div>
-        )}
+      <div className="stage">
+        <RoundTable seats={seats} debate={debate} stances={stances} speakingSeatIds={speakingSeatIds}
+          beagleBusy={beagleBusy} coderBusy={coderBusy} searches={searches} coderAnswers={coderAnswers}
+          since={since} speed={avgTokPerS(state.metrics)} collapsed={folded} onToggle={toggleFolded}
+          roundPill={roundPill} clock={<TotalTime since={since} />} />
       </div>
-      )}
-      {debate.round > 0 && (() => {
-        const done = messages.filter((m) => m.topic === debate.topic && m.round === debate.round && m.author_kind === 'seat' && m.status === 'done')
-        const dissent = done.filter((m) => m.stance === 'DISAGREE').map((m) => seats.find((s) => s.id === m.seat_id)?.handle)
-        const n = (s) => done.filter((m) => m.stance === s).length
-        const tally = done.length === 0 ? ''
-          : n('AGREE') === done.length ? `all ${done.length} agree`
-          : [n('AGREE') && `${n('AGREE')} agree`, n('REFINE') && `${n('REFINE')} refine`].filter(Boolean).join(' · ')
-        const jump = () => document.getElementById(`round-${debate.topic}-${debate.round}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        return (
-          <button className="consensus-pill" onClick={jump} title="Jump to this round">
-            <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>
-            <span className="cp-dots" aria-hidden="true">{stances.map((s, i) => <i key={i} className={`dot ${s ? s.toLowerCase() : 'idle'}`} />)}</span>
-            {(tally || dissent.length > 0) && <span>{tally}{dissent.length > 0 && <>{tally && ' · '}<em>{joinNames(dissent)} {dissent.length === 1 ? 'dissents' : 'dissent'}</em></>}</span>}
-          </button>
-        )
-      })()}
-      <TotalTime since={askedAt(messages, debate)} />
-      <button className="icon-btn stage-toggle" onClick={toggleCompact} aria-expanded={!compact}
-        aria-label={compact ? 'Show agent details' : 'Compact view'} title={compact ? 'Show agent details' : 'Compact view'}>
-        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d={compact ? 'm5 8 5 5 5-5' : 'm5 12 5-5 5 5'} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-    </div>
       <LivingAnswer drafts={(state.drafts || []).filter((d) => d.topic === debate.topic)} chair={debate.chair_handle} />
     </div>
   )
@@ -509,6 +455,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
   const answerRef = useRef(null)
   const [error, setError] = useState(null)
   const [jump, setJump] = useState(null) // 'latest' while live and scrolled up, 'answer' when the answer is out of view
+  const [scrolled, setScrolled] = useState(false) // read past the top: the table folds into a line
   const seatsById = useMemo(() => Object.fromEntries(state.seats.map((s) => [s.id, s])), [state.seats])
 
   const status = state.debate?.status
@@ -599,6 +546,8 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
         onScroll={(e) => {
           const el = e.currentTarget
           stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+          const top = el.scrollTop // the table folds past 90px and opens again near the top (no flicker in between)
+          setScrolled((was) => (was ? top > 8 : top > 90))
           const card = answerRef.current?.firstElementChild
           let next = null
           if (live && !stickRef.current) next = 'latest'
@@ -609,7 +558,7 @@ export default function DebateView({ debateId, onChanged, mobileBar }) {
           }
           if (next !== jump) setJump(next)
         }}>
-        {live && <Stage state={state} speakingSeatIds={speakingSeatIds} beagleBusy={beagleBusy} searches={searches} />}
+        {live && <Stage state={state} speakingSeatIds={speakingSeatIds} beagleBusy={beagleBusy} searches={searches} scrolled={scrolled} />}
         <div className="thread">
           {topics.map((t) => (
             <TopicBlock key={t} topic={t} state={state} seatsById={seatsById} current={t === debate.topic} answerRef={answerRef}
