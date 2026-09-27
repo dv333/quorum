@@ -34,6 +34,8 @@ class FakeClient(ChatClient):
         self.audit_reply = '{"problems": []}'
         self.revise_reply = "BOTTOM LINE: revised answer"
         self.verdict_reply = "VERDICT TEXT"
+        self.review_gap_reply = '{"missing": []}'
+        self.review_add_reply = "BOTTOM LINE: add back"
 
     def calls_with(self, marker):
         return [m for _, m, _ in self.calls if marker in m[0]["content"]]
@@ -63,6 +65,10 @@ class FakeClient(ChatClient):
             content, thinking = self.verify_reply(messages), ""
         elif sys.startswith("You audit an AI council"):
             content, thinking = self.audit_reply, ""
+        elif sys.startswith("You check an AI council's code review"):
+            content, thinking = self.review_gap_reply, ""
+        elif sys.startswith("You finish an AI council's code review"):
+            content, thinking = self.review_add_reply, ""
         elif "You correct your final answer" in sys:
             content, thinking = self.revise_reply, ""
         elif sys.startswith("You organize an AI council"):
@@ -806,6 +812,50 @@ async def test_a_code_review_is_never_answered_directly():
     await eng.task
     assert client.turn_calls()  # the council spoke
     assert db.query_one("SELECT reason FROM verdicts")["reason"] != "direct"
+
+
+DIFF_Q = "Review this code change.\n\nDiff:\n```diff\n-@app.get('/c/<int:id>')\n+@app.get('/c/<id>')\n```"
+REVIEW = "BOTTOM LINE: Don't merge.\n\n## Key points\n- SQL injection in db.py:15.\n\n## Details\n**High**\n1. Fix it."
+
+
+async def test_a_code_review_answer_gets_back_findings_the_summary_dropped():
+    client = FakeClient(lambda h, r, m: reply("AGREE", text="The <int:> converter was removed (api.py:14)."))
+    client.verdict_reply = REVIEW
+    client.review_gap_reply = (
+        '{"missing": [{"finding": "The <int:> route converter was removed", "where": "api.py:14", '
+        '"severity": "high", "raised_by": "Otter"}]}'
+    )
+    client.review_add_reply = REVIEW + "\n2. Restore `<int:id>` (api.py:14)."
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert "Restore `<int:id>`" in chair["content"]
+    meta = json.loads(chair["meta_json"])["review"]
+    assert meta["revised"] and meta["missing"][0]["where"] == "api.py:14"
+    gap = client.calls_with("You check an AI council's code review")[0]
+    assert "converter was removed" in gap[1]["content"]  # the auditor saw the debate
+
+
+async def test_a_revision_that_loses_the_review_is_not_used():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = REVIEW
+    client.review_gap_reply = '{"missing": [{"finding": "No timeout", "severity": "high"}]}'
+    client.review_add_reply = "Sure, here it is."  # no bottom line, no sections
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["content"].startswith("BOTTOM LINE: Don't merge.")
+    assert not json.loads(chair["meta_json"])["review"].get("revised")
+
+
+async def test_other_questions_are_not_checked_as_reviews():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Rent or buy?")
+    await eng.task
+    assert client.calls_with("You check an AI council's code review") == []
 
 
 async def test_chair_sets_the_number_of_rounds():

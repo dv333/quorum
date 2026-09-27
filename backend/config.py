@@ -76,6 +76,8 @@ RESEARCH_MAX_SOURCES = 5  # pages it reads before writing a brief
 RESEARCH_PAGE_CHARS = 3500  # characters kept from each page (longer excerpts keep caveats and context)
 RESEARCH_MAX_CLAIMS = 6  # material claims checked before the answer is written
 RESEARCH_SOURCES_PER_CLAIM = 3
+REVIEW_PART_CHARS = 12000  # debate text per check when a code review's answer is checked for dropped findings
+REVIEW_MAX_ADDED = 8  # findings added back to one review, at most
 CODER_REQUESTS_PER_ROUND = 2  # questions for the Coder (Claude Code or Codex) per round; each costs cloud tokens
 RESEARCH_REQUESTS_PER_ROUND = _env_int("LLC_RESEARCH_PER_ROUND", 3)  # agent requests honored per round
 
