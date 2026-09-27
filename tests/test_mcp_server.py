@@ -99,6 +99,28 @@ def test_an_unfinished_debate_says_how_to_get_the_answer(backend):
     assert "/#q/abc123" in text
 
 
+def test_a_cancelled_or_failed_debate_stops_the_wait_and_says_why(backend):
+    snap = snapshot("failed")
+    snap["messages"].append(
+        {
+            "id": 12,
+            "topic": 1,
+            "round": 1,
+            "author_kind": "system",
+            "status": "done",
+            "content": "Fewer than two agents responded this round, so the debate stopped.",
+        }
+    )
+    backend["snaps"] += [snap]
+    got, done = mcp_server.wait("abc123", 60)  # returns at once instead of waiting a minute
+    text = mcp_server.respond("abc123", got, done)
+    assert not done and "stopped after an error" in text and "Fewer than two agents" in text
+    assert not any(path.endswith("/continue") for path, _ in backend["post"])
+    backend["snaps"][:] = [snapshot("cancelled")]
+    got, done = mcp_server.wait("abc123", 60)
+    assert not done and "cancelled in the app" in mcp_server.respond("abc123", got, done)
+
+
 def test_codex_setup_is_added_once(tmp_path, monkeypatch):
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
     (tmp_path / "config.toml").write_text('model = "gpt-5"\n')

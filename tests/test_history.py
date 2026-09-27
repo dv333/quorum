@@ -76,3 +76,15 @@ async def test_the_sidebar_loads_in_one_request():
     assert found["results"]["count"] == 5 and len(found["results"]["items"]) == 2
     with pytest.raises(HTTPException):
         await main.sidebar(groups="not json", pins=None, q=None, limit=20)
+
+
+async def test_answered_conundrums_say_how_long_the_answer_took():
+    db.execute("UPDATE debates SET topic = 1 WHERE id = 'd00'")
+    asked = db.query_one("SELECT created_at FROM messages WHERE debate_id = 'd00'")["created_at"]
+    answered = (datetime.fromisoformat(asked) + timedelta(minutes=11, seconds=12)).isoformat()
+    db.execute(
+        "INSERT INTO verdicts (debate_id, topic, reason, rounds, message_id, created_at) VALUES ('d00', 1, 'max_rounds', 3, 1, ?)",
+        [answered],
+    )
+    rows = await main.list_debates(limit=2, before=None, after=None, q=None, ids=None, status=None, exclude=None)
+    assert rows[0]["took_seconds"] == 672 and rows[1]["took_seconds"] is None

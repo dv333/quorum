@@ -62,6 +62,7 @@ PRIOR_TOPICS_IN_CONTEXT = 3
 ACTIVE_STATUSES = ("running", "concluding", "researching", "intake")
 # Waiting on the user during the chair's clarifying interview
 INTAKE_WAITING = ("clarifying", "confirming")
+STOPPED = ("paused", "cancelled", "failed")  # stopped before an answer; any of them can be resumed
 
 
 def estimate_tokens(text: str) -> int:
@@ -877,7 +878,7 @@ class DebateEngine:
                 self._queue_research(requests[0], "You", "request")
             if coder_requests:
                 self._queue_research(coder_requests[0], "You", "code")
-            if status == "paused":
+            if status in STOPPED:
                 self._set(status="running")
                 self._start(self._run_rounds())
             # running / concluding / researching: the interjection and any request are
@@ -893,8 +894,9 @@ class DebateEngine:
             self._start(self._begin_debate())
 
     async def continue_(self) -> None:
+        """Resume a paused, cancelled or failed debate where it stopped."""
         async with self._cmd_lock:
-            if self.debate()["status"] == "paused" and not self.is_running():
+            if self.debate()["status"] in STOPPED and not self.is_running():
                 self._set(status="running")
                 self._start(self._run_rounds())
 
@@ -905,10 +907,21 @@ class DebateEngine:
             if self.debate()["status"] in ("running", "concluding"):
                 self._set(status="paused")
 
+    async def cancel(self) -> None:
+        """Stop for good, keeping everything said so far; it can still be resumed."""
+        async with self._cmd_lock:
+            status = self.debate()["status"]
+            if status in ("concluded", "idle", "cancelled"):
+                return
+            await self._cancel_task()
+            self.research_queue.clear()
+            self._set(status="cancelled")
+            self._system_message("Cancelled by you. Resume to pick up where it stopped.")
+
     async def conclude(self) -> None:
         async with self._cmd_lock:
             d = self.debate()
-            if d["status"] not in ("running", "paused") or d["topic"] == 0:
+            if d["status"] not in ("running", *STOPPED) or d["topic"] == 0:
                 return
             await self._cancel_task()
             self._start(self._conclude("manual"))
@@ -933,7 +946,7 @@ class DebateEngine:
         except Exception as e:  # never leave a debate stuck in "running"
             log.exception("debate %s crashed", self.id)
             self._system_message(f"The debate engine hit an error: {e}")
-            self._set(status="paused")
+            self._set(status="failed")
 
     async def _cancel_task(self) -> None:
         if self.is_running():
@@ -1165,10 +1178,10 @@ class DebateEngine:
                 ]
                 if len(done) < MIN_SEATS:
                     self._system_message(
-                        "Fewer than two agents responded this round, so the debate is paused. "
-                        "Check that the models are running, then continue."
+                        "Fewer than two agents responded this round, so the debate stopped. "
+                        "Check that the models are running, then resume."
                     )
-                    self._set(status="paused")
+                    self._set(status="failed")
                     return
 
                 finished = [m for m in done if m["status"] == "done"]
@@ -1392,6 +1405,8 @@ class DebateEngine:
             k: sum(a[k] for a in actors.values())
             for k in ("duration_ms", "prompt_tokens", "output_tokens", "searches", "pages", "calls", "lost_ms")
         }
+        # Generation speed over the calls that wrote something (not searches, the Coder or failed calls)
+        totals["gen_ms"] = sum(r["duration_ms"] for r in rows if r["output_tokens"] and r["kind"] != "search")
         return {"actors": list(actors.values()), "totals": totals}
 
     def _chair_label(self, d: Dict[str, Any]) -> str:
