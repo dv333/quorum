@@ -298,7 +298,9 @@ function LiveStatus({ state }) {
   const seatName = (id) => seats.find((s) => s.id === id)?.handle
   const writer = streaming.find((m) => m.author_kind === 'seat')
   let text
-  if (debate.status === 'concluding') {
+  if (debate.waiting) {
+    text = debate.waiting // another debate is using the model server: this one's call waits its turn
+  } else if (debate.status === 'concluding') {
     const answered = messages.some((m) => m.author_kind === 'chair' && m.topic === debate.topic && m.status === 'done')
     text = debate.phase ? debate.phase
       : streaming.some((m) => m.research_kind === 'factcheck') ? `${RESEARCHER} is fact-checking the answer…`

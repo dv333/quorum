@@ -175,6 +175,14 @@ fastest, and computers without a GPU work too, more slowly.
 </details>
 
 <details>
+<summary><b>Can I run several conundrums at once?</b></summary>
+
+Yes. Your computer runs one model well at a time, so conundrums take turns: each model call waits for the one before
+it, and a call for a model that's already loaded goes first, so models aren't reloaded over and over. The status line
+says who you're waiting on. Waiting never counts against an agent's time limit, and cloud models don't wait.
+</details>
+
+<details>
 <summary><b>Can I use ChatGPT, Claude or Gemini models?</b></summary>
 
 Yes, as council members: add OpenAI, Anthropic, Gemini, OpenRouter, Groq, Mistral, Together, DeepSeek or any

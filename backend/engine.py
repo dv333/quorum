@@ -10,6 +10,7 @@ import json
 import logging
 import re
 import time
+from contextlib import asynccontextmanager
 from datetime import date
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
@@ -50,6 +51,7 @@ from .parsing import (
     plain_answer,
     strip_thinking,
 )
+from .model_queue import QUEUE, Caller, server_key
 from .providers import ChatClient, Endpoint
 
 log = logging.getLogger(__name__)
@@ -745,6 +747,7 @@ class DebateEngine:
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
+        self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
         self._ctx_by_model: Dict[
             str, int
         ] = {}  # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
@@ -1254,7 +1257,6 @@ class DebateEngine:
         max_seconds, max_tokens = (
             (TURN_MAX_SECONDS, TURN_MAX_TOKENS) if kind == "turn" else (ANSWER_MAX_SECONDS, ANSWER_MAX_TOKENS)
         )
-        started = time.monotonic()
         partial = self.partials.setdefault(msg_id, {"content": "", "thinking": ""})
         stats: Dict[str, Any] = {}
         ep = self._endpoint(endpoint_id)
@@ -1287,11 +1289,15 @@ class DebateEngine:
                     stats = chunk.stats
 
         cut = False
-        try:
-            await asyncio.wait_for(consume(), max_seconds)
-        except asyncio.TimeoutError:
-            cut = True
-            log.warning("%s (%s) hit the %ss limit", actor, model, int(max_seconds))
+        async with self._model_turn(ep, actor, model):
+            started = time.monotonic()  # the limit starts once it's this call's turn, not while it waits
+            if keep_alive == 0 and QUEUE.wanted_next(server_key(ep), model):
+                keep_alive = "5m"  # another debate wants this model next: don't unload it
+            try:
+                await asyncio.wait_for(consume(), max_seconds)
+            except asyncio.TimeoutError:
+                cut = True
+                log.warning("%s (%s) hit the %ss limit", actor, model, int(max_seconds))
         emit(*splitter.flush())
         stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000), "cut": cut}
         stats["prompt_tokens"] = self._record(actor, model, kind, stats, messages)
@@ -1308,13 +1314,13 @@ class DebateEngine:
         topic: Optional[int] = None,
     ) -> str:
         """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded."""
-        started = time.monotonic()
         parts, stats = [], {}
+        ep = self._endpoint(endpoint_id)
 
         async def consume() -> None:
             nonlocal stats
             async for chunk in self.client.stream(
-                self._endpoint(endpoint_id),
+                ep,
                 model,
                 messages,
                 think=think,
@@ -1326,14 +1332,38 @@ class DebateEngine:
                 elif chunk.kind == "done":
                     stats = chunk.stats
 
-        try:
-            await asyncio.wait_for(consume(), ANSWER_MAX_SECONDS)
-        except asyncio.TimeoutError:
-            self._record(actor, model, f"{kind}-timeout", {"duration_ms": int((time.monotonic() - started) * 1000)})
-            raise RuntimeError(f"{actor} ({model}) took longer than {int(ANSWER_MAX_SECONDS // 60)} minutes") from None
+        async with self._model_turn(ep, actor, model):
+            started = time.monotonic()
+            try:
+                await asyncio.wait_for(consume(), ANSWER_MAX_SECONDS)
+            except asyncio.TimeoutError:
+                self._record(actor, model, f"{kind}-timeout", {"duration_ms": int((time.monotonic() - started) * 1000)})
+                raise RuntimeError(
+                    f"{actor} ({model}) took longer than {int(ANSWER_MAX_SECONDS // 60)} minutes"
+                ) from None
         stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000)}
         self._record(actor, model, kind, stats, messages, topic=topic)
         return "".join(parts)
+
+    @asynccontextmanager
+    async def _model_turn(self, ep: Endpoint, actor: str, model: str) -> Any:
+        """Wait for this model call's turn on a local server shared with other debates, saying who it waits on."""
+        title = (db.query_one("SELECT title FROM debates WHERE id = ?", [self.id]) or {}).get("title") or ""
+
+        def on_wait(holder: Caller) -> None:
+            self._set_waiting(waiting_text(actor, holder, self.id))
+
+        try:
+            async with QUEUE.turn(server_key(ep), Caller(self.id, actor, model, title), on_wait):
+                self._set_waiting(None)
+                yield
+        finally:
+            self._set_waiting(None)
+
+    def _set_waiting(self, text: Optional[str]) -> None:
+        if text != self.waiting:
+            self.waiting = text
+            self.bus.publish({"type": "debate_updated", "debate": {"waiting": text}})
 
     # ---------------------------------------------------------------- metrics
 
@@ -2859,6 +2889,7 @@ class DebateEngine:
                 "chair_endpoint_name": endpoint_names.get(d["chair_endpoint_id"], "?"),
                 "researcher_model": r_model,
                 "researcher_endpoint_name": endpoint_names.get(r_ep, "?"),
+                "waiting": self.waiting,
             },
             "seats": seats,
             "messages": [serialize_message(r, self.partials.get(r["id"])) for r in rows],
@@ -2876,6 +2907,14 @@ class DebateEngine:
                 for t in db.query("SELECT DISTINCT topic FROM usage WHERE debate_id = ?", [self.id])
             },
         }
+
+
+def waiting_text(actor: str, holder: Caller, debate_id: str) -> str:
+    """What a debate shows while its model call waits behind another one on this computer."""
+    if holder.debate_id == debate_id:
+        return f"{actor} is waiting for {holder.actor} to finish…"
+    where = f"“{holder.title}”" if holder.title else "another conundrum"
+    return f"{actor} is waiting its turn · {holder.actor} ({holder.model}) is answering {where}"
 
 
 # ---------------------------------------------------------------------------

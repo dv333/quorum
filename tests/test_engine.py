@@ -9,6 +9,7 @@ from backend import engine as engine_mod
 from backend import inventory
 from backend.config import HANDLES, SEAT_COLORS
 from backend.engine import DebateEngine
+from backend.model_queue import Caller, ModelQueue, server_key
 from backend.providers import ChatClient, Chunk
 
 
@@ -111,8 +112,9 @@ async def fake_plan(selection, num_ctx):
 
 
 @pytest.fixture(autouse=True)
-def memory_db():
+def memory_db(monkeypatch):
     db.connect(":memory:")
+    monkeypatch.setattr(engine_mod, "QUEUE", ModelQueue())
     yield
 
 
@@ -910,6 +912,50 @@ async def test_a_turn_that_runs_too_long_is_stopped_and_the_seat_sits_out(monkey
     assert len(client.turn_calls("Otter")) == 2
     failed = db.query("SELECT * FROM usage WHERE kind = 'turn-failed'")
     assert failed and failed[0]["actor"] == "Koala"
+
+
+async def test_a_turn_waiting_behind_another_debate_keeps_its_full_time(monkeypatch):
+    monkeypatch.setattr(engine_mod, "TURN_MAX_SECONDS", 0.2)
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    eng = make_debate(client, seats=3, max_rounds=1)
+    server = server_key(eng._endpoint(1))
+    other, release = Caller("d2", "Hedgehog", "big-model", "Order API review"), asyncio.Event()
+
+    async def other_debate():
+        async with engine_mod.QUEUE.turn(server, other):
+            await release.wait()
+
+    holder = asyncio.create_task(other_debate())
+    await asyncio.sleep(0)
+    await eng.post_user_message("Q")
+    await wait_for(lambda: eng.waiting)
+    assert (
+        "is waiting its turn" in eng.waiting and "Hedgehog (big-model) is answering “Order API review”" in eng.waiting
+    )
+    assert eng.snapshot()["debate"]["waiting"] == eng.waiting
+    await asyncio.sleep(0.4)  # longer than a turn may take: waiting must not count against it
+    release.set()
+    await holder
+    await eng.task
+    assert eng.waiting is None
+    assert not db.query("SELECT * FROM usage WHERE kind = 'turn-failed'")
+    assert len(client.turn_calls()) == 3
+    assert all(r["duration_ms"] < 200 for r in db.query("SELECT duration_ms FROM usage WHERE kind = 'turn'"))
+
+
+async def test_a_model_another_debate_wants_next_stays_loaded(monkeypatch):
+    async def seq_plan(selection, num_ctx):
+        return {"mode": "sequential"}
+
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    eng = make_debate(client, autopilot=False, models=["m1", "m1", "m2"])
+    eng.plan_lookup = seq_plan
+    # Another debate is waiting for m2
+    monkeypatch.setattr(engine_mod.QUEUE, "wanted_next", lambda server, model: model == "m2")
+    await eng.post_user_message("Q")
+    await eng.task
+    keep = [kw["keep_alive"] for _, kw in client.turn_calls()]
+    assert keep == ["5m", 0, "5m"]  # C's model isn't unloaded: the other debate reuses it
 
 
 async def test_turns_cap_their_output_and_leave_room_for_it(monkeypatch):
