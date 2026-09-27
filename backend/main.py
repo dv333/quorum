@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timezone
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +30,7 @@ from .config import (
     SEAT_COLORS,
 )
 from .hardware import estimate_model_bytes, fit_label
-from .engine import drop_engine, get_engine, recover_after_restart
+from .engine import APP_BUS, drop_engine, get_engine, recover_after_restart
 from .providers import ProviderError, delete_model, lookup_model, pull_model
 
 
@@ -644,28 +644,41 @@ async def post_conclude(debate_id: str):
     return {"ok": True}
 
 
+@app.get("/api/events")
+async def app_events():
+    """Which conundrums changed status, round or title, as it happens, so the sidebar doesn't poll."""
+    return StreamingResponse(
+        _stream(APP_BUS, None),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def _stream(bus: Any, first: Optional[Callable[[], Dict[str, Any]]]) -> AsyncIterator[str]:
+    q = bus.subscribe()
+    try:
+        if first is not None:  # taken after subscribing, so no event falls between it and the stream
+            yield f"data: {json.dumps(first())}\n\n"
+        while True:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=15)
+                if event is None:  # fell too far behind: end the stream, and the app reconnects
+                    return
+                yield f"data: {json.dumps(event)}\n\n"
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+    finally:
+        bus.unsubscribe(q)
+
+
 @app.get("/api/debates/{debate_id}/events")
 async def debate_events(debate_id: str):
     _require_debate(debate_id)
     eng = get_engine(debate_id)
-
-    async def gen() -> AsyncIterator[str]:
-        q = eng.bus.subscribe()
-        try:
-            yield f"data: {json.dumps({'type': 'snapshot', 'state': eng.snapshot()})}\n\n"
-            while True:
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=15)
-                    if event is None:  # fell too far behind: end the stream, and the app reconnects
-                        return
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
-        finally:
-            eng.bus.unsubscribe(q)
-
     return StreamingResponse(
-        gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        _stream(eng.bus, lambda: {"type": "snapshot", "state": eng.snapshot()}),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

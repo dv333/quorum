@@ -146,6 +146,13 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_debate ON messages(debate_id, id);
 CREATE INDEX IF NOT EXISTS idx_debates_created ON debates(created_at);
+CREATE INDEX IF NOT EXISTS idx_debates_status ON debates(status);
+CREATE INDEX IF NOT EXISTS idx_seats_debate ON seats(debate_id);
+CREATE INDEX IF NOT EXISTS idx_verdicts_debate ON verdicts(debate_id, topic);
+CREATE INDEX IF NOT EXISTS idx_usage_debate ON usage(debate_id, topic);
+CREATE INDEX IF NOT EXISTS idx_drafts_debate ON drafts(debate_id, topic);
+CREATE INDEX IF NOT EXISTS idx_summaries_debate ON summaries(debate_id, topic);
+CREATE INDEX IF NOT EXISTS idx_claims_debate ON claims(debate_id, topic);
 """
 
 # Columns added after v1; applied to existing databases on connect

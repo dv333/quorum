@@ -108,6 +108,11 @@ class EventBus:
         return bool(self._subscribers)
 
 
+# Changes the conundrum list shows (status, round, title), for the app's sidebar
+APP_BUS = EventBus()
+_LISTED = {"status", "round", "title", "topic", "interrupted"}
+
+
 # ---------------------------------------------------------------------------
 # Serialization helpers (shared with the API layer)
 # ---------------------------------------------------------------------------
@@ -802,6 +807,8 @@ class DebateEngine:
     def _set(self, **fields: Any) -> None:
         db.update("debates", self.id, **fields)
         self.bus.publish({"type": "debate_updated", "debate": self.debate()})
+        if _LISTED & fields.keys():
+            APP_BUS.publish({"type": "debate_changed", "id": self.id})
 
     def _insert_message(
         self,

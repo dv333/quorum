@@ -1403,3 +1403,19 @@ async def test_answered_debates_nobody_watches_are_let_go(monkeypatch):
     assert set(engine_mod._engines) == {"d2", "d3", "d4"}  # d1 is answered and unwatched; d2 can still resume
     engine_mod.get_engine("d3").bus.unsubscribe(watched)
     engine_mod._engines.clear()
+
+
+async def test_the_sidebar_hears_when_a_conundrum_changes_status_but_not_every_token():
+    q = engine_mod.APP_BUS.subscribe()
+    try:
+        client = FakeClient(lambda h, r, m: reply("AGREE"))
+        eng = make_debate(client)
+        await eng.post_user_message("Q")
+        await eng.task
+        events = []
+        while not q.empty():
+            events.append(q.get_nowait())
+        assert events and all(e == {"type": "debate_changed", "id": "d1"} for e in events)
+        assert len(events) < 20  # status and round changes, not streamed text
+    finally:
+        engine_mod.APP_BUS.unsubscribe(q)

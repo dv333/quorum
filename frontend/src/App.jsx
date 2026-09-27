@@ -135,11 +135,30 @@ export default function App() {
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', tick) }
   }, [])
 
-  // Live debates change status/title without navigation; keep the sidebar fresh
+  // Live debates change status/title without navigation: the server says when, and the sidebar refreshes then
+  useEffect(() => {
+    let source = null
+    let retry = null
+    let soon = null
+    let closed = false
+    const refresh = () => { clearTimeout(soon); soon = setTimeout(loadDebates, 200) } // one load for a burst of changes
+    const connect = () => {
+      source = new EventSource('/api/events')
+      source.onopen = refresh // catch up on anything missed while disconnected
+      source.onmessage = refresh
+      source.onerror = () => {
+        if (source.readyState === EventSource.CLOSED && !closed) retry = setTimeout(connect, 5000)
+      }
+    }
+    connect()
+    return () => { closed = true; clearTimeout(retry); clearTimeout(soon); source?.close() }
+  }, [loadDebates])
+
+  // A slow safety net while something runs, in case the live stream drops without an error
   const anyActive = live.some((d) => ['running', 'concluding', 'researching', 'intake'].includes(d.status))
   useEffect(() => {
     if (!anyActive) return undefined
-    const t = setInterval(loadDebates, 2500)
+    const t = setInterval(loadDebates, 30000)
     return () => clearInterval(t)
   }, [anyActive, loadDebates])
 
