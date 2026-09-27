@@ -53,8 +53,8 @@ function layout(width, count, helpers, collapsed, narrow) {
   const left = Math.max(0, (width - desk - group) / 2)
   const area = left + group
   const cx = left + group / 2
-  const cy = 24 + ORB / 2 + sRy - 6
-  const height = cy + sRy + ORB / 2 + 26
+  const cy = 38 + ORB / 2 + sRy - 6 // room above the head seat for its name and role
+  const height = cy + sRy + ORB / 2 + 40
   const seats = Array.from({ length: count }, (_, i) => {
     const a = (-90 + (i * 360) / count) * (Math.PI / 180)
     return { x: cx + sRx * Math.cos(a), y: cy + sRy * Math.sin(a), scale: 1, angle: a }
@@ -161,7 +161,10 @@ export default function RoundTable({
                 {!speaking && <StanceBadge stance={st} />}
               </span>
             </AgentTip>
-            <span className="rt-name">{seat.handle}</span>
+            <span className="rt-label">
+              <b>{seat.handle}</b>
+              {seat.role && <small title={seat.role_focus || seat.role}>{seat.role}</small>}
+            </span>
           </div>
         )
       })}

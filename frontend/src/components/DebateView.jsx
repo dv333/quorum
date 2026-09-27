@@ -155,7 +155,8 @@ function Stage({ state, speakingSeatIds, beagleBusy, searches, scrolled }) {
       : n('AGREE') === done.length ? `all ${done.length} agree`
       : [n('AGREE') && `${n('AGREE')} agree`, n('REFINE') && `${n('REFINE')} refine`].filter(Boolean).join(' · ')
     const jump = () => document.getElementById(`round-${debate.topic}-${debate.round}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    roundPill = (
+    // At the table the round is on the table itself: the pill only carries the tally, once there is one
+    if (folded || tally || dissent.length > 0) roundPill = (
       <button className="consensus-pill" onClick={jump} title="Jump to this round">
         {folded && <span className="cp-round">Round {debate.round} of {debate.max_rounds}</span>}
         {folded && <span className="cp-dots" aria-hidden="true">{stances.map((st, i) => <i key={i} className={`dot ${st ? st.toLowerCase() : 'idle'}`} />)}</span>}
