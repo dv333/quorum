@@ -70,7 +70,7 @@
       "id": "shared-connection",
       "what": "one SQLite connection shared across threads (check_same_thread=False)",
       "match": [
-        "check_same_thread|shared (sqlite )?conn|global conn|single (sqlite )?conn|one conn|per.request conn"
+        "check_same_thread|(shared|global|single|one|module.level) (sqlite )?conn|per.request conn"
       ]
     },
     {
@@ -127,7 +127,7 @@
     {
       "id": "no-tests",
       "match": [
-        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested"
+        "\\b(no|missing|add|more|lacks?|lacking|without|write) (\\w+ )?tests?\\b|test coverage|untested|(never|not|isn't|aren't) (actually )?tested|tests? (don't|do not|never) (check|cover|test)"
       ]
     },
     {

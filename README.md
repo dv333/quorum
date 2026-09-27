@@ -87,17 +87,9 @@ API compatibility, tests). They argue over several rounds, and a read-only **Cod
 already use) answers their questions about your repository, with every `file:line` it cites checked. You get findings
 by severity, each with a fix, and the points the reviewers disagreed on.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/benchmarks/review/chart-dark.svg">
-    <img src="docs/benchmarks/review/chart-light.svg" width="780" alt="Planted bugs found: ruff 19%, one local model alone 91%, Quorum 100%, Claude Code alone 100%">
-  </picture>
-</p>
-
-**Eight local models together caught every planted bug; the largest of them, reviewing alone, missed 2 of 22.** A
-linter caught 19%. Claude Code reviewing alone also caught every one, in about 40 seconds against Quorum's half hour,
-so Quorum is a second opinion that works in the background while you keep coding, not a replacement for your agent.
-[The method, every finding and how to rerun it →](docs/benchmarks/review/)
+We measure every change to reviews against a [public benchmark](docs/benchmarks/review/): changes with planted
+bugs, clean changes to catch false alarms, and the same review from a linter, a single local model and Claude Code for
+comparison. A review takes minutes, not seconds, so it runs in the background while you keep coding.
 
 The council runs on your machine. The Coder's questions about your code go to Claude Code or Codex; set
 `QUORUM_CODER=off` to keep a review entirely local.
@@ -160,9 +152,9 @@ early.
 <summary><b>Is it better than asking one AI?</b></summary>
 
 For hard questions it's more careful: several models catch each other's mistakes, claims are checked against sources,
-and disagreements stay visible. In the [code-review benchmark](docs/benchmarks/review/), eight local models together
-caught every planted bug while the best of them alone missed some. It won't beat a frontier cloud model on raw
-knowledge, and it's slower.
+and disagreements stay visible. It won't beat a frontier cloud model on raw knowledge, and it's slower. For code
+reviews, the [benchmark](docs/benchmarks/review/) shows where it stands today, including where a single model does
+as well.
 </details>
 
 <details>
