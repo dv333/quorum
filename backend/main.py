@@ -504,6 +504,8 @@ async def create_debate(body: CreateDebate):
     )
     if body.repo_path:
         db.update("debates", debate_id, repo_path=repo)
+    if "max_rounds" in body.model_fields_set:  # asked for explicitly (MCP quick or deep, the CLI): keep it
+        db.update("debates", debate_id, rounds_fixed=1)
     for i, seat in enumerate(seats):
         db.execute(
             "INSERT INTO seats (debate_id, handle, endpoint_id, model, color, thinking_enabled, position) "
@@ -553,7 +555,7 @@ async def patch_debate(debate_id: str, body: UpdateDebate):
     if body.title is not None and body.title.strip():
         eng._set(title=body.title.strip())
     if body.max_rounds is not None:
-        eng._set(max_rounds=body.max_rounds)
+        eng._set(max_rounds=body.max_rounds, rounds_fixed=1)
     if body.research_enabled is not None:
         eng._set(research_enabled=int(body.research_enabled))
     if body.autopilot is not None:

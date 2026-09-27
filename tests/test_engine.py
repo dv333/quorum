@@ -781,6 +781,18 @@ async def test_question_budget_forces_a_summary():
     assert kinds == ["question", "question", "question", "summary"]
 
 
+async def test_the_chair_sizes_the_debate_unless_the_caller_set_the_rounds():
+    for fixed, expected in [(0, 4), (1, 1)]:
+        db.connect(":memory:")
+        client = FakeClient(lambda h, r, m: reply("REFINE"))
+        client.intake_replies = ['{"action": "clear", "rounds": 4}']
+        eng = make_debate(client, max_rounds=1)
+        db.update("debates", "d1", rounds_fixed=fixed)
+        await eng.post_user_message("Which laptop should I buy?")
+        await eng.task
+        assert eng.debate()["max_rounds"] == expected, fixed
+
+
 async def test_skip_interview_uses_answers_so_far():
     client = FakeClient(lambda h, r, m: reply("AGREE"))
     client.intake_replies = [ASK]
