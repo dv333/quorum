@@ -967,6 +967,9 @@ class DebateEngine:
             self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
         except (TypeError, ValueError):
             pass
+        if action == "direct" and is_code_debate(question, d["pack"], d.get("repo_path")):
+            # A review always gets the council: a model once answered a diff "directly" with "Ready to get started?"
+            action = "clear"
         if action == "direct" and not asked and not summarized:
             await self._answer_directly()
             return

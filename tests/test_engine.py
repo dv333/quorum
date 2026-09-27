@@ -798,6 +798,16 @@ async def test_trivial_conundrum_is_answered_directly_by_the_chair():
     assert chair["status"] == "done" and chair["content"]
 
 
+async def test_a_code_review_is_never_answered_directly():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Review this code change.\n\nDiff:\n```diff\n-a = 1\n+a = 2\n```")
+    await eng.task
+    assert client.turn_calls()  # the council spoke
+    assert db.query_one("SELECT reason FROM verdicts")["reason"] != "direct"
+
+
 async def test_chair_sets_the_number_of_rounds():
     client = FakeClient(lambda h, r, m: reply("REFINE"))
     client.intake_replies = ['{"action": "clear", "rounds": 2}']
