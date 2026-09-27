@@ -145,6 +145,8 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_debate ON messages(debate_id, id);
+-- the question and follow-ups of each debate, without reading every reply (search, the sidebar's timings)
+CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(debate_id, author_kind, round);
 CREATE INDEX IF NOT EXISTS idx_debates_created ON debates(created_at);
 CREATE INDEX IF NOT EXISTS idx_debates_status ON debates(status);
 CREATE INDEX IF NOT EXISTS idx_seats_debate ON seats(debate_id);
@@ -203,6 +205,11 @@ def connect(path: str = DB_PATH) -> sqlite3.Connection:
         _conn.row_factory = sqlite3.Row
         _conn.execute("PRAGMA foreign_keys = ON")
         _conn.execute("PRAGMA journal_mode = WAL") if path != ":memory:" else None
+        # With WAL, NORMAL can only lose the last moments of writes on a power cut, never corrupt; commits get ~10x
+        # cheaper (the engine commits every few seconds while replies stream). Another process (the CLI, a script)
+        # holding a write briefly makes a write wait instead of failing with "database is locked".
+        _conn.execute("PRAGMA synchronous = NORMAL")
+        _conn.execute("PRAGMA busy_timeout = 5000")
         _conn.executescript(SCHEMA)
         for table, column, ddl in MIGRATIONS:
             cols = {r["name"] for r in _conn.execute(f"PRAGMA table_info({table})")}

@@ -100,3 +100,13 @@ async def test_a_restart_marks_live_conundrums_until_resumed_or_dismissed():
     rows = await main.list_debates(limit=None, before=None, after=None, q=None, ids="d03", status=None, exclude=None)
     assert rows[0]["status"] == "paused" and rows[0]["interrupted"] == 0
     engine._engines.clear()
+
+
+def test_search_and_the_sidebar_use_indexes_not_a_scan_of_every_reply():
+    plan = db.query(
+        "EXPLAIN QUERY PLAN SELECT 1 FROM messages m WHERE m.debate_id = 'd01' AND m.author_kind = 'user' AND m.round = 0"
+    )
+    assert any("idx_messages_user" in r["detail"] for r in plan)
+    for table in ("seats", "verdicts", "usage", "drafts", "summaries", "claims"):
+        plan = db.query(f"EXPLAIN QUERY PLAN SELECT 1 FROM {table} WHERE debate_id = 'd01'")
+        assert any("USING" in r["detail"] and "INDEX" in r["detail"] for r in plan), table
