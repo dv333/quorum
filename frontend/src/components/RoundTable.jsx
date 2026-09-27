@@ -13,7 +13,7 @@ const STANCE = {
   DISAGREE: { label: 'disagrees', icon: 'M4.5 4.5l7 7m0-7-7 7' },
 }
 const ORB = 48 // px, the orb at the table; it shrinks to 30 in the line
-const LINE_H = 56
+const LINE_H = 44
 const DESK_W = 212
 
 function StanceBadge({ stance }) {
@@ -72,7 +72,7 @@ function TableClock({ since, speed }) {
 
 export default function RoundTable({
   seats, debate, stances, speakingSeatIds, beagleBusy, coderBusy, searches, coderAnswers, since, speed,
-  collapsed, onToggle, roundPill, clock,
+  collapsed, onToggle, roundPill, draft, clock,
 }) {
   const ref = useRef(null)
   const [width, setWidth] = useState(900)
@@ -202,10 +202,10 @@ export default function RoundTable({
       })}
 
       {folded && !narrow ? (
-        <div className="rt-line-bar" style={{ left: L.barLeft }}>{clock}<span className="rt-line-gap" />{roundPill}</div>
+        <div className="rt-line-bar" style={{ left: L.barLeft }}>{clock}<span className="rt-line-gap" />{roundPill}{draft}</div>
       ) : (
         <>
-          <div className="rt-line-info">{roundPill}</div>
+          <div className="rt-line-info">{roundPill}{draft}</div>
           {folded && <div className="rt-line-clock">{clock}</div>}
         </>
       )}

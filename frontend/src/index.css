@@ -1202,16 +1202,16 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .rt-line-info { position: absolute; right: 36px; top: 6px; z-index: 5; }
 .rt.folded .rt-line-info { top: 50%; transform: translateY(-50%); }
 .rt-line-info .consensus-pill { margin: 0; }
-.rt-line-bar { position: absolute; top: 0; right: 36px; height: 56px; z-index: 5; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rt-line-bar { position: absolute; top: 0; right: 36px; height: 100%; z-index: 5; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .rt-line-bar .stage-time { position: static; transform: none; flex: none; }
 .rt-line-gap { flex: 1; }
-.rt-line-bar .consensus-pill { margin: 0; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.rt-line-bar .consensus-pill { margin: 0; flex: 0 1 auto; min-width: 108px; max-width: 100%; overflow: hidden; } /* 'Round 2 of 3' always fits; names shorten */
 .rt-line-bar .consensus-pill .cp-round { flex: none; }
 .rt-line-bar .consensus-pill em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.rt-line-clock { position: absolute; left: 50%; top: 0; width: 0; height: 56px; z-index: 5; }
-.rt.narrow .rt-line-clock { left: 0; top: 56px; height: 36px; }
+.rt-line-clock { position: absolute; left: 50%; top: 0; width: 0; height: 44px; z-index: 5; }
+.rt.narrow .rt-line-clock { left: 0; top: 44px; height: 36px; }
 .rt.narrow .rt-line-clock .stage-time { left: 0; transform: translateY(-50%); font-size: 14px; padding: 4px 11px; }
-.rt.narrow .rt-line-info { top: 74px; right: 0; }
+.rt.narrow .rt-line-info { top: 62px; right: 0; transform: translateY(-50%); }
 .rt-toggle { position: absolute; right: 0; top: 6px; z-index: 5; }
 .rt.folded .rt-toggle { top: 50%; transform: translateY(-50%); }
 @media (prefers-reduced-motion: reduce) { .rt, .rt-seat, .rt-orb, .rt-spot, .rt-bubble { transition: none; } .rt-bubble i, .rt-work i { animation: none; } }
@@ -1273,3 +1273,57 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .bubble.beagle .kind-tag { color: color-mix(in srgb, var(--beagle) 80%, var(--text)); background: color-mix(in srgb, var(--beagle) 14%, transparent); }
 .bubble.coder .kind-tag { color: var(--text-2); background: var(--fill); }
 .reading .kind-tag { display: none; }
+
+/* ---------------------------------------------------------------- slim chrome */
+/* The header is one line: title, who chairs (the reason on hover), status, and the main action; the rest is under ⋯ */
+.topbar { padding: 8px 20px; min-height: 48px; }
+.q-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.q-title h2 { font-size: 16px; min-width: 0; flex: 0 1 auto; }
+.q-title .sub { margin-top: 0; flex: 0 1000 auto; min-width: 0; }
+.topbar .btn { padding: 6px 13px; font-size: 13px; }
+.head-pills .head-pill { padding: 2px 9px; }
+
+/* The debate bar: one 44px line, no padding of its own */
+.stage:has(.rt.folded) { padding-top: 0; padding-bottom: 0; }
+.stage-wrap { transition: top 0.28s var(--ease), opacity 0.28s var(--ease); }
+.stage-wrap.away { top: -64px; opacity: 0; pointer-events: none; }
+.stage-wrap:focus-within { top: 0; opacity: 1; pointer-events: auto; }
+.rt.folded .rt-line-bar, .rt.folded .rt-toggle { transition: none; }
+.rt-line-info { display: flex; align-items: center; gap: 8px; }
+
+/* Popovers: the ⋯ menu, the draft panel and the message-box options */
+.pop-anchor { position: relative; display: inline-flex; }
+.pop-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 230px; padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  border-radius: 14px; background: color-mix(in srgb, var(--card) 97%, transparent); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  box-shadow: var(--shadow-lg), 0 0 0 0.5px var(--hairline-strong); animation: pop 0.18s var(--ease);
+}
+.pop-menu.up { top: auto; bottom: calc(100% + 8px); }
+.pop-menu > button { all: unset; box-sizing: border-box; display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 9px; cursor: pointer; }
+.pop-menu > button:hover, .pop-menu > button:focus-visible { background: var(--fill); }
+.pop-menu > button b { font: 600 13px var(--font); }
+.pop-menu > button small { font-size: 12px; color: var(--text-2); }
+.pop-menu > button.danger b { color: var(--danger); }
+.more-btn { padding: 6px 9px; display: inline-grid; place-items: center; }
+.more-btn[aria-expanded="true"] { background: var(--fill-2); }
+
+.draft-pill {
+  all: unset; box-sizing: border-box; flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  font: 600 11.5px var(--font); color: var(--blue); background: color-mix(in srgb, var(--blue) 10%, transparent); white-space: nowrap;
+}
+.draft-pill:hover, .living.open .draft-pill { background: color-mix(in srgb, var(--blue) 17%, transparent); }
+.living.compact { max-width: none; margin: 0; padding: 0; }
+.draft-panel { width: min(560px, 80vw); padding: 12px 16px 10px; gap: 6px; color: var(--text-2); }
+.draft-panel .draft-bl { margin: 0 0 4px; font: 500 14.5px/1.5 var(--font); color: var(--text); }
+.draft-panel .draft-bl .living-label { display: block; margin-bottom: 3px; }
+
+/* The message box: one row, options behind the sliders button, and the status line under it */
+.composer-wrap { padding-bottom: 10px; }
+.composer-meta { padding-top: 5px; min-height: 0; }
+.composer-opts { flex: none; width: 34px; height: 34px; color: var(--text-2); position: relative; }
+.composer-opts.changed::after { content: ''; position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--refine); }
+.pop-menu.options { min-width: 290px; padding: 10px 12px; gap: 10px; right: -40px; }
+.pop-menu.options .switch { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; }
+.pop-menu.options .switch span { display: flex; flex-direction: column; gap: 1px; }
+.pop-menu.options .switch small { font-size: 12px; color: var(--text-2); }
+.composer .pop-anchor { align-self: flex-end; margin-bottom: 2px; }
