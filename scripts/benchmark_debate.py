@@ -84,7 +84,9 @@ def graded(q: Dict[str, Any], text: str) -> bool:
 
 def _plain_math(text: str) -> str:
     """LaTeX as a model writes it in plain text: \\( \\frac{2}{3} \\) reads as 2/3."""
+    text = re.sub(r"\\(display|text)style\s*", "", text)
     text = re.sub(r"\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}", r"\1/\2", text)
+    text = re.sub(r"\\[dt]?frac\s*(\d)(\d)", r"\1/\2", text)  # \frac16
     return re.sub(r"\\[()\[\]]|\$", "", text)
 
 

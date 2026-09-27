@@ -54,6 +54,7 @@ def test_latex_fractions_count():
     q = QUESTIONS["monty"]
     assert bench.graded(q, r"The probability of winning by switching is \( \frac{2}{3} \).")
     assert bench.graded(q, r"$\dfrac{2}{3}$")
+    assert bench.graded(QUESTIONS["dice-seven"], r"The probability is \(\displaystyle \frac16\).")
     assert not bench.graded(q, r"\( \frac{1}{2} \)")
 
 
