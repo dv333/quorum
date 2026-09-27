@@ -267,10 +267,12 @@ def main() -> None:
     ap.add_argument("--ids", default="", help="comma-separated question ids (default: all)")
     ap.add_argument("--report", action="store_true", help="only write the report from results.json")
     ap.add_argument("--no-single", action="store_true", help="skip the single-model baseline")
+    ap.add_argument("--out", default=str(OUT), help="folder for results.json and the report")
     args = ap.parse_args()
     questions = json.loads(QUESTIONS.read_text())["questions"]
-    OUT.mkdir(parents=True, exist_ok=True)
-    path = OUT / "results.json"
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / "results.json"
     results = json.loads(path.read_text()) if path.exists() else {}
     if not args.report:
         wanted = {i for i in args.ids.split(",") if i}
@@ -293,8 +295,8 @@ def main() -> None:
                 print(f"    quorum: agents {agents}/{len(qr['agents'])}, draft {qr['draft_round1_correct']}, "
                       f"final {qr['final_correct']} ({qr['seconds']}s)", flush=True)  # fmt: skip
             path.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n")
-    (OUT / "README.md").write_text(report(results, questions))
-    print(f"wrote {OUT / 'README.md'}")
+    (out / "README.md").write_text(report(results, questions))
+    print(f"wrote {out / 'README.md'}")
 
 
 if __name__ == "__main__":
