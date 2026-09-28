@@ -1545,3 +1545,45 @@ async def test_a_direct_answer_can_use_a_python_check(fake_python):
     assert fake_python == ["print(6 * 7)"]
     assert chair["content"].endswith("It's **42**.") and "So it's 40" not in chair["content"]
     assert chair["tokens"] == 10  # both calls counted
+
+
+async def test_an_agent_that_calls_its_own_python_tool_goes_on_without_checks(fake_python):
+    """gpt-oss has a Python tool of its own: told it can run Python, it calls that, and Ollama can't parse it."""
+
+    class ToolCaller(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if "You are Koala" in messages[0]["content"] and "@Python:" in messages[0]["content"]:
+                self.calls.append((model, messages, kw))
+                raise RuntimeError("error parsing tool call: raw='print(1)'")
+                yield  # pragma: no cover
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = ToolCaller(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("How many primes are below 1000?")
+    await eng.task
+    koala = client.turn_calls("Koala")
+    assert ["@Python:" in m[0]["content"] for m, _ in koala] == [True, False, False]  # once, then never again
+    assert [kw["think"] for _, kw in koala] == [True, True, False]  # its retry still thinks in round 1
+    msgs = db.query("SELECT m.* FROM messages m JOIN seats s ON s.id = m.seat_id WHERE s.handle = 'Koala'")
+    assert [m["status"] for m in msgs] == ["done", "done"]
+
+
+async def test_a_chair_that_calls_its_own_python_tool_answers_without_checks(fake_python):
+    class ToolCaller(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if "answer it yourself" in messages[0]["content"] and "@Python:" in messages[1]["content"]:
+                self.calls.append((model, messages, kw))
+                raise RuntimeError("error parsing tool call: raw='print(1)'")
+                yield  # pragma: no cover
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = ToolCaller(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client)
+    await eng.post_user_message("What is 6 times 7?")
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["status"] == "done" and chair["content"] == "VERDICT TEXT"

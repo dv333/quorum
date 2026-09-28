@@ -83,6 +83,11 @@ def before_output(text: str, limit: int = 2) -> str:
     return text[: ends[-1]] if ends else text
 
 
+def tool_call_error(e: Exception) -> bool:
+    """The model tried to call a tool of its own (gpt-oss has a Python tool) and the server couldn't parse it."""
+    return "tool call" in str(e).lower()
+
+
 def _command(kind: str, workdir: str) -> List[str]:
     py = [sys.executable, "-I", "-S", "-B", os.path.join(workdir, "guard.py"), os.path.join(workdir, "check.py")]
     if kind == "sandbox-exec":

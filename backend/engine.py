@@ -791,6 +791,7 @@ class DebateEngine:
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
+        self._no_python: set = set()  # seats whose model trips over Python checks (gpt-oss calls its own Python tool)
         self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
         # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
         self._ctx_by_model: Dict[str, int] = {}
@@ -1135,9 +1136,21 @@ class DebateEngine:
             # The chair thinks before a direct answer. Without it, questions that only look simple (puzzles, sums, dates)
             # went wrong: the answer came first and the working under it sometimes reached a different number
             think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], True)
-            stats = await self._stream_into(
-                row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
-            )
+            try:
+                stats = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
+                )
+            except Exception as e:
+                if not (pyrun.tool_call_error(e) and self._python_on()):
+                    raise
+                # gpt-oss called a Python tool of its own: it answers without checks
+                messages = prompts.direct_answer_messages(
+                    label, self._question(d["topic"]), self._prior_topics(d["topic"])
+                )
+                self._restart_reply(row["id"], "(it tried to call a Python tool of its own; answering without checks)")
+                stats = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
+                )
             partial = self.partials[row["id"]]
             if not strip_thinking(partial["content"]).strip() and think:
                 # It spent its whole budget thinking: one more try, answering straight away
@@ -1735,9 +1748,24 @@ class DebateEngine:
                     BRIEF_TURN_TOKENS if brief else None,
                 )
 
+            async def first_try() -> Dict[str, Any]:
+                nonlocal messages
+                try:
+                    return await attempt(think)
+                except Exception as e:
+                    if not pyrun.tool_call_error(e) or seat["id"] in self._no_python:
+                        raise
+                    # gpt-oss has a Python tool of its own and calls it when told it can run Python, which Ollama
+                    # can't parse: this agent goes without Python checks
+                    log.warning("seat %s (%s) called a tool; no Python checks for it", seat["handle"], seat["model"])
+                    self._no_python.add(seat["id"])
+                    messages = self._turn_context(seat, round_no, exclude_id=msg_id)
+                    self._restart_reply(msg_id, "(it tried to call a Python tool of its own; answering without checks)")
+                    return await attempt(think)
+
             retried = False
             try:
-                stats = await attempt(think)
+                stats = await first_try()
             except Exception as e:
                 # A server error, or a reply the server couldn't parse (deepseek-r1's thinking sometimes trips
                 # Ollama's parser): one more try, answering straight away
@@ -1770,8 +1798,11 @@ class DebateEngine:
                     {"role": "assistant", "content": pyrun.before_output(content)},
                     {"role": "user", "content": prompts.python_followup(output)},
                 ]
-                more = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False), follow)
-                stats = _add_stats(stats, more)
+                try:
+                    more = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False), follow)
+                    stats = _add_stats(stats, more)
+                except Exception as e:  # the turn stands with the check's output; only its last words are missing
+                    log.warning("seat %s (%s) couldn't finish after its check: %s", seat["handle"], seat["model"], e)
                 content = strip_thinking(partial["content"])
             st = parse_stance(content)
             self._finish_message(
@@ -2203,7 +2234,7 @@ class DebateEngine:
                 role={"role": seat["role"], "focus": seat.get("role_focus") or ""} if seat.get("role") else None,
                 coder=bool(self._coder()),
                 roster=roster,
-                python=self._python_on(),
+                python=self._python_on() and seat["id"] not in self._no_python,
             )
 
         others = [s for s in self.seats() if s["id"] != seat["id"]]
