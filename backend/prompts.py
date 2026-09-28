@@ -60,11 +60,12 @@ CODER_HELP = """
 
 PYTHON_HELP = """
 - You can check a calculation with Python. When the answer depends on a count, a sum, a probability, a date or what
-  a program prints, don't work it out in your head: write a line
+  a program prints, don't work it out in your head. Start your message with a line
   @Python:
-  followed by a ```python block that prints the result, and stop there. Quorum runs it (standard library only, no
-  files or network, 10 seconds) and shows you what it printed, then you finish your message. Make sure the program
-  answers the question exactly as asked; if its output surprises you, find out why before you trust either."""
+  followed by a ```python block that prints the result (for "what does this code print", the code itself), and stop
+  there, before stating any answer (even if the question asks for the answer first: you give it after the output). Quorum runs it (standard library only, no files
+  or network, 10 seconds) and shows you what it printed, then you finish your message. Make sure the program answers
+  the question exactly as asked; if its output surprises you, find out why before you trust either."""
 
 
 PYTHON_FOLLOWUP = """{results}
@@ -505,9 +506,11 @@ def direct_answer_messages(
     chair: str, question: str, prior_topics: List[Dict[str, str]], python: bool = False
 ) -> List[Dict[str, str]]:
     check = (
-        " To check a count, a sum, a probability, a date or what code prints, write a line @Python: followed by a "
-        "```python block that prints the result, and stop there; Quorum runs it (standard library only) and shows you "
-        "the output, then you write the answer."
+        " To check a count, a sum, a probability, a date or what code prints, start with a line @Python: followed by a "
+        "```python block that prints the result (for what code prints, the code itself), and stop there, before stating "
+        "any answer (even if the question asks "
+        "for the answer first); Quorum runs it (standard library only) and shows you the output, then you write the "
+        "answer in the form the question asks for."
         if python
         else ""
     )
