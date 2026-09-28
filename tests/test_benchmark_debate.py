@@ -68,3 +68,19 @@ def test_a_direct_answer_counts_for_the_final_answer_but_not_for_disagreement():
     }
     s = bench.summarize(results, qs)
     assert (s["direct"], s["split_questions"], s["final_correct"]) == (1, 1, 2)
+
+
+def test_the_hard_set_matches_its_builder():
+    """Every answer in the hard set is computed by benchmarks/hard/build.py; none is typed by hand."""
+    import subprocess
+
+    hard = Path(__file__).resolve().parent.parent / "benchmarks" / "hard"
+    built = subprocess.run([sys.executable, str(hard / "build.py")], capture_output=True, text=True, check=True)
+    assert json.loads(built.stdout) == json.loads((hard / "questions.json").read_text())
+
+
+def test_a_strict_set_grades_only_the_answer_line():
+    q = {"answer": "1", "accept": ["1"]}
+    assert bench.graded(q, bench.answer_line("ANSWER: 1°\nAt 7:38 the hands are 1 degree apart."))
+    assert not bench.graded(q, bench.answer_line("**ANSWER:** 11°\nOne reason: 1 hand moves."))
+    assert bench.answer_line("No answer line.\nMore.") == "No answer line."
