@@ -1113,11 +1113,20 @@ class DebateEngine:
         row = self._insert_message(topic=d["topic"], round_no=0, author_kind="chair", status="streaming")
         try:
             messages = prompts.direct_answer_messages(label, self._question(d["topic"]), self._prior_topics(d["topic"]))
-            think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+            # The chair thinks before a direct answer. Without it, questions that only look simple (puzzles, sums, dates)
+            # went wrong: the answer came first and the working under it sometimes reached a different number
+            think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], True)
             stats = await self._stream_into(
                 row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
             )
             partial = self.partials[row["id"]]
+            if not strip_thinking(partial["content"]).strip() and think:
+                # It spent its whole budget thinking: one more try, answering straight away
+                self._restart_reply(row["id"], "(thought until the limit; answering without thinking)")
+                no_think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+                stats = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], messages, no_think, None, label, "answer"
+                )
             self._finish_message(
                 row["id"],
                 content=strip_thinking(partial["content"]).strip() or "…",

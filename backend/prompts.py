@@ -491,7 +491,7 @@ def direct_answer_messages(chair: str, question: str, prior_topics: List[Dict[st
             "content": f"""Today is {today()}.
 {history_block(prior_topics)}The user says: {question}
 
-Reply directly, briefly and warmly in markdown. If it's a greeting or small talk, reply in kind and invite them to bring a real conundrum for the council. If it's a factual question, give the answer in a sentence or two.""",
+Reply directly, briefly and warmly in markdown. If it's a greeting or small talk, reply in kind and invite them to bring a real conundrum for the council. If it's a question with an answer (a fact, a sum, a date, a puzzle), work it out and check it before you write, then give the answer in a sentence or two, with the key step when there's a calculation. Questions that look easy are often traps.""",
         },
     ]
 
