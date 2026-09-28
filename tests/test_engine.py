@@ -6,7 +6,7 @@ import pytest
 
 from backend import db
 from backend import engine as engine_mod
-from backend import inventory
+from backend import inventory, pyrun
 from backend.config import HANDLES, SEAT_COLORS
 from backend.engine import DebateEngine
 from backend.model_queue import Caller, ModelQueue, server_key
@@ -58,7 +58,7 @@ class FakeClient(ChatClient):
         agent = AGENT_RE.search(sys)
         if agent:
             handle = agent.group(1)
-            round_no = int(re.search(r"\(round (\d+)", messages[-1]["content"]).group(1))
+            round_no = int(re.search(r"\(round (\d+)", messages[1]["content"]).group(1))
             gate = self.gates.get(handle)
             if gate is not None:
                 await gate.wait()
@@ -1452,3 +1452,88 @@ async def test_the_sidebar_hears_when_a_conundrum_changes_status_but_not_every_t
         assert len(events) < 20  # status and round changes, not streamed text
     finally:
         engine_mod.APP_BUS.unsubscribe(q)
+
+
+# ---------------------------------------------------------------- Python checks
+
+
+@pytest.fixture
+def fake_python(monkeypatch):
+    ran = []
+
+    async def run(code):
+        ran.append(code)
+        return pyrun.Result(True, "42", 0.01)
+
+    monkeypatch.setattr(pyrun, "sandbox", lambda: "fake")
+    monkeypatch.setattr(pyrun, "run", run)
+    return ran
+
+
+CHECK = "Let me compute it.\n@Python:\n```python\nprint(6 * 7)\n```\nSo it's 40.\n\nSTANCE: AGREE\nPOSITION: 40"
+
+
+async def test_an_agent_finishes_its_turn_with_what_its_python_check_printed(fake_python):
+    def turn(handle, round_no, messages):
+        if "Now finish your message" in messages[-1]["content"]:
+            return reply("AGREE", "The program says 42.", "42")
+        return (CHECK, "") if handle == "Panda" else reply("AGREE", position="42")
+
+    client = FakeClient(turn)
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("What is 6 times 7?")
+    await eng.task
+    assert fake_python == ["print(6 * 7)"]
+    msg = db.query_one("SELECT * FROM messages m JOIN seats s ON s.id = m.seat_id WHERE s.handle = 'Panda'")
+    # what it guessed before the output is dropped; the output and its finished reply are kept
+    assert "print(6 * 7)" in msg["content"] and "42" in msg["content"] and "So it's 40" not in msg["content"]
+    assert msg["position_line"] == "42"
+    follow = [m for m, _ in client.turn_calls("Panda") if "Now finish your message" in m[-1]["content"]]
+    assert len(follow) == 1 and "42" in follow[0][-1]["content"] and "So it's 40" not in follow[0][-2]["content"]
+
+
+async def test_agents_are_told_about_python_checks_only_when_a_sandbox_exists(fake_python, monkeypatch):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How many primes are below 1000?")
+    await eng.task
+    assert all("@Python:" in m[0]["content"] for m, _ in client.turn_calls())
+
+    db.connect(":memory:")
+    monkeypatch.setattr(pyrun, "sandbox", lambda: None)
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How many primes are below 1000?")
+    await eng.task
+    assert not any("@Python:" in m[0]["content"] for m, _ in client.turn_calls())
+
+
+async def test_a_code_review_gets_no_python_checks(fake_python):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    assert not any("@Python:" in m[0]["content"] for m, _ in client.turn_calls())
+
+
+async def test_a_direct_answer_can_use_a_python_check(fake_python):
+    class Chair(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if "answer it yourself" in messages[0]["content"]:
+                self.calls.append((model, messages, kw))
+                done = "Now finish your message" in messages[-1]["content"]
+                yield Chunk("content", "It's **42**." if done else CHECK)
+                yield Chunk("done", stats={"tokens": 5})
+                return
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = Chair(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client)
+    await eng.post_user_message("What is 6 times 7?")
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert fake_python == ["print(6 * 7)"]
+    assert chair["content"].endswith("It's **42**.") and "So it's 40" not in chair["content"]
+    assert chair["tokens"] == 10  # both calls counted

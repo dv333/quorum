@@ -58,6 +58,25 @@ CODER_HELP = """
   and the Coder will answer from the code before the next agent speaks. At most one question per message."""
 
 
+PYTHON_HELP = """
+- You can check a calculation with Python. When the answer depends on a count, a sum, a probability, a date or what
+  a program prints, don't work it out in your head: write a line
+  @Python:
+  followed by a ```python block that prints the result, and stop there. Quorum runs it (standard library only, no
+  files or network, 10 seconds) and shows you what it printed, then you finish your message. Make sure the program
+  answers the question exactly as asked; if its output surprises you, find out why before you trust either."""
+
+
+PYTHON_FOLLOWUP = """{results}
+
+Now finish your message using this output. If the output disagrees with what you expected, say which one is right and
+why (a program can also misread the question). Don't write another @Python block."""
+
+
+def python_followup(results: str) -> str:
+    return PYTHON_FOLLOWUP.format(results=results)
+
+
 def agent_system_prompt(
     handle: str,
     others: List[str],
@@ -68,6 +87,7 @@ def agent_system_prompt(
     role: Optional[Dict[str, str]] = None,
     roster: Optional[List[str]] = None,
     coder: bool = False,
+    python: bool = False,
 ) -> str:
     return f"""Today is {today()}. You are {handle}, one member of a council of AI agents working together to give the user the best possible answer, by debating in a group chat.{role_line(role)}
 The other agents are: {", ".join(roster or others)}. The user may also post messages; treat them as guidance from the person you all serve.
@@ -80,7 +100,7 @@ How to debate:
 - Keep it under {WORD_CAP} words. Use markdown only when it helps (short lists, code).
 - The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 - If the user addresses you by name (for example @{handle}), answer them directly first.
-- Speak only as yourself. Never write messages for other agents, the user, {RESEARCHER_NAME} or the Coder.{RESEARCH_HELP if research else ""}{CODER_HELP if coder else ""}
+- Speak only as yourself. Never write messages for other agents, the user, {RESEARCHER_NAME} or the Coder.{RESEARCH_HELP if research else ""}{CODER_HELP if coder else ""}{PYTHON_HELP if python else ""}
 
 End EVERY message with exactly these two lines:
 STANCE: AGREE | DISAGREE | REFINE
@@ -158,6 +178,7 @@ def turn_messages(
     role: Optional[Dict[str, str]] = None,
     roster: Optional[List[str]] = None,
     coder: bool = False,
+    python: bool = False,
 ) -> List[Dict[str, str]]:
     user = [history_block(prior_topics), f"THE QUESTION:\n{question}\n"]
     if summary:
@@ -182,7 +203,7 @@ def turn_messages(
         {
             "role": "system",
             "content": agent_system_prompt(
-                handle, others, criteria, custom_rubric, research, guidance, role, roster, coder
+                handle, others, criteria, custom_rubric, research, guidance, role, roster, coder, python
             ),
         },
         {"role": "user", "content": "".join(user)},
@@ -357,7 +378,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
+Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
 {ANSWER_FORMAT}""",
         },
@@ -480,7 +501,16 @@ Where {ROUNDS_GUIDE}.""",
     ]
 
 
-def direct_answer_messages(chair: str, question: str, prior_topics: List[Dict[str, str]]) -> List[Dict[str, str]]:
+def direct_answer_messages(
+    chair: str, question: str, prior_topics: List[Dict[str, str]], python: bool = False
+) -> List[Dict[str, str]]:
+    check = (
+        " To check a count, a sum, a probability, a date or what code prints, write a line @Python: followed by a "
+        "```python block that prints the result, and stop there; Quorum runs it (standard library only) and shows you "
+        "the output, then you write the answer."
+        if python
+        else ""
+    )
     return [
         {
             "role": "system",
@@ -491,7 +521,7 @@ def direct_answer_messages(chair: str, question: str, prior_topics: List[Dict[st
             "content": f"""Today is {today()}.
 {history_block(prior_topics)}The user says: {question}
 
-Reply directly, briefly and warmly in markdown. If it's a greeting or small talk, reply in kind and invite them to bring a real conundrum for the council. If it's a question with an answer (a fact, a sum, a date, a puzzle), work it out and check it before you write, then give the answer in a sentence or two, with the key step when there's a calculation. Questions that look easy are often traps.""",
+Reply directly, briefly and warmly in markdown. If it's a greeting or small talk, reply in kind and invite them to bring a real conundrum for the council. If it's a question with an answer (a fact, a sum, a date, a puzzle), work it out and check it before you write, then give the answer in a sentence or two, with the key step when there's a calculation. Questions that look easy are often traps.{check}""",
         },
     ]
 

@@ -15,7 +15,7 @@ from datetime import date
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-from . import coder, db, firecrawl, inventory, prompts
+from . import coder, db, firecrawl, inventory, prompts, pyrun
 from .config import (
     MAX_NUM_CTX,
     MAX_ROUNDS_LIMIT,
@@ -747,6 +747,15 @@ def quote_in_source(quote: str, text: str) -> bool:
 CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
 
 
+def _add_stats(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    """Two calls that wrote one message, counted as one."""
+    out = {**a, **b}
+    for k in ("tokens", "duration_ms", "prompt_tokens"):
+        if a.get(k) is not None and b.get(k) is not None:
+            out[k] = a[k] + b[k]
+    return out
+
+
 class DebateEngine:
     def __init__(
         self,
@@ -1112,7 +1121,9 @@ class DebateEngine:
         self._set(status="concluding")
         row = self._insert_message(topic=d["topic"], round_no=0, author_kind="chair", status="streaming")
         try:
-            messages = prompts.direct_answer_messages(label, self._question(d["topic"]), self._prior_topics(d["topic"]))
+            messages = prompts.direct_answer_messages(
+                label, self._question(d["topic"]), self._prior_topics(d["topic"]), python=self._python_on()
+            )
             # The chair thinks before a direct answer. Without it, questions that only look simple (puzzles, sums, dates)
             # went wrong: the answer came first and the working under it sometimes reached a different number
             think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], True)
@@ -1127,6 +1138,18 @@ class DebateEngine:
                 stats = await self._stream_into(
                     row["id"], d["chair_endpoint_id"], d["chair_model"], messages, no_think, None, label, "answer"
                 )
+            first = strip_thinking(partial["content"]).strip()
+            output = await self._python_checks(row["id"], first) if first else None
+            if output:
+                follow = messages + [
+                    {"role": "assistant", "content": pyrun.before_output(first)},
+                    {"role": "user", "content": prompts.python_followup(output)},
+                ]
+                no_think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+                more = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], follow, no_think, None, label, "answer"
+                )
+                stats = _add_stats(stats, more)
             self._finish_message(
                 row["id"],
                 content=strip_thinking(partial["content"]).strip() or "…",
@@ -1689,12 +1712,14 @@ class DebateEngine:
             think = await self._thinking_flag(seat["endpoint_id"], seat["model"], wanted)
             partial = self.partials[msg_id]
 
-            async def attempt(flag: Optional[Union[bool, str]]) -> Dict[str, Any]:
+            async def attempt(
+                flag: Optional[Union[bool, str]], msgs: Optional[List[Dict[str, str]]] = None
+            ) -> Dict[str, Any]:
                 return await self._stream_into(
                     msg_id,
                     seat["endpoint_id"],
                     seat["model"],
-                    messages,
+                    msgs or messages,
                     flag,
                     self._keep_alive(seat, upcoming),
                     seat["handle"],
@@ -1730,6 +1755,16 @@ class DebateEngine:
                     if stats.get("cut")
                     else "returned an empty reply"
                 )
+            output = await self._python_checks(msg_id, content)
+            if output:
+                # It asked for a Python check: it finishes its message with what the program printed
+                follow = messages + [
+                    {"role": "assistant", "content": pyrun.before_output(content)},
+                    {"role": "user", "content": prompts.python_followup(output)},
+                ]
+                more = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False), follow)
+                stats = _add_stats(stats, more)
+                content = strip_thinking(partial["content"])
             st = parse_stance(content)
             self._finish_message(
                 msg_id,
@@ -1785,6 +1820,27 @@ class DebateEngine:
 
     def _queue_research(self, request: str, requested_by: Optional[str], kind: str) -> None:
         self.research_queue.append({"request": request, "requested_by": requested_by, "kind": kind})
+
+    def _python_on(self) -> bool:
+        """Agents can check calculations with Python: a sandbox exists, and this isn't a code review (the reviewed
+        code can't run on its own)."""
+        d = self.debate()
+        return bool(pyrun.sandbox()) and not is_code_debate(self._question(d["topic"]), d["pack"], d.get("repo_path"))
+
+    async def _python_checks(self, msg_id: int, content: str) -> Optional[str]:
+        """Runs the programs a reply asked for (@Python:), shows what they printed under it, and returns that for the
+        model to finish its reply with. None when it asked for none."""
+        programs = pyrun.parse_requests(content) if self._python_on() else []
+        if not programs:
+            return None
+        self._log(msg_id, "(running its Python check)")
+        results = [await pyrun.run(code) for code in programs]
+        text = pyrun.results_text(programs, results)
+        partial = self.partials[msg_id]
+        partial["content"] = f"{pyrun.before_output(content).rstrip()}\n\n{text}\n\n"
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        self.bus.publish({"type": "message_updated", "message": serialize_message(row, partial)})
+        return text
 
     def _coder(self) -> Optional[str]:
         """The coding agent for this conundrum (Claude Code or Codex), when a repository is attached."""
@@ -2139,6 +2195,7 @@ class DebateEngine:
                 role={"role": seat["role"], "focus": seat.get("role_focus") or ""} if seat.get("role") else None,
                 coder=bool(self._coder()),
                 roster=roster,
+                python=self._python_on(),
             )
 
         others = [s for s in self.seats() if s["id"] != seat["id"]]

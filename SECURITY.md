@@ -8,6 +8,9 @@ Quorum is designed to run on your own computer. A few things to keep in mind:
   browser. Protect that file like any other credential store, and never commit it.
 - With web research on, your questions (as search queries) are sent to the search provider. With a cloud model in
   your council, the debate is sent to that provider.
+- Agents can run short Python programs to check calculations. They run in an OS sandbox (`sandbox-exec` on macOS,
+  `bwrap` on Linux) with no network, no writes outside a temporary folder and no child processes; without a sandbox
+  the feature is off. Set `QUORUM_PYTHON=off` to turn it off anyway.
 
 ## Reporting a vulnerability
 
