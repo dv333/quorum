@@ -1,0 +1,2609 @@
+{
+ "py-fib-sign": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 144\n\nThe function `g(n)` computes a variation of the Fibonacci sequence. Let's trace the values:\n- `g(0) = 0`\n- `g(1) = 1`\n- For $n > 1$, `g(n) = g(n-1) + g(n-2) * (1 if n % 3 else -1)`.\n\nLet's compute step-by-step:\n- `g(2)`: $n=2$, $2 \\% 3 \\neq 0$, so multiplier is $1$. $g(2) = g(1) + g(0)*1 = 1 + 0 = 1$.\n- `g(3)`: $n=3$, $3 \\% 3 == 0$, so multiplier is $-1$. $g(3) = g(2) + g(1)*(-1) = 1 - 1 = 0$.\n- `g(4)`: $n=4$, $4 \\% 3 \\neq 0$, multiplier is $1$. $g(4) = g(3) + g(2)*1 = 0 + 1 = 1$.\n- `g(5)`: $n=5$, $5 \\% 3 \\neq 0$, multiplier is $1$. $g(5) = g(4) + g(3)*1 = 1 + 0 = 1$.\n- `g(6)`: $n=6$, $6 \\% 3 == 0$, multiplier is $-1$. $g(6) = g(5) + g(4)*(-1) = 1 - 1 = 0$.\n- `g(7)`: $n=7$, $7 \\% 3 \\neq 0$, multiplier is $1$. $g(7) = g(6) + g(5)*1 = 0 + 1 = 1$.\n- `g(8)`: $n=8$, $8 \\% 3 \\neq 0$, multiplier is $1$. $g(8) = g(7) + g(6)*1 = 1 + 0 = 1$.\n- `g(9)`: $n=9$, $9 \\% 3 == 0$, multiplier is $-1$. $g(9) = g(8) + g(7)*(-1) = 1 - 1 = 0$.\n- `g(10)`: $n=10$, $10 \\% 3 \\neq 0$, multiplier is $1$. $g(10) = g(9) + g(8)*1 = 0 + 1 = 1$.\n- `g(11)`: $n=11$, $11 \\% 3 \\neq 0$, multiplier is $1$. $g(11) = g(10) + g(9)*1 = 1 + 0 = 1$.\n- `g(12)`: $n=12$, $12 \\% 3 == 0$, multiplier is $-1$. $g(12) = g(11) + g(10)*(-1) = 1 - 1 = 0$.\n\nWait, let me re-check the pattern.\nThe sequence is: 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0...\nIt seems to repeat every 3 terms starting from index 0: $g(3k) = 0$, $g(3k+1) = 1$, $g(3k+2) = 1$.\nLet's verify `g(12)`. Since $12$ is divisible by 3, $g(12)$ should be 0.\n\nLet me double check the calculation for `g(6)` again.\n`g(4) = 1`, `g(5) = 1`.\n`g(6) = g(5) + g(4) * (-1) = 1 - 1 = 0`. Correct.\n`g(7) = g(6) + g(5) * (1) = 0 + 1 = 1`. Correct.\n`g(8) = g(7) + g(6) * (1) = 1 + 0 = 1`. Correct.\n`g(9) = g(8) + g(7) * (-1) = 1 - 1 = 0`. Correct.\n`g(10) = g(9) + g(8) * (1) = 0 + 1 = 1`. Correct.\n`g(11) = g(10) + g(9) * (1) = 1 + 0 = 1`. Correct.\n`g(12) = g(11) + g(10) * (-1) = 1 - 1 = 0`.\n\nThe output is 0.",
+   "correct": false,
+   "seconds": 120.0,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "5ab1b8492fa4",
+   "seconds": 569.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 0 due to a rapidly stabilizing period-3 cycle in the recurrence, making manual tracing highly feasible for n=12.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "g(12) prints 0; the function is safe and fast at this depth, and the sequence has period 3.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program outputs 0.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 153, although a full evaluation is necessary to confirm this.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The function `g(n)` outputs 0 for `n = 12` due to the alternating sign flip every third term.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `0` because the recursive function's pattern leads to cancellation at n=12.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 0 because g(12) returns 0 based on the recursive function definition and the conditional sign change for multiples of 3.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 0.",
+   "draft_round1_correct": true,
+   "final": "The program prints 0 because the recursive function generates a repeating cycle of values 0, 1, 1, and 12 is a multiple of 3.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "48fe559158cd",
+   "seconds": 689.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "",
+     "correct": false
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 0 due to specific cancellations at multiples of 3.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 0.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 0, indicating that g(12) equals zero.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 0.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 0.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 0",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 218.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 0 because g(n) equals 0 whenever n is a multiple of 3.",
+   "draft_round1_correct": true,
+   "final": "The Python program prints 0.",
+   "final_correct": true
+  }
+ },
+ "py-slice": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: aaac\n\nThe string `s` is `\"abracadabra\"`. The slice `s[::-3]` starts from the end and steps backward by 3, yielding characters at indices 10, 7, 4, 1 which are `'a'`, `'a'`, `'c'`, `'a'` (resulting in `\"aaac\"`). The slice `s[1:-1:4]` starts at index 1 and steps forward by 4 up to (but not including) the last character, yielding characters at indices 1 and 5 which are `'b'` and `'a'` (resulting in `\"ba\"`). Concatenating these gives `\"aaac\" + \"ba\" = \"aaacba\"`. Wait, let me re-calculate carefully.\n\nIndices of `s = \"abracadabra\"`:\n0:a, 1:b, 2:r, 3:a, 4:c, 5:a, 6:d, 7:a, 8:b, 9:r, 10:a\n\n`s[::-3]`: Start at end (index 10), step -3. Indices: 10 ('a'), 7 ('a'), 4 ('c'), 1 ('b'). Result: `\"aab c\"` -> `\"aabc\"`.\n`s[1:-1:4]`: Start at index 1, stop before index -1 (which is 9), step 4. Indices: 1 ('b'), 5 ('a'). Index 9 is excluded because it's the stop point. Result: `\"ba\"`.\n\nConcatenation: `\"aabc\" + \"ba\" = \"aab cba\"` -> `\"aabcba\"`.\n\nLet me double check `s[::-3]`.\nIndex 10: 'a'\nIndex 7: 'a'\nIndex 4: 'c'\nIndex 1: 'b'\nNext would be -2, which is out of bounds. So `s[::-3]` is `\"aabc\"`.\n\nLet me double check `s[1:-1:4]`.\nStart index 1 ('b').\nNext index 1+4=5 ('a').\nNext index 5+4=9. The stop is `-1` which corresponds to index 10 (exclusive) or effectively the end of the string minus 1? In Python slicing `s[1:-1]`, the stop is the element at index -1 (the last character), exclusive. So it goes up to index 9.\nDoes index 9 get included? No, because the step is positive and we are moving towards the end. The slice includes start but excludes stop. Stop is index 9 (character 'r'). So indices generated are 1, 5. Next is 9, which equals the stop index, so it is excluded.\nSo `s[1:-1:4]` is `\"ba\"`.\n\nTotal: `\"aabc\" + \"ba\" = \"aabcba\"`.",
+   "correct": false,
+   "seconds": 133.0,
+   "retried": true
+  }
+ },
+ "py-nonlocal": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 21\n\n**Explanation:**\n1.  **Global Scope**: The variable `x` is initialized to `10`.\n2.  **Closure Creation**: When `outer()` is called, it creates a local variable `x` with value `1`. It defines `inner`, which uses the `nonlocal` keyword to refer to this specific local `x` (not the global one), and returns `inner`. The variable `f` now holds this function along with its captured environment.\n3.  **First Call (`f()`)**: This calls `inner`. The `nonlocal x` refers to the captured variable (currently `1`). It increments it by 5, making it `6`, and returns `6`. This return value is ignored.\n4.  **Print Statement (`print(f() + x)`)**:\n    *   `f()` is called again. The `nonlocal x` (now `6`) is incremented by 5 to become `11`. The function returns `11`.\n    *   The variable `x` in the expression `+ x` is looked up in the global scope (since the code is executing at the module level). The global `x` has never been modified and remains `10`.\n    *   The calculation is `11 + 10`, which equals `21`.\n5.  **Output**: The program prints `21`.",
+   "correct": true,
+   "seconds": 82.9,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "3882c7d35bc2",
+   "seconds": 538.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 21 because nonlocal modifies the closure variable (updating it cumulatively to 11) while global x remains fixed at 10.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 21, and the security risk is the silent divergence between the global `x` and the closure `x` sharing the same name.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 21.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 21 because the `inner` function modifies the `x` variable in the `outer` scope, and that value is subsequently used in the final `print` statement.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 26 because the `nonlocal` keyword modifies `x` in `outer`, and the global `x` remains unchanged.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 21 because the `nonlocal` reference in `inner()` modifies the `x` in `outer()`'s scope, while the global `x` remains unchanged.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 21.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The CPython VM handles nested function objects and variable resolution by creating a new scope for the inner function, which has its own `x` variable.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 21",
+   "draft_round1_correct": true,
+   "final": "The program prints 21.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "f6ee9fd652d4",
+   "seconds": 722.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 21 because the first `f()` updates the closure's variable, and the second `f()` returns 11, which is added to the unchanged global `x` (10).",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 21 because `nonlocal x` modifies `outer`'s local x (1→6→11) while the global x (10) remains unchanged, making the final expression 11 + 10 = 21.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `21`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 16 because the `inner` function modifies the `x` variable in the `outer` scope, and the final print statement sums the returned value from `inner` and the original `x` value.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 21 because `f()` modifies the `x` in `outer()` scope, and the global `x` remains unchanged.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 21.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program outputs 21 because the second call to `f()` increments the `x` in `outer()` from 6 to 11, and the global `x` is still 10.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 16 because of the addition of the result of the inner function to the global variable x, but the explanation is not entirely accurate due to the recursive nature of the function calls.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 21 because the closure variable is modified to 11 by the second call, which is added to the unchanged global variable.",
+   "draft_round1_correct": true,
+   "final": "The program prints 21.",
+   "final_correct": true
+  }
+ },
+ "py-mississippi": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: i 22\n\n**Explanation:**\nThe program iterates through the string `\"mississippi\"`, calculating the sum of the indices for each character and storing it in the dictionary `d`.\n- **'m'** appears at index 0. Sum = 0.\n- **'i'** appears at indices 1, 4, 7, 10. Sum = 1 + 4 + 7 + 10 = 22.\n- **'s'** appears at indices 2, 3, 5, 6. Sum = 2 + 3 + 5 + 6 = 16.\n- **'p'** appears at indices 8, 9. Sum = 8 + 9 = 17.\n\nThe dictionary `d` ends up as `{'m': 0, 'i': 22, 's': 16, 'p': 17}`. The `max` function finds the key with the highest value (which is `'i'` with a value of 22). Finally, it prints the key and its corresponding value separated by a space.",
+   "correct": true,
+   "seconds": 98.8,
+   "retried": false
+  }
+ },
+ "py-finally": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 23\n\n**Explanation:**\n1.  **Function `f()` behavior**: The function contains a `try...finally` block. Although it attempts to return `1` inside the `try` block, the `finally` block is always executed before the function returns control to the caller. Since the `finally` block contains a `return 2` statement, it overrides the pending return value from the `try` block. Therefore, every call to `f()` returns `2`.\n2.  **Evaluating the expression**: The code inside `print` is `f() * 10 + len([f() for _ in range(3)])`.\n    *   **First term (`f() * 10`)**: The first call to `f()` returns `2`. Multiplying by 10 results in `20`.\n    *   **Second term (`len(...)`)**: The list comprehension `[f() for _ in range(3)]` iterates three times (for values 0, 1, and 2). Each iteration calls `f()`, which returns `2`. This creates the list `[2, 2, 2]`. The length of this list is `3`.\n3.  **Final Result**: The expression evaluates to `20 + 3`, which equals `23`.",
+   "correct": true,
+   "seconds": 93.2,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "c0e869211e25",
+   "seconds": 538.8,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 56 because the finally block's return statement overrides the try block's return value in all calls.",
+     "correct": false
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 23, because the finally-return overrides the try-return, making f() ≡ 2, so 2*10 + len([2,2,2]) = 23.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `23`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print 23 because the `finally` block overrides the `try` block's return and the list comprehension evaluates to a list of three 2s.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 23.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 23.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 23 because the finally block's return statement overrides the try block's return.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "I think the program will print 43 because the function `f()` always returns 2 due to the `finally` block.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 23.",
+   "draft_round1_correct": true,
+   "final": "The program prints 23 because the return statement in the finally block unconditionally overrides the return statement in the try block, making f() always evaluate to 2.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "e231289e4501",
+   "seconds": 406.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The output is exactly 23 because the return value in the finally block overrides the one in the try block.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 23 because `f()` always returns 2 (finally block overrides try), so 2*10 + len([2,2,2]) = 20 + 3 = 23.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints the integer 23.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 23 because the `finally` block always overrides the `try` block's return value, making `f()` always return 2.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `23`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 23.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 23 because the finally block overrides the return value.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program will print 32.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 23 because the finally block's return value overrides the try block, making f() always return 2.",
+   "draft_round1_correct": true,
+   "final": "The program prints 23.",
+   "final_correct": true
+  }
+ },
+ "py-zip-iter": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 5 -1\n\n**Explanation:**\n1.  `it = iter(range(11))` creates an iterator that yields the numbers 0 through 10.\n2.  `zip(it, it)` pulls items from the **same** iterator object for both arguments of every tuple. It pulls one item for the first slot, then immediately pulls the next item for the second slot.\n    *   It successfully forms pairs: `(0, 1)`, `(2, 3)`, `(4, 5)`, `(6, 7)`, and `(8, 9)`.\n    *   When attempting to form the next pair, it pulls `10` for the first slot. However, when it tries to pull a second item for the second slot, the iterator is exhausted (raises `StopIteration`).\n    *   Because `zip` requires both items to complete a tuple, it stops immediately. The value `10` is not included in the list.\n3.  `pairs` contains 5 tuples, so `len(pairs)` is **5**.\n4.  Since the iterator `it` was exhausted during the `zip` process (after yielding 10), calling `next(it, -1)` returns the default value **-1**.",
+   "correct": true,
+   "seconds": 107.7,
+   "retried": false
+  }
+ },
+ "py-grid": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 21\n\n**Explanation:**\n\n1.  **`grid = [[0] * 3] * 3`**: This creates a list containing three references to the **same** inner list object (a common Python pitfall). Initially, all three rows point to the same memory address `[0, 0, 0]`.\n2.  **`grid[0][0] = 1`**: This modifies the shared inner list. Since all rows reference the same object, the grid effectively becomes `[[1, 0, 0], [1, 0, 0], [1, 0, 0]]`.\n3.  **`grid[1][1] += 2`**: This modifies the second element of the shared inner list (which is currently 0). It becomes 2. The grid is now `[[1, 2, 0], [1, 2, 0], [1, 2, 0]]`.\n4.  **`grid[2] = [5, 5, 5]`**: This reassigns the reference at index 2 to a completely new list object. The first two rows remain linked to the modified shared list `[1, 2, 0]`, while the third row is now `[5, 5, 5]`.\n5.  **`print(sum(map(sum, grid)))`**:\n    *   Sum of row 0 (`[1, 2, 0]`) is 3.\n    *   Sum of row 1 (`[1, 2, 0]`) is 3.\n    *   Sum of row 2 (`[5, 5, 5]`) is 15.\n    *   Total sum: $3 + 3 + 15 = 21$.",
+   "correct": true,
+   "seconds": 34.0,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "37248ce81aa2",
+   "seconds": 716.4,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 21 due to aliasing between rows 0 and 1, while row 2 is rebinding to a new list object.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 21, because `[[0]*3]*3` aliases rows 0 and 1, so both mutations apply to both, then row 2 is rebound independently.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 21.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print 21 if the grid initialization doesn’t create shared references, but likely a different value if it does.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 19 due to shared references in the grid initialization.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `21` because the first two rows share the same list, and the third row is replaced explicitly.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The grid creation is flawed due to shared references.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program will print a value other than 26 due to the shared reference issue.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 21.",
+   "draft_round1_correct": true,
+   "final": "The program prints 21 because [[0]3]3 creates three references to the same inner list, so both mutations affect rows 0 and 1 before row 2 is independently reassigned.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "a443dcf20b9a",
+   "seconds": 644.3,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 21 because the first two rows remain identical references to a mutated list `[1, 2, 0]`, while the third row becomes an independent list `[5, 5, 5]`.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 21 due to shared row references, which is a significant data integrity risk.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 21, but using list multiplication introduces aliasing that can compromise reliability.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The Python program prints 21, which is the sum of all elements in the modified grid.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 21.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 21 because of shared references in the initial grid creation.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 18, as calculated by summing the rows after modification.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 14 because of how the grid is structured and the operations performed on its elements.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 21 because the first two rows share a reference to a mutated list [1, 2, 0], while the third row is replaced by an independent list [5, 5, 5].",
+   "draft_round1_correct": true,
+   "final": "The program prints 21 because the initial list creation creates aliased rows, causing mutations in one row to affect others until the third row is explicitly replaced.",
+   "final_correct": true
+  }
+ },
+ "py-for-else": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 25\n\n**Explanation:**\n\nThe code iterates through `i` from 0 to 5. For each `i`, it loops through `j` from 0 to `i-1`. Inside the inner loop, if `(i + j) % 4 == 0`, the loop breaks immediately without incrementing `n`. If the inner loop completes without breaking (i.e., the `else` block attached to the `for` loop is executed), `n` increases by 10. Otherwise, for every iteration of `j` that does not trigger a break, `n` increases by 1.\n\nLet's trace the execution:\n\n1.  **i = 0**: `range(0)` is empty. The inner loop doesn't run. The `else` block executes.\n    *   `n += 10` -> `n = 10`\n\n2.  **i = 1**: `j` takes values `[0]`.\n    *   `j = 0`: `(1 + 0) % 4 = 1 != 0`. No break. `n += 1` -> `n = 11`.\n    *   Loop finishes normally. `else` block executes.\n    *   `n += 10` -> `n = 21`\n\n3.  **i = 2**: `j` takes values `[0, 1]`.\n    *   `j = 0`: `(2 + 0) % 4 = 2 != 0`. No break. `n += 1` -> `n = 22`.\n    *   `j = 1`: `(2 + 1) % 4 = 3 != 0`. No break. `n += 1` -> `n = 23`.\n    *   Loop finishes normally. `else` block executes.\n    *   `n += 10` -> `n = 33`\n\n4.  **i = 3**: `j` takes values `[0, 1, 2]`.\n    *   `j = 0`: `(3 + 0) % 4 = 3 != 0`. No break. `n += 1` -> `n = 34`.\n    *   `j = 1`: `(3 + 1) % 4 = 0 == 0`. **Break**.\n    *   Loop breaks. `else` block does NOT execute.\n\n5.  **i = 4**: `j` takes values `[0, 1, 2, 3]`.\n    *   `j = 0`: `(4 + 0) % 4 = 0 == 0`. **Break**.\n    *   Loop breaks. `else` block does NOT execute.\n\n6.  **i = 5**: `j` takes values `[0, 1, 2, 3, 4]`.\n    *   `j = 0`: `(5 + 0) % 4 = 1 != 0`. No break. `n += 1` -> `n = 35`.\n    *   `j = 1`: `(5 + 1) % 4 = 2 != 0`. No break. `n += 1` -> `n = 36`.\n    *   `j = 2`: `(5 + 2) % 4 = 3 != 0`. No break. `n += 1` -> `n = 37`.\n    *   `j = 3`: `(5 + 3) % 4 = 0 == 0`. **Break**.\n    *   Loop breaks. `else` block does NOT execute.\n\nWait, let me re-evaluate the logic carefully. The `break` happens inside the `if`. If it breaks, the `else` clause of the `for` loop is skipped. If it doesn't break, the `else` clause runs.\n\nLet's re-trace step-by-step:\n\n*   **i=0**: Inner loop empty. `else` runs. `n = 0 + 10 = 10`.\n*   **i=1**: `j=0`. `(1+0)%4 = 1`. No break. `n += 1` (n=11). Loop ends. `else` runs. `n += 10` (n=21).\n*   **i=2**: `j=0`. `(2+0)%4 = 2`. No break. `n += 1` (n=22). `j=1`. `(2+1)%4 = 3`. No break. `n += 1` (n=23). Loop ends. `else` runs. `n += 10` (n=33).\n*   **i=3**: `j=0`. `(3+0)%4 = 3`. No break. `n += 1` (n=34). `j=1`. `(3+1)%4 = 0`. **Break**. `else` skipped.\n*   **i=4**: `j=0`. `(4+0)%4 = 0`. **Break**. `else` skipped.\n*   **i=5**: `j=0`. `(5+0)%4 = 1`. No break. `n += 1` (n=35). `j=1`. `(5+1)%4 = 2`. No break. `n += 1` (n=36). `j=2`. `(5+2)%4 = 3`. No break. `n += 1` (n=37). `j=3`. `(5+3)%4 = 0`. **Break**. `else` skipped.\n\nFinal value is 37? Let me double check my arithmetic.\nInitial n=0.\ni=0: else -> n=10.\ni=1: j=0 (sum=1, no break) -> n=11. else -> n=21.\ni=2: j=0 (sum=2, no break) -> n=22. j=1 (sum=3, no break) -> n=23. else -> n=33.\ni=3: j=0 (sum=3, no break) -> n=34. j=1 (sum=4, break). n stays 34.\ni=4: j=0 (sum=4, break). n stays 34.\ni=5: j=0 (sum=5, no break) -> n=35. j=1 (sum=6, no break) -> n=36. j=2 (sum=7, no break) -> n=37. j=3 (sum=8, break). n stays 37.\n\nThe result is 37.",
+   "correct": false,
+   "seconds": 152.9,
+   "retried": true
+  }
+ },
+ "py-floordiv": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: -1\n\nThe expression evaluates as follows:\n1. `-7 // 2`: Floor division rounds towards negative infinity, so $-3.5$ becomes $-4$.\n2. `-7 % 3`: The modulo result has the same sign as the divisor (positive). Since $-7 = (-3 \\times 3) + 2$, the remainder is $2$.\n3. `7 // -2`: Floor division rounds towards negative infinity, so $-3.5$ becomes $-4$.\n4. `7 % -3`: The modulo result has the same sign as the divisor (negative). Since $7 = (-3 \\times -3) - 2$, the remainder is $-2$.\n\nSumming these up: $-4 + 2 + (-4) + (-2) = -8$.\n\nWait, let me re-calculate carefully.\n1. `-7 // 2`: $-7 / 2 = -3.5$. Floor is $-4$. Correct.\n2. `-7 % 3`: We need $r$ such that $-7 = q \\times 3 + r$ where $0 \\le r < 3$. If $q=-3$, then $-9 + r = -7 \\Rightarrow r=2$. Correct.\n3. `7 // -2`: $7 / -2 = -3.5$. Floor is $-4$. Correct.\n4. `7 % -3`: We need $r$ such that $7 = q \\times (-3) + r$ where $0 > r \\ge -3$ (same sign as divisor). If $q=-3$, then $-9 + r = 7 \\Rightarrow r=16$ (too big). If $q=-2$, then $-6 + r = 7 \\Rightarrow r=13$ (too big). Wait.\n   Let's use the formula: `a % n` has the sign of `n`.\n   $7 / -3 = -2.33...$. Floor is $-3$. So quotient is $-3$.\n   Remainder = $7 - (-3 \\times -3) = 7 - 9 = -2$. Correct.\n\nTotal sum: $-4 + 2 + (-4) + (-2) = -8$.\n\nLet me double check the first term again.\n`-7 // 2`: Python floor division `//` rounds down to the nearest integer less than or equal to the result.\n$-7 / 2 = -3.5$. The integer less than or equal to $-3.5$ is $-4$. So `-7 // 2` is `-4`.\n\nLet me double check the third term again.\n`7 // -2`:\n$7 / -2 = -3.5$. The integer less than or equal to $-3.5$ is $-4$. So `7 // -2` is `-4`.\n\nSo the calculation is:\n$-4 + 2 + (-4) + (-2)$\n$= -2 + (-4) + (-2)$\n$= -6 + (-2)$\n$= -8$\n\nWhy did I initially think -1? Let me re-read standard integer division behavior.\nIn Python:\n`-7 // 2` is `-4`.\n`-7 % 3` is `2`. (Check: $-4 \\times 3 + 2 = -12 + 2 = -10 \\neq -7$. Wait. The definition is `a == (a // b) * b + (a % b)`).\nLet's check `-7 % 3`:\n`-7 // 3` is `-3` (since $-7/3 = -2.33$, floor is $-3$).\n`-7 % 3` should be `0`. Because $-7 = (-3 \\times 3) + 2$? No. $-9 + 2 = -7$. Yes. So `-7 % 3` is `2`.\n\nLet's check `7 % -3`:\n`7 // -3` is `-3` (since $7/-3 = -2.33$, floor is $-3$).\n`7 % -3` should be such that $7 = (-3 \\times -3) + r \\Rightarrow 7 = 9 + r \\Rightarrow r = -2$.\nSo `7 % -3` is `-2`.\n\nLet's check `7 // -2`:\n`7 / -2 = -3.5`. Floor is `-4`. So `7 // -2` is `-4`.\n\nSum:\n$(-7 // 2) + (-7 \\% 3) + (7 // -2) + (7 \\% -3)$\n$= -4 + 2 + (-4) + (-2)$\n$= -8$\n\nLet me re-verify `-7 % 3`.\nPython docs: `a % n` has the same sign as `n`. Divisor is 3 (positive).\n$a = q \\times n + r$.\n$-7 = q \\times 3 + r$.\nIf $q = -2$, $r = -1$ (wrong sign).\nIf $q = -3$, $r = 2$ (correct sign, $0 \\le r < 3$).\nSo `-7 % 3` is `2`.\n\nLet me re-verify `7 % -3`.\nDivisor is -3 (negative).\n$a = q \\times n + r$.\n$7 = q \\times (-3) + r$.\nIf $q = -2$, $r = 13$ (wrong magnitude/sign logic for modulo range).\nThe remainder must satisfy $0 > r \\ge -3$ (same sign as divisor, i.e., negative or zero, and $|r| < |n|$).\nActually, the condition is usually that `a % n` has the same sign as `n`.\nIf $q = -3$, $7 = (-3)(-3) + r \\Rightarrow 7 = 9 + r \\Rightarrow r = -2$.\nIs $-2$ valid? Yes, it has the same sign as -3.\n\nSo the terms are:\n1. `-4`\n2. `2`\n3. `-4`\n4. `-2`\n\nSum: $-4 + 2 - 4 - 2 = -8$.\n\nLet me try a different interpretation just in case I made a silly arithmetic error.\n$-4 + 2 = -2$\n$-2 - 4 = -6$\n$-6 - 2 = -8$\n\nThe answer is -8.",
+   "correct": false,
+   "seconds": 152.5,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "197e140d5f10",
+   "seconds": 580.7,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints -8 based on Python 3's floor division and modulo rules.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The expression evaluates to -8 under Python 3's floor-division and modulo semantics.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints -8; no overflow or type‑coercion issues arise in Python.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The expression evaluates to -8.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `-8` based on correct evaluation of each operation.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `-8` because each term is evaluated according to Python 3's rules for floor division and modulo operations with negative numbers.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints -8.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints -1 as its output.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints -8.",
+   "draft_round1_correct": true,
+   "final": "The Python 3 program prints -8 because floor division rounds towards negative infinity and modulo results take the sign of the divisor.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "38d03318911c",
+   "seconds": 626.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints -8.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints -8, driven by floor division rounding toward negative infinity and modulo taking the divisor's sign.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints **-8**.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The Python program prints -8, as confirmed by executing the code directly.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `-8`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program correctly prints -8 based on Python's handling of floor division and modulo operations with negative numbers.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints -8.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program may print a different value due to the behavior of the // operator with negative inputs.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints -8.",
+   "draft_round1_correct": true,
+   "final": "The Python 3 program prints -8.",
+   "final_correct": true
+  }
+ },
+ "py-bools": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 24\n\nIn Python, boolean values are subclasses of integers where `True` equals `1` and `False` equals `0`. The list `[True, True, 3]` sums to $1 + 1 + 3 = 5$. The expression `(True + True)` evaluates to $1 + 1 = 2$, which is then raised to the power of 3 ($2^3 = 8$). Finally, multiplying the sum by this result gives $5 \\times 8 = 40$. Wait, let me re-calculate.\n\nSum: `True` (1) + `True` (1) + `3` = 5.\nBase: `True` (1) + `True` (1) = 2.\nExponentiation: $2^3 = 8$.\nMultiplication: $5 \\times 8 = 40$.\n\nLet me double-check the logic.\n`sum([True, True, 3])` -> `1 + 1 + 3` -> `5`.\n`(True + True) ** 3` -> `(1 + 1) ** 3` -> `2 ** 3` -> `8`.\n`5 * 8` -> `40`.\n\nThe output is 40.",
+   "correct": false,
+   "seconds": 131.3,
+   "retried": true
+  }
+ },
+ "py-class-attr": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 4\n\n**Explanation:**\n1.  **Class Attribute Sharing:** `items = []` is defined as a class attribute, meaning it is shared by all instances of `A`. Initially, both `a` and `b` point to this same list object.\n2.  **Mutations:** \n    *   `a.add(1)` appends `1` to the shared list (now `[1]`).\n    *   `b.add(2)` appends `2` to the *same* shared list (now `[1, 2]`) because `b` has not yet defined its own `items`.\n3.  **Shadowing:** The line `b.items = [9]` creates a new instance attribute for `b`. This \"shadows\" the class attribute for object `b`, but `a` (and the class itself) still points to the original shared list `[1, 2]`.\n4.  **Final Calculation:** \n    *   `a.add(3)` accesses the shared list (via `a`), appends `3` (making it `[1, 2, 3]`), and returns its length, which is **3**.\n    *   `len(b.items)` accesses `b`'s specific instance attribute `[9]`, returning a length of **1**.\n5.  **Result:** The program prints the sum: 3 + 1 = 4.",
+   "correct": true,
+   "seconds": 109.7,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "d02498e6c9e1",
+   "seconds": 560.0,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program definitively prints 4 due to class attribute shadowing creating instance-level isolation for b while a continues modifying the original shared list.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 4, because `b.items = [9]` creates an instance attribute that shadows the class attribute for `b` only, while `a` still mutates the shared class-level list.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 4.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print 2 due to the shared nature of the `items` list and its subsequent modification.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `3`.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `4` due to shared class variables and instance-specific overrides.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The code prints 4, but it violates encapsulation due to direct attribute modification.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python 3 program will print 6.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 4 due to instance attribute shadowing.",
+   "draft_round1_correct": true,
+   "final": "The program prints 4.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "05b1c9b06efe",
+   "seconds": 623.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 4 due to the separation of class and instance variable scopes after b.items is reassigned.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 4 because `a` uses the shared class-level list while `b` uses a shadowed instance-level list.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 4.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program's output is 4, and my previous reasoning was flawed, indicating a misunderstanding of how the program functions.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `3`.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `4` because `a.add(3)` modifies the original class list while `b.items` refers to a separate instance list.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program outputs 3 by combining the new length from a's items (after adding 3) and the fixed length of b's items (after being reassigned).",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 9.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 4.",
+   "draft_round1_correct": true,
+   "final": "The program prints 4.",
+   "final_correct": true
+  }
+ },
+ "py-remove-loop": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: [3, 6, 9, 10]\n\n**Explanation:**\nThe code iterates through the list `x` while simultaneously removing elements from it. This causes a \"skipping\" effect because removing an item shifts all subsequent items one index to the left, but the loop iterator continues to the next index number.\n\nHere is the step-by-step trace:\n1.  **Iteration 1:** The iterator picks the element at index 0 (`1`). Since `1` is odd, it is removed. The list becomes `[3, 5, 6, 7, 9, 10]`. The number `3` shifts to index 0.\n2.  **Iteration 2:** The iterator moves to index 1. Because the list shifted, index 1 now holds `5` (skipping `3`). Since `5` is odd, it is removed. The list becomes `[3, 6, 7, 9, 10]`.\n3.  **Iteration 3:** The iterator moves to index 2. Index 2 now holds `7` (skipping `6`). Since `7` is odd, it is removed. The list becomes `[3, 6, 9, 10]`.\n4.  **Iteration 4:** The iterator moves to index 3. Index 3 now holds `10`. Since `10` is even, nothing happens.\n5.  **End:** The loop finishes.\n\nThe remaining elements are `[3, 6, 9, 10]`.",
+   "correct": true,
+   "seconds": 30.7,
+   "retried": false
+  }
+ },
+ "py-lru-calls": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 67\n\nThe code calculates Fibonacci numbers using memoization via `lru_cache`. The function `c(n)` computes the $n$-th Fibonacci number. Because of the cache, each unique value of `c(k)` is computed only once across all calls.\n\n1.  First, `c(30)` is called. This triggers computations for `c(0)` through `c(30)`. Since `lru_cache` stores these results, the number of function calls made here corresponds to the number of unique arguments passed during the recursive expansion of `c(30)`. For a standard Fibonacci recursion without cache, it would be exponential, but with cache, each `c(k)` for $k \\le 30$ is computed exactly once. Thus, `calls` increments for every integer from 0 to 30. That is 31 calls (for inputs 0, 1, ..., 30).\n2.  Next, `c(35)` is called. The cache already contains results for $0 \\dots 30$. The computation of `c(35)` will require `c(34)`, which requires `c(33)`, ..., down to `c(31)`. The values `c(30)` and below are retrieved from the cache without incrementing `calls` (the `calls += 1` line is inside the function body, so it only runs when the function is actually executed, not when a cached value is returned).\n3.  Therefore, the second call adds computations for inputs 31, 32, 33, 34, and 35. That is 5 additional calls.\n\nTotal calls = 31 (from first call) + 5 (from second call) = 36? Wait, let's re-verify the base cases.\n`c(0)` and `c(1)` return 1 immediately. They are still \"called\" once each.\nFor `c(30)`: The recursion tree with memoization effectively computes `c(0), c(1), ..., c(30)` exactly once each. Total = 31 calls.\nFor `c(35)`: It needs `c(34)` and `c(33)`. `c(34)` needs `c(33)` and `c(32)`, etc. The new values computed are `c(31), c(32), c(33), c(34), c(35)`. Total = 5 calls.\nSum = 31 + 5 = 36.\n\nLet me double-check the logic.\n`c(0)` -> calls=1\n`c(1)` -> calls=2\n`c(2)` -> calls `c(1)` (cached), `c(0)` (cached). Wait, no. The first time `c(2)` is called, it calls `c(1)` and `c(0)`. But `c(1)` and `c(0)` were already computed?\nActually, the order of computation for `c(n)` with memoization is:\nTo compute `c(n)`, it calls `c(n-1)`. To compute `c(n-1)`, it calls `c(n-2)`, etc.\nSo for `c(30)`:\nIt computes `c(0)` (call 1), `c(1)` (call 2), `c(2)` (call 3, uses cached c(1), c(0)), ..., `c(30)` (call 31).\nSo yes, 31 calls for the first part.\n\nFor `c(35)`:\nIt starts by calling `c(34)`.\n`c(34)` calls `c(33)`.\n...\n`c(31)` calls `c(30)` (cached) and `c(29)` (cached). So `c(31)` is computed.\nThen `c(32)` is computed (needs c(31) cached, c(30) cached).\nThen `c(33)` is computed.\nThen `c(34)` is computed.\nThen `c(35)` is computed.\nThe new computations are for n = 31, 32, 33, 34, 35. That is 5 calls.\n\nTotal = 31 + 5 = 36.\n\nLet me re-read the code carefully.\n`calls += 1` happens at the start of the function.\nWhen `c(30)` is called:\n- `c(30)` executes (call 1). Calls `c(29)`.\n- `c(29)` executes (call 2). Calls `c(28)`.\n...\n- `c(1)` executes (call 30). Returns 1.\n- `c(0)` executes (call 31). Returns 1.\n- Back up the stack, all intermediate values are cached.\nSo 31 calls for `c(30)`.\n\nWhen `c(35)` is called:\n- `c(35)` executes (call 32). Calls `c(34)`.\n- `c(34)` executes (call 33). Calls `c(33)`.\n...\n- `c(31)` executes (call 36). Calls `c(30)` (cached, returns immediately without calling function body again? No, `lru_cache` returns the result directly. The function body is NOT executed for cached hits). And calls `c(29)` (cached).\n- So `c(31)` is computed.\n- Then `c(32)` is computed (call 37? No wait).\n\nLet's trace carefully.\nAfter `c(30)`, cache has 0..30.\nCall `c(35)`.\n1. `c(35)` not in cache. Execute body. `calls` becomes 32. Calls `c(34)`.\n2. `c(34)` not in cache. Execute body. `calls` becomes 33. Calls `c(33)`.\n3. `c(33)` not in cache. Execute body. `calls` becomes 34. Calls `c(32)`.\n4. `c(32)` not in cache. Execute body. `calls` becomes 35. Calls `c(31)`.\n5. `c(31)` not in cache. Execute body. `calls` becomes 36. Calls `c(30)` and `c(29)`.\n   - `c(30)` is in cache. Returns result. No new call.\n   - `c(29)` is in cache. Returns result. No new call.\n   - `c(31)` returns.\n6. Back to `c(32)`. It has `c(31)` (just computed/cached) and `c(30)` (cached). Returns.\n7. Back to `c(33)`. It has `c(32)` (just computed/cached) and `c(31)` (cached). Returns.\n8. Back to `c(34)`. It has `c(33)` (just computed/cached) and `c(32)` (cached). Returns.\n9. Back to `c(35)`. It has `c(34)` (just computed/cached) and `c(33)` (cached). Returns.\n\nTotal calls = 36.\n\nWait, did I miss anything?\nIs `c(0)` and `c(1)` base cases handled correctly in the count?\nYes, `c(0)` is called once during the descent of `c(30)`.\n`c(1)` is called once during the descent of `c(30)`.\n\nSo the answer is 36.",
+   "correct": false,
+   "seconds": 148.9,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "6c00270cbaa7",
+   "seconds": 948.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 36, because lru_cache(maxsize=None) guarantees exactly one body execution per distinct argument, giving 31 + 5 = 36 total calls.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 36.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 4004, though calculating the exact call count requires deeper analysis of cache interactions.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `36`, as `lru_cache` efficiently reduces the number of recursive calls.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 36.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program will print the total number of function calls made to `c(n)` when `c(30)` and `c(35)` are called.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 36.",
+   "draft_round1_correct": true,
+   "final": "The program prints 36 because lrucache memoizes each unique integer argument exactly once, resulting in 31 executions for c(0) through c(30) and 5 more for c(31) through c(35).",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "46dd9ae884fb",
+   "seconds": 737.7,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 36.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 36 because the unbounded cache memoizes all calls from n=0 to n=35.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `36`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 36 because each function call, including recursive calls and cache hits, increments the `calls` counter.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 36 due to effective caching of recursive calls.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 36 because `lru_cache` ensures each `n` is computed once, leading to 31 + 5 = 36 total calls.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 36.",
+   "draft_round1_correct": true,
+   "final": "The program prints the number 36.",
+   "final_correct": true
+  }
+ },
+ "py-split": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 3 6 2\n\nThe string `t` is `\" a  b ,c \"`.\n\n1. `t.split()` splits by whitespace (default behavior), treating consecutive whitespace as a single separator and ignoring leading/trailing whitespace. The resulting list is `['a', 'b', 'c']`, which has length **3**.\n2. `t.split(\" \")` splits by the literal space character, including empty strings for consecutive spaces or leading/trailing spaces. The string `\" a  b ,c \"` split by `\" \"` results in `['', 'a', '', 'b', ',c', '']`, which has length **6**.\n3. `t.split(\",\")` splits by the comma. The string `\" a  b ,c \"` split by `\",\"` results in `[' a  b ', 'c ']`, which has length **2**.",
+   "correct": true,
+   "seconds": 126.2,
+   "retried": true
+  }
+ },
+ "py-skip-threes": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 2145\n\nThe program calculates the sum of all integers from 1 to 99 that do not contain the digit '3' and are not divisible by 3. It iterates through `range(1, 100)` (i.e., 1 to 99). For each number `k`, it checks if `k` is divisible by 3 (`k % 3 == 0`) or if the string representation of `k` contains the character `'3'` (`\"3\" in str(k)`). If either condition is true, it skips the number using `continue`. Otherwise, it adds `k` to the sum `s`.\n\nTo verify:\n1. The sum of all integers from 1 to 99 is $ \\frac{99 \\times 100}{2} = 4950 $.\n2. We subtract numbers divisible by 3: $ 3, 6, ..., 99 $. This is an arithmetic series with 33 terms. Sum = $ \\frac{33}{2}(3 + 99) = 33 \\times 51 = 1683 $.\n3. We subtract numbers containing the digit '3' that were *not* already subtracted in step 2 (i.e., not divisible by 3). These are: $ 13, 23, 30-39, 43, 53, 63, 73, 83, 93 $.\n   - Note: 30, 33, 36, 39 are divisible by 3 and were already removed.\n   - Numbers with '3' not divisible by 3: $ 13, 23, 31, 32, 34, 35, 37, 38, 43, 53, 73, 83 $. (Note: 63 and 93 are divisible by 3).\n   - Let's list them carefully:\n     - Single digit: None (3 is div by 3).\n     - Teens: 13 (not div by 3), 23 (not div by 3).\n     - Thirties: 30 (div 3), 31 (no 3-digit sum? $3+1=4$ no), 32 ($3+2=5$ no), 33 (div 3), 34 ($3+4=7$ no), 35 ($3+5=8$ no), 36 (div 3), 37 ($3+7=10$ no), 38 ($3+8=11$ no), 39 (div 3).\n     - Forties: 43 ($4+3=7$ no).\n     - Fifties: 53 ($5+3=8$ no).\n     - Sixties: 63 (div 3).\n     - Seventies: 73 ($7+3=10$ no).\n     - Eighties: 83 ($8+3=11$ no).\n     - Nineties: 93 (div 3).\n   - The numbers to subtract are: $ 13, 23, 31, 32, 34, 35, 37, 38, 43, 53, 73, 83 $.\n   - Sum of these: $ 13+23+31+32+34+35+37+38+43+53+73+83 = 495 $.\n4. Result: $ 4950 - 1683 - 495 = 2772 $? Wait, let's re-calculate.\n\nLet's do it by summing the kept numbers directly to be safe.\nKept numbers are those where $k \\% 3 \\neq 0$ AND `'3'` not in `str(k)`.\n\nRange 1-9: Keep 1, 2, 4, 5, 7, 8. (Skip 3, 6, 9). Sum = $1+2+4+5+7+8 = 27$.\nRange 10-19: Keep 10, 11, 14, 15(no, div 3? $1+5=6$ yes), 17, 18(no). Wait.\n   - 10: not div 3, no '3'. Keep.\n   - 11: not div 3, no '3'. Keep.\n   - 12: div 3. Skip.\n   - 13: has '3'. Skip.\n   - 14: not div 3, no '3'. Keep.\n   - 15: div 3 ($1+5=6$). Skip.\n   - 16: not div 3, no '3'. Keep.\n   - 17: not div 3, no '3'. Keep.\n   - 18: div 3. Skip.\n   - 19: not div 3, no '3'. Keep.\n   - Sum = $10+11+14+16+17+19 = 87$.\n\nRange 20-29:\n   - 20: Keep.\n   - 21: div 3 ($2+1=3$). Skip.\n   - 22: Keep.\n   - 23: has '3'. Skip.\n   - 24: div 3 ($2+4=6$). Skip.\n   - 25: Keep.\n   - 26: Keep.\n   - 27: div 3. Skip.\n   - 28: Keep.\n   - 29: Keep.\n   - Sum = $20+22+25+26+28+29 = 150$.\n\nRange 30-39: All contain '3'. Skip all. Sum = 0.\n\nRange 40-49:\n   - 40: Keep.\n   - 41: Keep.\n   - 42: div 3 ($4+2=6$). Skip.\n   - 43: has '3'. Skip.\n   - 44: Keep.\n   - 45: div 3 ($4+5=9$). Skip.\n   - 46: Keep.\n   - 47: Keep.\n   - 48: div 3 ($4+8=12$). Skip.\n   - 49: Keep.\n   - Sum = $40+41+44+46+47+49 = 267$.\n\nRange 50-59:\n   - 50: Keep.\n   - 51: div 3 ($5+1=6$). Skip.\n   - 52: Keep.\n   - 53: has '3'. Skip.\n   - 54: div 3. Skip.\n   - 55: Keep.\n   - 56: Keep.\n   - 57: div 3 ($5+7=12$). Skip.\n   - 58: Keep.\n   - 59: Keep.\n   - Sum = $50+52+55+56+58+59 = 330$.\n\nRange 60-69:\n   - 60: div 3. Skip.\n   - 61: Keep.\n   - 62: Keep.\n   - 63: div 3. Skip.\n   - 64: Keep.\n   - 65: Keep.\n   - 66: div 3. Skip.\n   - 67: Keep.\n   - 68: Keep.\n   - 69: div 3. Skip.\n   - Sum = $61+62+64+65+67+68 = 387$.\n\nRange 70-79:\n   - 70: Keep.\n   - 71: Keep.\n   - 72: div 3. Skip.\n   - 73: has '3'. Skip.\n   - 74: Keep.\n   - 75: div 3 ($7+5=12$). Skip.\n   - 76: Keep.\n   - 77: Keep.\n   - 78: div 3. Skip.\n   - 79: Keep.\n   - Sum = $70+71+74+76+77+79 = 447$.\n\nRange 80-89:\n   - 80: Keep.\n   - 81: div 3. Skip.\n   - 82: Keep.\n   - 83: has '3'. Skip.\n   - 84: div 3. Skip.\n   - 85: Keep.\n   - 86: Keep.\n   - 87: div 3 ($8+7=15$). Skip.\n   - 88: Keep.\n   - 89: Keep.\n   - Sum = $80+82+85+86+88+89 = 510$.\n\nRange 90-99:\n   - 90: div 3. Skip.\n   - 91: Keep.\n   - 92: Keep.\n   - 93: has '3'. Skip.\n   - 94: Keep.\n   - 95: Keep.\n   - 96: div 3. Skip.\n   - 97: Keep.\n   - 98: Keep.\n   - 99: div 3. Skip.\n   - Sum = $91+92+94+95+97+98 = 567$.\n\nTotal Sum = $27 + 87 + 150 + 0 + 267 + 330 + 387 + 447 + 510 + 567$.\n$27 + 87 = 114$\n$114 + 150 = 264$\n$264 + 267 = 531$\n$531 + 330 = 861$\n$861 + 387 = 1248$\n$1248 + 447 = 1695$\n$1695 + 510 = 2205$\n$2205 + 567 = 2772$.\n\nWait, my previous quick calculation was 2145. Let me re-read the code.\n`if k % 3 == 0 or \"3\" in str(k): continue`\nThis means we SKIP if divisible by 3 OR contains '3'. We SUM the rest.\n\nLet's double check the sum of all numbers 1-99: 4950.\nSum of numbers divisible by 3 (3, 6, ..., 99): $3 \\times (1 + 2 + ... + 33) = 3 \\times \\frac{33 \\times 34}{2} = 3 \\times 561 = 1683$.\nSum of numbers containing '3' that are NOT divisible by 3:\nNumbers with '3':\n13, 23, 30-39, 43, 53, 63, 73, 83, 93.\nDivisible by 3 in this set:\n30 ($3+0=3$), 33 ($3+3=6$), 36 ($3+6=9$), 39 ($3+9=12$), 63 ($6+3=9$), 93 ($9+3=12$).\nSum of these divisible by 3: $30+33+36+39+63+93 = 294$.\nTotal sum of numbers with '3': $13+23 + (30+...+39) + 43+53+63+73+83+93$.\nSum 30-39: $\\frac{10}{2}(30+39) = 5 \\times 69 = 345$.\nSum others: $13+23+43+53+73+83+93 = 380$.\nTotal sum with '3' = $345 + 380 = 725$.\n\nWe want to subtract numbers that are EITHER div by 3 OR have '3'.\nUsing Inclusion-Exclusion Principle for the set of excluded numbers $E$:\n$Sum(E) = Sum(\\text{div by 3}) + Sum(\\text{has '3'}) - Sum(\\text{div by 3 AND has '3'})$.\nWe calculated $Sum(\\text{div by 3}) = 1683$.\nWe calculated $Sum(\\text{has '3'}) = 725$.\nThe intersection (div by 3 AND has '3') is $\\{30, 33, 36, 39, 63, 93\\}$.\nSum of intersection = $294$.\n\n$Sum(E) = 1683 + 725 - 294 = 2164$.\n\nResult = Total Sum - $Sum(E) = 4950 - 2164 = 2786$.\n\nLet me re-check the manual summation.\nRange 1-9: 1,2,4,5,7,8. Sum=27. Correct.\nRange 10-19: 10,11,14,16,17,19. Sum=87. Correct.\nRange 20-29: 20,22,25,26,28,29. Sum=150. Correct.\nRange 30-39: All skipped. Sum=0. Correct.\nRange 40-49: 40,41,44,46,47,49. Sum=267. Correct.\nRange 50-59: 50,52,55,56,58,59. Sum=330. Correct.\nRange 60-69: 61,62,64,65,67,68. Sum=387. Correct.\nRange 70-79: 70,71,74,76,77,79. Sum=447. Correct.\nRange 80-89: 80,82,85,86,88,89. Sum=510. Correct.\nRange 90-99: 91,92,94,95,97,98. Sum=567. Correct.\n\nTotal: $27+87+150+0+267+330+387+447+510+567$.\n$27+87=114$\n$114+150=264$\n$264+267=531$\n$531+330=861$\n$861+387=1248$\n$1248+447=1695$\n$1695+510=2205$\n$2205+567=2772$.\n\nWhere is the discrepancy?\nLet's check the Inclusion-Exclusion again.\nSum(div by 3) = 1683.\nSum(has '3') = 725.\nIntersection sum = 294.\nUnion Sum = $1683 + 725 - 294 = 2114$.\nWait. $1683 + 725 = 2408$. $2408 - 294 = 2114$.\n$4950 - 2114 = 2836$.\n\nLet's re-calculate Sum(has '3').\nNumbers with '3' in 1-99:\n13, 23, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 43, 53, 63, 73, 83, 93.\nSum:\n$13+23 = 36$.\n$30+31+32+33+34+35+36+37+38+39 = 345$.\n$43+53+63+73+83+93 = 405$.\nTotal Sum(has '3') = $36 + 345 + 405 = 786$.\n\nIntersection (div by 3 AND has '3'):\n30, 33, 36, 39, 63, 93.\nSum = $30+33+36+39+63+93 = 294$.\n\nUnion Sum = $1683 + 786 - 294 = 2175$.\nResult = $4950 - 2175 = 2775$.\n\nStill different from 2772. Let's check the manual sum again.\nRange 1-9: 1,2,4,5,7,8. Sum=27.\nRange 10-19: 10,11,14,16,17,19. Sum=87.\nRange 20-29: 20,22,25,26,28,29. Sum=150.\nRange 30-39: 0.\nRange 40-49: 40,41,44,46,47,49. Sum=267.\nRange 50-59: 50,52,55,56,58,59. Sum=330.\nRange 60-69: 61,62,64,65,67,68. Sum=387.\nRange 70-79: 70,71,74,76,77,79. Sum=447.\nRange 80-89: 80,82,85,86,88,89. Sum=510.\nRange 90-99: 91,92,94,95,97,98. Sum=567.\n\nLet's check Range 40-49 again.\n40 (ok), 41 (ok), 42 (div3 skip), 43 (has3 skip), 44 (ok), 45 (div3 skip), 46 (ok), 47 (ok), 48 (div3 skip), 49 (ok).\nSum: $40+41+44+46+47+49 = 267$. Correct.\n\nLet's check Range 50-59 again.\n50 (ok), 51 (div3 skip), 52 (ok), 53 (has3 skip), 54 (div3 skip), 55 (ok), 56 (ok), 57 (div3 skip), 58 (ok), 59 (ok).\nSum: $50+52+55+56+58+59 = 330$. Correct.\n\nLet's check Range 60-69 again.\n60 (div3 skip), 61 (ok), 62 (ok), 63 (div3 skip), 64 (ok), 65 (ok), 66 (div3 skip), 67 (ok), 68 (ok), 69 (div3 skip).\nSum: $61+62+64+65+67+68 = 387$. Correct.\n\nLet's check Range 70-79 again.\n70 (ok), 71 (ok), 72 (div3 skip), 73 (has3 skip), 74 (ok), 75 (div3 skip), 76 (ok), 77 (ok), 78 (div3 skip), 79 (ok).\nSum: $70+71+74+76+77+79 = 447$. Correct.\n\nLet's check Range 80-89 again.\n80 (ok), 81 (div3 skip), 82 (ok), 83 (has3 skip), 84 (div3 skip), 85 (ok), 86 (ok), 87 (div3 skip), 88 (ok), 89 (ok).\nSum: $80+82+85+86+88+89 = 510$. Correct.\n\nLet's check Range 90-99 again.\n90 (div3 skip), 91 (ok), 92 (ok), 93 (has3 skip), 94 (ok), 95 (ok), 96 (div3 skip), 97 (ok), 98 (ok), 99 (div3 skip).\nSum: $91+92+94+95+97+98 = 567$. Correct.\n\nLet's check Range 1-9 again.\n1,2,3(skip),4,5,6(skip),7,8,9(skip).\nSum: $1+2+4+5+7+8 = 27$. Correct.\n\nLet's check Range 10-19 again.\n10(ok), 11(ok), 12(skip), 13(skip), 14(ok), 15(skip), 16(ok), 17(ok), 18(skip), 19(ok).\nSum: $10+11+14+16+17+19 = 87$. Correct.\n\nLet's check Range 20-29 again.\n20(ok), 21(skip), 22(ok), 23(skip), 24(skip), 25(ok), 26(ok), 27(skip), 28(ok), 29(ok).\nSum: $20+22+25+26+28+29 = 150$. Correct.\n\nTotal Sum: $27 + 87 + 150 + 0 + 267 + 330 + 387 + 447 + 510 + 567$.\n$27+87=114$\n$114+150=264$\n$264+267=531$\n$531+330=861$\n$861+387=1248$\n$1248+447=1695$\n$1695+510=2205$\n$2205+567=2772$.\n\nWhy did the Inclusion-Exclusion give 2775?\nSum(has '3') = 786.\nIntersection sum = 294.\nUnion Sum = $1683 + 786 - 294 = 2175$.\n$4950 - 2175 = 2775$.\n\nLet's re-verify Sum(has '3').\nList: 13, 23, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 43, 53, 63, 73, 83, 93.\nSum:\n$13+23=36$.\n$30+31+32+33+34+35+36+37+38+39 = 345$.\n$43+53+63+73+83+93 = 405$.\n$36+345+405 = 786$. Correct.\n\nLet's re-verify Intersection sum.\nNumbers div by 3 AND have '3'.\nFrom 1-9: 3 (has '3', div 3). Wait! I missed 3 in the intersection list earlier?\nIn my manual sum, I skipped 3 because it's div by 3.\nIn my Inclusion-Exclusion, I listed intersection as $\\{30, 33, 36, 39, 63, 93\\}$.\nI missed **3** and **3**? No, 3 is in 1-9.\nIs 3 in the list of numbers with '3'? Yes.\nIs 3 divisible by 3? Yes.\nSo 3 is in the intersection.\nAlso, are there any others?\nRange 1-9: 3.\nRange 10-19: None (13 no, 23 no).\nRange 20-29: None.\nRange 30-39: 30, 33, 36, 39.\nRange 40-49: None.\nRange 50-59: None.\nRange 60-69: 63.\nRange 70-79: None.\nRange 80-89: None.\nRange 90-99: 93.\n\nIntersection set: $\\{3, 30, 33, 36, 39, 63, 93\\}$.\nSum of intersection: $3 + 294 = 297$.\n\nRecalculate Union Sum:\n$Sum(E) = Sum(\\text{div by 3}) + Sum(\\text{has '3'}) - Sum(\\text{intersection})$.\n$Sum(E) = 1683 + 786 - 297 = 2172$.\n\nResult = $4950 - 2172 = 2778$.\n\nStill not 2772. Let's check Sum(div by 3).\n$3, 6, ..., 99$.\nCount = 33.\nSum = $\\frac{33}{2}(3+99) = \\frac{33}{2}(102) = 33 \\times 51 = 1683$. Correct.\n\nLet's check Sum(has '3') again.\nIs 3 included? Yes.\nIs 30-39 included? Yes.\nIs 43, 53, 63, 73, 83, 93 included? Yes.\nIs 13, 23 included? Yes.\nSum = $3 + (13+23) + (30..39) + (43+53+63+73+83+93)$.\n$3 + 36 + 345 + 405 = 789$.\nAh, previously I calculated $13+23=36$ and added to 345 and 405. I forgot to add the single digit 3 to the \"has '3'\" sum explicitly in the final addition step or rather, I listed it as part of the group but summed it as if it wasn't there?\nLet's look at my previous Sum(has '3') calculation:\n\"Sum: $13+23 = 36$. $30..39 = 345$. $43..93 = 405$. Total $786$.\"\nI missed the number **3** in that sum!\nSo Sum(has '3') is actually $786 + 3 = 789$.\n\nRecalculate Union Sum:\n$Sum(E) = 1683 + 789 - 297 = 2175$.\nResult = $4950 - 2175 = 2775$.\n\nStill not 2772. What is missing?\nLet's check the intersection sum again.\nIntersection: $\\{3, 30, 33, 36, 39, 63, 93\\}$.\nSum = $3 + 30 + 33 + 36 + 39 + 63 + 93 = 297$. Correct.\n\nLet's check Sum(has '3') again.\nNumbers: 3, 13, 23, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 43, 53, 63, 73, 83, 93.\nSum:\n$3+13+23 = 39$.\n$30+31+32+33+34+35+36+37+38+39 = 345$.\n$43+53+63+73+83+93 = 405$.\nTotal = $39 + 345 + 405 = 789$. Correct.\n\nUnion Sum = $1683 + 789 - 297 = 2175$.\nResult = $4950 - 2175 = 2775$.\n\nWhy is my manual sum 2772?\nLet's re-add the manual sums.\n$27+87=114$.\n$114+150=264$.\n$264+267=531$.\n$531+330=861$.\n$861+387=1248$.\n$1248+447=1695$.\n$1695+510=2205$.\n$2205+567=2772$.\n\nThere is a difference of 3.\nLet's check the manual sum for Range 1-9 again.\nKept: 1, 2, 4, 5, 7, 8.\nSkipped: 3 (div 3), 6 (div 3), 9 (div 3).\nSum = $1+2+4+5+7+8 = 27$.\n\nLet's check the Inclusion-Exclusion logic for the number 3.\nNumber 3 is divisible by 3. It is in Sum(div by 3).\nNumber 3 has '3'. It is in Sum(has '3').\nIt is in Intersection.\nSo it is subtracted once from the total sum (added twice, subtracted once -> net -1).\nThis is correct.\n\nLet's check if I missed any number in the manual sum.\nRange 1-9: 1,2,4,5,7,8. (6 numbers).\nRange 10-19: 10,11,14,16,17,19. (6 numbers).\nRange 20-29: 20,22,25,26,28,29. (6 numbers).\nRange 30-39: 0 numbers.\nRange 40-49: 40,41,44,46,47,49. (6 numbers).\nRange 50-59: 50,52,55,56,58,59. (6 numbers).\nRange 60-69: 61,62,64,65,67,68. (6 numbers).\nRange 70-79: 70,71,74,76,77,79. (6 numbers).\nRange 80-89: 80,82,85,86,88,89. (6 numbers).\nRange 90-99: 91,92,94,95,97,98. (6 numbers).\n\nTotal kept numbers = $6 \\times 9 = 54$.\nTotal numbers 1-99 = 99.\nNumbers skipped = $99 - 54 = 45$.\nLet's count skipped numbers.\nDiv by 3: 33 numbers.\nHas '3': 19 numbers (3, 13, 23, 30-39(10), 43, 53, 63, 73, 83, 93).\nIntersection: 7 numbers (3, 30, 33, 36, 39, 63, 93).\nUnion size = $33 + 19 - 7 = 45$.\nMatches.\n\nSo why the sum difference?\nLet's check Range 1-9 sum again.\n$1+2+4+5+7+8 = 27$.\nLet's check Range 10-19 sum again.\n$10+11+14+16+17+19 = 87$.\nLet's check Range 20-29 sum again.\n$20+22+25+26+28+29 = 150$.\n\nLet's check Range 40-49 sum again.\n$40+41+44+46+47+49 = 267$.\nLet's check Range 50-59 sum again.\n$50+52+55+56+58+59 = 330$.\nLet's check Range 60-69 sum again.\n$61+62+64+65+67+68 = 387$.\nLet's check Range 70-79 sum again.\n$70+71+74+76+77+79 = 447$.\nLet's check Range 80-89 sum again.\n$80+82+85+86+88+89 = 510$.\nLet's check Range",
+   "correct": false,
+   "seconds": 229.1,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "eca017a3422d",
+   "seconds": 1005.7,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 2772, not the previously suggested values.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 2772, computed as 4950 minus the inclusion-exclusion sum (2178) of numbers divisible by 3 or containing the digit 3.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "",
+     "correct": false
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program calculates the sum of numbers between 1 and 99 inclusive, excluding those divisible by 3 or containing the digit '3'.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 2854, as it sums numbers not divisible by 3 or containing '3'.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 2772.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints the sum of all numbers between 1 and 100 that are not multiples of 3 or contain the digit 3.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 2772.",
+   "draft_round1_correct": true,
+   "final": "The program prints 2772.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "8fcb68980f69",
+   "seconds": 924.3,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The correct output is 2772.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 2772, which is the sum of all integers from 1 to 99 that are neither divisible by 3 nor contain the digit \"3\".",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "2772 is the exact output of the program.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program calculates and prints the sum of numbers from 1 to 99 that are not divisible by 3 and do not contain the digit 3.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 3168 by summing numbers from 1 to 99 that are neither divisible by 3 nor contain the digit '3'.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 3733.",
+     "correct": false
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The answer is the sum of numbers from 1 to 99 that don't satisfy either condition, which is 2912.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program will print the sum of all integers from 1 to 99, excluding multiples of 3 and those containing the digit 3, but the inclusion of numbers like 13 and 23 in the count is unclear.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 2772.",
+   "draft_round1_correct": true,
+   "final": "The Python program prints 2772.",
+   "final_correct": true
+  }
+ },
+ "py-send": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 28\n\nThe generator `gen` starts by yielding `total` (which is 0). The first `next(g)` consumes this initial yield. Then, the loop iterates over `[5, 7, 11, 4]`, sending each value to the generator via `g.send(v)`.\n\n1.  **Send 5**: `x = 5`. `total` is 0 (even). Condition `total % 2` is False, so it executes `x` (which is 5). `total` becomes $0 + 5 = 5$. It yields 5.\n2.  **Send 7**: `x = 7`. `total` is 5 (odd). Condition `total % 2` is True, so it executes `x * 2` (which is 14). `total` becomes $5 + 14 = 19$. It yields 19.\n3.  **Send 11**: `x = 11`. `total` is 19 (odd). Condition `total % 2` is True, so it executes `x * 2` (which is 22). `total` becomes $19 + 22 = 41$. It yields 41.\n4.  **Send 4**: `x = 4`. `total` is 41 (odd). Condition `total % 2` is True, so it executes `x * 2` (which is 8). `total` becomes $41 + 8 = 49$. It yields 49.\n\nWait, let me re-read the conditional logic carefully: `total += x * 2 if total % 2 else x`. This is equivalent to `if total % 2: total += x * 2; else: total += x`.\n\nLet's re-trace:\n1.  **Initial**: `total = 0`. `next(g)` yields 0.\n2.  **Send 5**: `x = 5`. `total` is 0 (even). `else` branch: `total += 5`. `total` becomes 5. Yields 5.\n3.  **Send 7**: `x = 7`. `total` is 5 (odd). `if` branch: `total += 7 * 2` (14). `total` becomes $5 + 14 = 19$. Yields 19.\n4.  **Send 11**: `x = 11`. `total` is 19 (odd). `if` branch: `total += 11 * 2` (22). `total` becomes $19 + 22 = 41$. Yields 41.\n5.  **Send 4**: `x = 4`. `total` is 41 (odd). `if` branch: `total += 4 * 2` (8). `total` becomes $41 + 8 = 49$. Yields 49.\n\nThe loop finishes. The generator is not closed, but the last value assigned to `last` is the result of the last `g.send(4)`, which is 49.\n\nLet me double check the operator precedence.\n`total += x * 2 if total % 2 else x`\nThis parses as `total += (x * 2 if total % 2 else x)`.\nIf `total` is even, add `x`. If `total` is odd, add `2*x`.\n\nTrace again:\n- Start: `total = 0`. Yield 0.\n- Send 5: `x=5`. `total=0` (even). Add 5. `total = 5`. Yield 5.\n- Send 7: `x=7`. `total=5` (odd). Add $7*2=14$. `total = 5+14=19`. Yield 19.\n- Send 11: `x=11`. `total=19` (odd). Add $11*2=22$. `total = 19+22=41`. Yield 41.\n- Send 4: `x=4`. `total=41` (odd). Add $4*2=8$. `total = 41+8=49`. Yield 49.\n\nThe variable `last` holds the last yielded value, which is 49.",
+   "correct": false,
+   "seconds": 137.2,
+   "retried": true
+  }
+ },
+ "py-sort-key": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: ['b10', 'b9', 'b1']\n\n**Explanation:**\n1.  **The Key Function:** The `key` argument defines how items are compared. It creates a tuple `(first_letter, negative_number)`. Python sorts tuples element by element.\n    *   First, it sorts alphabetically by the letter (`a` comes before `b`, etc.).\n    *   Second, for items with the same letter, it sorts by the numeric value. Because the number is negated (e.g., `-10` vs `-2`), larger original numbers become smaller negative values. Since Python sorts in ascending order by default, `-10` comes before `-2`. This effectively sorts the numbers in **descending** order.\n\n2.  **Sorting the List:**\n    *   `'a'` items: `\"a10\"` (key `('a', -10)`) comes before `\"a2\"` (key `('a', -2)`).\n    *   `'b'` items: `\"b10\"` (`-10`) comes before `\"b9\"` (`-9`), which comes before `\"b1\"` (`-1`).\n    *   `'c'` items: `\"c1\"`.\n\n    The fully sorted list is: `['a10', 'a2', 'b10', 'b9', 'b1', 'c1']`.\n\n3.  **Slicing:** The code requests the slice `[2:5]`, which includes indices 2, 3, and 4 (the start index is inclusive, the end index is exclusive).\n    *   Index 0: `'a10'`\n    *   Index 1: `'a2'`\n    *   **Index 2: `'b10'`**\n    *   **Index 3: `'b9'`**\n    *   **Index 4: `'b1'`**\n    *   Index 5: `'c1'`\n\nThe result is `['b10', 'b9', 'b1']`.",
+   "correct": true,
+   "seconds": 29.3,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "e57c6b050207",
+   "seconds": 692.4,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The correct output is ['b10', 'b9', 'b1'] because the negative integer key sorts numeric parts in descending order, placing b10 (value 10) before b9 (value 9) before b1 (value 1) within the 'b' group.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints ['b10', 'b9', 'b1'] and carries no security or side-effect risk.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program outputs ['b10', 'b9', 'b1'] by sorting on the first character and descending numeric value of the rest.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints a slice of the sorted list based on the first character and the negative of the integer portion.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The output is `['b1', 'b9', 'b10']`.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints ['b10', 'b9', 'b1'] because the sorting key reverses the numeric part's order, and the slice selects the third to fifth elements.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints the strings \"b10\", \"b9\", and \"b1\" in that order.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints the first three elements of the sorted list.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints ['b10', 'b9', 'b1'] because it sorts by the first character and then by the numeric part in descending order.",
+   "draft_round1_correct": true,
+   "final": "The program prints ['b10', 'b9', 'b1'] because it sorts the list alphabetically by first character and then by the numeric suffix in descending order, before slicing the third through fifth elements.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "8ca66248d476",
+   "seconds": 770.8,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints ['b10', 'b9', 'b1'].",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints ['b10', 'b9', 'b1'] because numeric suffixes are parsed cleanly and the slice [2:5] selects exactly the three 'b'-group entries.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints ['b10', 'b9', 'b1'].",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The code sorts strings based on the first character then the negative of the integer portion, extracting a slice of the sorted list.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `['b10', 'b9', 'b1']` with no injection risks in its current form.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints ['b10', 'b9', 'b1'].",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The current approach is more readable than using list comprehension for this specific task.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints ['b9', 'a2', 'b10'] when sorted from index 2 to 5.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program sorts strings by their first character and then by the numeric suffix in descending order, resulting in ['a10', 'a2', 'b10', 'b9', 'b1', 'c1']. Slicing from index 2 to 5 yields the middle three elements.",
+   "draft_round1_correct": false,
+   "final": "The program prints ['b10', 'b9', 'b1'].",
+   "final_correct": true
+  }
+ },
+ "py-int-bases": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 86\n\n**Explanation:**\nThe program evaluates four integer conversions and sums them up:\n\n1.  `int(\"0b101\", 0)`: The base `0` tells Python to detect the base from the prefix. `0b` indicates binary (base 2). Binary `101` equals **5** ($4 + 0 + 1$).\n2.  `int(\"17\", 8)`: The base is explicitly set to 8 (octal). Octal `17` equals $1 \\times 8^1 + 7 \\times 8^0$, which is **15**.\n3.  `int(\"z\", 36)`: The base is 36. In base-36, digits are 0-9 followed by a-z (case-insensitive). 'a' represents 10, so 'z' represents $10 + 25 =$ **35**.\n4.  `int(\"0x1F\", 16)`: The base is 16 (hexadecimal). Hex `1F` equals $1 \\times 16^1 + 15 \\times 16^0$, which is **31**.\n\n**Total:** $5 + 15 + 35 + 31 = 86$.",
+   "correct": true,
+   "seconds": 24.7,
+   "retried": false
+  }
+ },
+ "py-bits": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: -43\n\n**Explanation:**\n\nTo find the output, we evaluate the bitwise operations and arithmetic step-by-step using the binary representations of 37 and 21.\n\n1.  **Binary Conversion**:\n    *   $37$ in binary is `100101`.\n    *   $21$ in binary is `010101`.\n\n2.  **Bitwise XOR (`^`)**:\n    *   `37 ^ 21` performs a bitwise exclusive OR.\n    *   `100101` XOR `010101` = `110000` (which is 48 in decimal).\n\n3.  **Binary String and Count**:\n    *   `bin(48)` returns the string `'0b110000'`.\n    *   `.count(\"1\")` counts the number of '1' characters in that string, which is **2**.\n\n4.  **Bitwise AND (`&`)**:\n    *   `37 & 21` performs a bitwise AND.\n    *   `100101` AND `010101` = `000101` (which is **5** in decimal).\n\n5.  **Bitwise OR (`|`)**:\n    *   `37 | 21` performs a bitwise OR.\n    *   `100101` OR `010101` = `110101` (which is **53** in decimal).\n\n6.  **Final Arithmetic**:\n    *   The expression simplifies to: `2 * 5 - 53`.\n    *   Multiplication takes precedence over subtraction: `(2 * 5) - 53` = `10 - 53`.\n    *   Result: **-43**.",
+   "correct": true,
+   "seconds": 97.0,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "81f692a613b9",
+   "seconds": 641.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints -43 due to binary operations resulting in 2 * 5 - 53.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints -43, computed as 2×5−53 from the XOR/AND/OR of 37 and 21.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints –43.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 10, due to a miscalculation in the previous attempt.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `-43`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints -43.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints -37.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints -2.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints -43.",
+   "draft_round1_correct": true,
+   "final": "The program prints -43, derived from the bitwise operations 2  5 - 53.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "4e0f9de34b1b",
+   "seconds": 716.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints -43.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints -43.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints -43.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program correctly prints -43 due to a correct evaluation of the bitwise operations.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The exact output of the program is `-17`.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints -43.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints -43.",
+   "draft_round1_correct": true,
+   "final": "The program prints -43.",
+   "final_correct": true
+  }
+ },
+ "py-default-dict": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 3 4 jumps\n\n**Explanation:**\nThe program iterates through the words in the string \"the quick brown fox jumps over the lazy dog\" and groups them into a dictionary `d` based on their length (using `len(w)` as the key).\n\n1.  **Dictionary Construction**:\n    *   Words with length 3: `['the', 'fox', 'the', 'dog']`\n    *   Words with length 5: `['quick', 'brown', 'jumps']`\n    *   Words with length 4: `['over', 'lazy']`\n    The dictionary keys are the integers `3`, `5`, and `4`.\n\n2.  **Evaluating the Print Statement**:\n    *   `len(d)`: Counts the number of keys in the dictionary. Since there are lengths 3, 4, and 5, the length is **3**.\n    *   `len(d[3])`: Accesses the list for key 3 (`['the', 'fox', 'the', 'dog']`) and returns its length, which is **4**.\n    *   `d[5][-1]`: Accesses the list for key 5 (`['quick', 'brown', 'jumps']`). The index `-1` retrieves the last item in the list, which is **\"jumps\"**.\n\n3.  **Output**:\n    The `print` function outputs these three values separated by spaces: `3 4 jumps`.",
+   "correct": true,
+   "seconds": 89.1,
+   "retried": false
+  }
+ },
+ "py-str-mul": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 13\n\n**Explanation:**\n\n1.  **`s = \"ab\" * 3`**: This creates the string `\"ababab\"`.\n2.  **`s.count(\"aba\")`**: Counts non-overlapping occurrences of `\"aba\"` in `\"ababab\"`. It finds one at index 0 (`aba`bab) and one at index 2 (ab`aba`). However, `count` does not overlap by default. Let's trace carefully:\n    *   Index 0: `aba` matches. The next search starts at index 3.\n    *   Index 3: `bab` does not match `aba`.\n    *   So, `s.count(\"aba\")` returns **2**. (Wait, let me double-check Python's `count` behavior. Python's `str.count(sub)` counts non-overlapping occurrences. In `\"ababab\"`, indices are 012345.\n        *   Match at 0: `a[0]b[1]a[2]`. Next search starts at index 3.\n        *   Remaining string from index 3 is `\"bab\"`. No match for `\"aba\"`.\n        *   Actually, let's re-verify. `count` scans left to right.\n        *   Found at 0. Next start is 3. String from 3 is \"bab\". No \"aba\".\n        *   Wait, is there another one? No. So `s.count(\"aba\")` is **2**? Let's check manually:\n            *   `\"ababab\"`\n            *   Index 0: `a`, `b`, `a` -> Match.\n            *   Index 1: `b`, `a`, `b` -> No.\n            *   Index 2: `a`, `b`, `a` -> Match? If non-overlapping, the first match consumed indices 0,1,2. The next search starts at index 3. At index 3, we have `b`, `a`, `b`. No match.\n            *   So `s.count(\"aba\")` is **2**? No, it's **2** only if they overlap. Standard `count` is non-overlapping.\n            *   Let's re-read Python docs or test mentally: `\"ababab\".count(\"aba\")`.\n                *   First match at 0. Consumes 0-2. Next search starts at 3.\n                *   Substring from 3 is \"bab\". No \"aba\".\n                *   So count is **1**?\n                *   Let's check overlapping logic again. If I have `\"aaaa\".count(\"aa\")`, it returns 2 (indices 0 and 2). It skips the consumed characters.\n                *   In `\"ababab\"`, match at 0 (`aba`). Next start index is 3. String from 3 is `bab`. No match. So count is **1**?\n                *   Wait, let's look at index 2. `a[2]b[3]a[4]` is `aba`. But since the first match ended at index 2 (exclusive end 3), the next search starts at 3. It cannot start at 2.\n                *   So `s.count(\"aba\")` returns **1**.\n\n    *   *Correction*: Let me re-evaluate standard Python behavior for `count`.\n        *   `\"ababab\".count(\"aba\")` -> The first match is at index 0. The search continues from index 3. The remaining string is \"bab\". There is no \"aba\" in \"bab\". So the count is **1**.\n\n    *   Let's re-read the question carefully. Did I miss something?\n        *   `s = \"ababab\"`\n        *   `s.count(\"aba\")`:\n            *   Check index 0: `aba` == `aba`. Match. Next start = 3.\n            *   Check index 3: `bab` != `aba`.\n            *   Result: **1**.\n\n3.  **`s.find(\"ba\", 2)`**: Finds the first occurrence of `\"ba\"` starting at index 2.\n    *   String: `a b a b a b`\n    *   Indices: 0 1 2 3 4 5\n    *   Start search at index 2 (`a`).\n    *   Index 2: `ab` != `ba`.\n    *   Index 3: `ba` == `ba`. Match found.\n    *   Returns index **3**.\n\n4.  **`s.rfind(\"b\", 0, 4)`**: Finds the last occurrence of `\"b\"` in the slice `s[0:4]` (indices 0 to 3).\n    *   Slice `s[0:4]` is `\"abab\"`.\n    *   Indices in original string: 0 (`a`), 1 (`b`), 2 (`a`), 3 (`b`).\n    *   Last `'b'` is at index **3**.\n\n5.  **Sum**: `1 + 3 + 3 = 7`.\n\nWait, let me double check `count`.\nPython 3: `\"ababab\".count(\"aba\")`\nIf I run this in my head:\n`\"aaaa\".count(\"aa\")` is 2. (Indices 0 and 2).\n`\"ababab\".count(\"aba\")`:\nMatch at 0. Next search starts at 3.\n`s[3:]` is `\"bab\"`.\nDoes `\"bab\"` contain `\"aba\"`? No.\nSo count is 1.\n\nLet's re-read the string construction. `s = \"ab\" * 3` -> `\"ababab\"`. Correct.\n\nIs it possible `count` overlaps? No, `str.count` does not overlap.\n\nLet's re-evaluate `find`.\n`s.find(\"ba\", 2)`:\nSearch for `\"ba\"` starting at index 2.\nIndex 2 is `'a'`. `s[2:4]` is `\"ab\"`. Not `\"ba\"`.\nIndex 3 is `'b'`. `s[3:5]` is `\"ba\"`. Match.\nReturns **3**. Correct.\n\nLet's re-evaluate `rfind`.\n`s.rfind(\"b\", 0, 4)`:\nSearch for `\"b\"` in `s[0:4]` which is `\"abab\"`.\nIndices 0,1,2,3 correspond to `'a','b','a','b'`.\nLast `'b'` is at index 3.\nReturns **3**. Correct.\n\nTotal: `1 + 3 + 3 = 7`.\n\nLet me pause and think if I made a mistake on `count`.\nWhat if the string was `\"abaaba\"`? Count would be 2.\nBut it is `\"ababab\"`.\nIndex 0: `a b a` (Match)\nIndex 1: `b a b`\nIndex 2: `a b a` (Overlap with first match) -> Ignored by `count`.\nIndex 3: `b a b`\n\nSo `count` is indeed 1.\n\nLet's check if there is any trick.\n`s = \"ab\" * 3` -> `\"ababab\"`\n\nMaybe I should verify `rfind` bounds. `rfind(sub[, start[, end]])`.\n`end` is exclusive. So it searches in `s[0:4]`.\n`s[0] = 'a'`\n`s[1] = 'b'`\n`s[2] = 'a'`\n`s[3] = 'b'`\nLast `'b'` is at index 3. Correct.\n\nSo the answer is 7.\n\nLet me double check `count` again just to be absolutely sure.\nCommon pitfall: people think `count` overlaps like regex lookahead. It does not.\nExample: `\"ababa\".count(\"aba\")`.\nMatch at 0 (`aba`). Next start 3.\n`s[3:]` is `\"ba\"`. No match.\nResult 1.\n\nExample: `\"aaaa\".count(\"aa\")`.\nMatch at 0 (`aa`). Next start 2.\n`s[2:]` is `\"aa\"`. Match at 2 (relative to original index 2).\nResult 2.\n\nIn `\"ababab\"`:\nMatch at 0. Next start 3.\nRemaining: `\"bab\"`. No `\"aba\"`.\nResult 1.\n\nSo `1 + 3 + 3 = 7`.\n\nWait, I might have misread the string.\n`\"ab\" * 3` is `\"ababab\"`.\n\nLet's try one more check. Is it possible `find` returns -1? No, \"ba\" exists at index 3.\nIs it possible `rfind` returns -1? No, \"b\" exists in first 4 chars.\n\nFinal calculation:\n`s.count(\"aba\")` = 1\n`s.find(\"ba\", 2)` = 3\n`s.rfind(\"b\", 0, 4)` = 3\nSum = 7.\n\nANSWER: 7",
+   "correct": false,
+   "seconds": 154.3,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "5d64b65d1153",
+   "seconds": 602.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 7.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 7, because s.count uses non-overlapping matching (giving 1), s.find(\"ba\",2) returns 3, and s.rfind(\"b\",0,4) returns 3.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints the integer 7.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print 7.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 5, and it does not pose any injection risks.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `8`.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 1.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 7.",
+   "draft_round1_correct": true,
+   "final": "The program prints 7.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "420896aa15bc",
+   "seconds": 707.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 7.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 7.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints the integer 7.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 5, due to the combined effect of string counting, finding, and reverse finding operations.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The Python program prints the integer `5`.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints 8.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program will print 10.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 7.",
+   "draft_round1_correct": true,
+   "final": "The program prints 7.",
+   "final_correct": true
+  }
+ },
+ "py-dict-order": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: abc10\n\nThe code creates a dictionary `d` with keys \"a\", \"b\", and \"c\". It deletes the key \"a\", then re-adds it with value 4, and updates \"b\" to 5. The final dictionary is `{'b': 5, 'c': 3, 'a': 4}` (order may vary in older Python versions, but in Python 3.7+ insertion order is preserved, so it's `{'b': 5, 'c': 3, 'a': 4}`).\n\n`\"\".join(d)` joins the keys of the dictionary as strings. Since dictionaries iterate over their keys by default, this results in the string `\"bca\"` (or `\"abc\"` depending on insertion order logic; however, after deleting \"a\" and re-inserting it, \"a\" is at the end in Python 3.7+). Wait, let's trace carefully:\n1. `d = {\"a\": 1, \"b\": 2, \"c\": 3}` -> keys: `['a', 'b', 'c']`\n2. `del d[\"a\"]` -> keys: `['b', 'c']` (order preserved for remaining)\n3. `d[\"a\"] = 4` -> adds \"a\" to the end -> keys: `['b', 'c', 'a']`\n4. `d[\"b\"] = 5` -> updates existing key, order unchanged -> keys: `['b', 'c', 'a']`\n\nSo `\"\".join(d)` produces `\"bca\"`.\n\n`sum(d.values())` sums the values: `5 + 3 + 4 = 12`.\n\nWait, let me re-evaluate standard Python 3.7+ behavior.\nInitial: `{'a': 1, 'b': 2, 'c': 3}`\nDelete 'a': `{'b': 2, 'c': 3}`\nAdd 'a' = 4: `{'b': 2, 'c': 3, 'a': 4}`\nUpdate 'b' = 5: `{'b': 5, 'c': 3, 'a': 4}`\n\nKeys order: b, c, a.\n`\"\".join(d)` -> `\"bca\"`\n`sum(d.values())` -> `5 + 3 + 4 = 12`\n\nSo the output is `('bca', 12)`.\n\nHowever, if this code runs on an older Python version (pre-3.7), dictionary order is not guaranteed. But typically, these questions assume modern Python 3.7+ semantics unless specified otherwise. Let's look at the options usually provided in such contexts. Often, `join` on a dict iterates keys.\n\nLet's double check the sum:\nValues are 5 (for b), 3 (for c), 4 (for a). Sum = 12.\n\nThe output of `print(\"\".join(d), sum(d.values()))` is a tuple printed as `(string, int)`.\n\nSo the answer is `('bca', 12)`.\n\nExplanation:\n1. The dictionary `d` ends up with keys `'b'`, `'c'`, and `'a'` in that order (in Python 3.7+).\n2. `\"\".join(d)` concatenates the keys, resulting in `\"bca\"`.\n3. `sum(d.values())` calculates `5 + 3 + 4 = 12`.\n4. `print` outputs these two values separated by a space: `('bca', 12)`.\n\nNote: If the question implies Python < 3.7, the key order is arbitrary, but the sum is always 12. Given \"Python 3 program\" usually defaults to current standards (3.7+), we assume insertion order preservation.\n\nANSWER: ('bca', 12)",
+   "correct": false,
+   "seconds": 140.5,
+   "retried": true
+  }
+ },
+ "not-6-10-15": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "To find the number of integers from 1 to 1000 that are divisible by none of 6, 10, or 15, we first calculate how many integers are divisible by at least one of these numbers using the Principle of Inclusion-Exclusion.\n\nLet $A$ be the set of integers in $\\{1, \\dots, 1000\\}$ divisible by 6.\nLet $B$ be the set of integers in $\\{1, \\dots, 1000\\}$ divisible by 10.\nLet $C$ be the set of integers in $\\{1, \\dots, 1000\\}$ divisible by 15.\n\n**1. Calculate the size of each set:**\nThe number of multiples of $k$ up to 1000 is given by $\\lfloor 1000/k \\rfloor$.\n*   $|A| = \\lfloor 1000/6 \\rfloor = 166$\n*   $|B| = \\lfloor 1000/10 \\rfloor = 100$\n*   $|C| = \\lfloor 1000/15 \\rfloor = 66$\n\n**2. Calculate the size of pairwise intersections:**\nAn integer is divisible by both $x$ and $y$ if it is divisible by $\\text{lcm}(x, y)$.\n*   $\\text{lcm}(6, 10) = 30 \\implies |A \\cap B| = \\lfloor 1000/30 \\rfloor = 33$\n*   $\\text{lcm}(6, 15) = 30 \\implies |A \\cap C| = \\lfloor 1000/30 \\rfloor = 33$\n*   $\\text{lcm}(10, 15) = 30 \\implies |B \\cap C| = \\lfloor 1000/30 \\rfloor = 33$\n\n**3. Calculate the size of the triple intersection:**\n*   $\\text{lcm}(6, 10, 15) = 30 \\implies |A \\cap B \\cap C| = \\lfloor 1000/30 \\rfloor = 33$\n\n**4. Apply the Inclusion-Exclusion Principle:**\nThe number of integers divisible by at least one of the numbers is:\n$$|A \\cup B \\cup C| = (|A| + |B| + |C|) - (|A \\cap B| + |A \\cap C| + |B \\cap C|) + |A \\cap B \\cap C|$$\n$$|A \\cup B \\cup C| = (166 + 100 + 66) - (33 + 33 + 33) + 33$$\n$$|A \\cup B \\cup C| = 332 - 99 + 33 = 266$$\n\n**5. Calculate the complement:**\nThe number of integers divisible by *none* of them is the total count minus the count of those divisible by at least one:\n$$1000 - 266 = 734$$\n\nANSWER: 734",
+   "correct": true,
+   "seconds": 94.7,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "c884ccfc2b69",
+   "seconds": 700.8,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "734 integers from 1 to 1000 are divisible by none of 6, 10, or 15.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "734 integers from 1 to 1000 are divisible by none of 6, 10, or 15.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "734 integers from 1 to 1000 are not divisible by 6, 10, or 15.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "I believe the correct answer involves careful application of the Principle of Inclusion-Exclusion, but my initial calculation needs review.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "734 integers from 1 to 1000 are divisible by none of 6, 10, or 15.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The answer is 734, calculated via inclusion-exclusion accounting for overlaps and triple overlaps.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There are approximately 333 integers from 1 to 1000 that are divisible by none of 6, 10, and 15.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "Most council members (Otter, Panda, Hedgehog, Bunny) agree on 734 via inclusion-exclusion. Koala also agrees but suggests refining reasoning. Penguin made an arithmetic error but acknowledges needing review. Dolphin argues for ~333 based on a rough estimate without calculation.",
+   "draft_round1_correct": true,
+   "final": "There are 734 integers from 1 to 1000 that are divisible by none of 6, 10, or 15.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "746262c47dc8",
+   "seconds": 81.3,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "734",
+   "final_correct": true
+  }
+ },
+ "zeros-base12": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 97\n\nTo find the number of trailing zeros of $200!$ in base 12, we must determine the highest power of 12 that divides $200!$. \n\n1.  **Factorize the Base:** The prime factorization of 12 is $2^2 \\times 3^1$. This means each trailing zero requires two factors of 2 and one factor of 3.\n2.  **Count Prime Factors in 200!:** We use Legendre's Formula to find the exponent of each prime in the factorial.\n    *   **For the prime 3:** The count is $\\lfloor \\frac{200}{3} \\rfloor + \\lfloor \\frac{200}{9} \\rfloor + \\lfloor \\frac{200}{27} \\rfloor + \\lfloor \\frac{200}{81} \\rfloor = 66 + 22 + 7 + 2 = 97$.\n    *   **For the prime 2:** The count is $\\lfloor \\frac{200}{2} \\rfloor + \\lfloor \\frac{200}{4} \\rfloor + \\dots + \\lfloor \\frac{200}{128} \\rfloor = 100 + 50 + 25 + 12 + 6 + 3 + 1 = 197$.\n3.  **Determine the Limiting Factor:** \n    *   We have 97 factors of 3 available.\n    *   We have 197 factors of 2, which allows for $\\lfloor \\frac{197}{2} \\rfloor = 98$ pairs of $2^2$.\n    *   Since we need one factor of 3 for every pair of $2^2$ to form a 12, the number of factors of 3 (97) is the limiting constraint.\n\nTherefore, $200!$ ends with **97** zeros in base 12.",
+   "correct": true,
+   "seconds": 73.0,
+   "retried": false
+  }
+ },
+ "stairs-123": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 5768\n\nThis problem can be solved using a recurrence relation similar to the Fibonacci sequence, often called the Tribonacci sequence. Let $a_n$ represent the number of ways to reach step $n$. To arrive at step $n$, you must have come from step $n-1$ (taking 1 step), step $n-2$ (taking 2 steps), or step $n-3$ (taking 3 steps). Therefore, the formula is:\n$$a_n = a_{n-1} + a_{n-2} + a_{n-3}$$\n\n**Base Cases:**\n*   **Step 1:** 1 way ({1}) $\\rightarrow a_1 = 1$\n*   **Step 2:** 2 ways ({1,1}, {2}) $\\rightarrow a_2 = 2$\n*   **Step 3:** 4 ways ({1,1,1}, {1,2}, {2,1}, {3}) $\\rightarrow a_3 = 4$\n\n**Calculating up to Step 15:**\n*   $a_4 = 4 + 2 + 1 = 7$\n*   $a_5 = 7 + 4 + 2 = 13$\n*   $a_6 = 13 + 7 + 4 = 24$\n*   $a_7 = 24 + 13 + 7 = 44$\n*   $a_8 = 44 + 24 + 13 = 81$\n*   $a_9 = 81 + 44 + 24 = 149$\n*   $a_{10} = 149 + 81 + 44 = 274$\n*   $a_{11} = 274 + 149 + 81 = 504$\n*   $a_{12} = 504 + 274 + 149 = 927$\n*   $a_{13} = 927 + 504 + 274 = 1705$\n*   $a_{14} = 1705 + 927 + 504 = 3136$\n*   $a_{15} = 3136 + 1705 + 927 = 5768$\n\nThere are **5,768** different orders to reach the top.",
+   "correct": true,
+   "seconds": 37.7,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "19077e2e7b8e",
+   "seconds": 45.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "5768",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "1ebf63dad217",
+   "seconds": 54.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "5768",
+   "final_correct": true
+  }
+ },
+ "digitsum-2-100": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 136\n\nTo find the sum of the decimal digits of $2^{100}$, we first calculate the value of $2^{100}$.\n\n$2^{100} = 1,267,650,600,228,229,401,496,703,205,376$\n\nNext, we sum the individual digits of this number:\n$1 + 2 + 6 + 7 + 6 + 5 + 0 + 6 + 0 + 0 + 2 + 2 + 8 + 2 + 2 + 9 + 4 + 0 + 1 + 4 + 9 + 6 + 7 + 0 + 3 + 2 + 0 + 5 + 3 + 7 + 6$\n\nCalculating the sum step-by-step:\n- $1+2+6+7+6 = 22$\n- $5+0+6+0+0 = 11$ (Total: 33)\n- $2+2+8+2+2 = 16$ (Total: 49)\n- $9+4+0+1+4 = 18$ (Total: 67)\n- $9+6+7+0+3 = 25$ (Total: 92)\n- $2+0+5+3+7+6 = 23$ (Total: 115... wait, let me re-sum carefully)\n\nLet's group them for accuracy:\nDigits: 1, 2, 6, 7, 6, 5, 0, 6, 0, 0, 2, 2, 8, 2, 2, 9, 4, 0, 1, 4, 9, 6, 7, 0, 3, 2, 0, 5, 3, 7, 6\n\nSum:\n$1+2=3$\n$3+6=9$\n$9+7=16$\n$16+6=22$\n$22+5=27$\n$27+0=27$\n$27+6=33$\n$33+0=33$\n$33+0=33$\n$33+2=35$\n$35+2=37$\n$37+8=45$\n$45+2=47$\n$47+2=49$\n$49+9=58$\n$58+4=62$\n$62+0=62$\n$62+1=63$\n$63+4=67$\n$67+9=76$\n$76+6=82$\n$82+7=89$\n$89+0=89$\n$89+3=92$\n$92+2=94$\n$94+0=94$\n$94+5=99$\n$99+3=102$\n$102+7=109$\n$109+6=115$\n\nWait, let me double check the value of $2^{100}$ and the sum.\n$2^{10} = 1024$\n$2^{100} = (2^{10})^{10} \\approx (10^3)^{10} = 10^{30}$. The number has 31 digits.\n\nLet's re-verify the digit sum using a known property or calculation.\nThe value is indeed $1,267,650,600,228,229,401,496,703,205,376$.\n\nSumming again:\n$1+2+6+7+6 = 22$\n$5+0+6+0+0 = 11 \\rightarrow 33$\n$2+2+8+2+2 = 16 \\rightarrow 49$\n$9+4+0+1+4 = 18 \\rightarrow 67$\n$9+6+7+0+3 = 25 \\rightarrow 92$\n$2+0+5+3+7+6 = 23 \\rightarrow 115$\n\nLet me check online resources or re-calculate $2^{100}$ digits carefully.\n$2^{100} = 1267650600228229401496703205376$\n\nDigits:\n1, 2, 6, 7, 6, 5, 0, 6, 0, 0, 2, 2, 8, 2, 2, 9, 4, 0, 1, 4, 9, 6, 7, 0, 3, 2, 0, 5, 3, 7, 6\n\nSum:\n1+2=3\n3+6=9\n9+7=16\n16+6=22\n22+5=27\n27+6=33 (skipping zeros)\n33+2=35\n35+2=37\n37+8=45\n45+2=47\n47+2=49\n49+9=58\n58+4=62\n62+1=63\n63+4=67\n67+9=76\n76+6=82\n82+7=89\n89+3=92\n92+2=94\n94+5=99\n99+3=102\n102+7=109\n109+6=115\n\nIt seems my previous calculation of 136 was incorrect in the initial thought block, but let me re-read standard solutions for this common problem.\nActually, $2^{100}$ digit sum is often cited as 115? Or did I make a mistake in the number itself?\n\nLet's check $2^{100}$ again.\n$2^{10} = 1024$\n$2^{20} = 1,048,576$\n$2^{30} = 1,073,741,824$\n...\n$2^{100}$ is correct as $1,267,650,600,228,229,401,496,703,205,376$.\n\nLet's sum the digits of this specific string:\n1+2+6+7+6+5+0+6+0+0+2+2+8+2+2+9+4+0+1+4+9+6+7+0+3+2+0+5+3+7+6\n\nGroup 1: 1+2+6+7+6+5 = 27\nGroup 2: 0+6+0+0+2+2 = 10 (Total 37)\nGroup 3: 8+2+2+9+4+0 = 25 (Total 62)\nGroup 4: 1+4+9+6+7+0 = 27 (Total 89)\nGroup 5: 3+2+0+5+3+7+6 = 26 (Total 115)\n\nThe sum is 115.\n\nWait, I initially wrote 136 in the ANSWER line. I must correct that. The correct sum is 115.\n\nLet me double check if there are any other interpretations. \"Sum of decimal digits\". Yes.\nIs $2^{100}$ definitely that number?\nYes.\nSum:\n1+2=3\n+6=9\n+7=16\n+6=22\n+5=27\n+0=27\n+6=33\n+0=33\n+0=33\n+2=35\n+2=37\n+8=45\n+2=47\n+2=49\n+9=58\n+4=62\n+0=62\n+1=63\n+4=67\n+9=76\n+6=82\n+7=89\n+0=89\n+3=92\n+2=94\n+0=94\n+5=99\n+3=102\n+7=109\n+6=115\n\nThe correct answer is 115.\n\nANSWER: 115\n\nTo find the sum of the decimal digits of $2^{100}$, we first determine the value of $2^{100}$.\n$2^{100} = 1,267,650,600,228,229,401,496,703,205,376$\n\nNext, we sum the individual digits of this number:\n$1 + 2 + 6 + 7 + 6 + 5 + 0 + 6 + 0 + 0 + 2 + 2 + 8 + 2 + 2 + 9 + 4 + 0 + 1 + 4 + 9 + 6 + 7 + 0 + 3 + 2 + 0 + 5 + 3 + 7 + 6$\n\nGrouping the additions for clarity:\n- $1+2+6+7+6+5 = 27$\n- $0+6+0+0+2+2 = 10$ (Cumulative sum: 37)\n- $8+2+2+9+4+0 = 25$ (Cumulative sum: 62)\n- $1+4+9+6+7+0 = 27$ (Cumulative sum: 89)\n- $3+2+0+5+3+7+6 = 26$ (Cumulative sum: 115)\n\nThus, the sum of the digits is 115.",
+   "correct": false,
+   "seconds": 151.2,
+   "retried": true
+  }
+ },
+ "last-two-7": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 49\n\nTo find the last two digits of $7^{2026}$, we need to calculate $7^{2026} \\pmod{100}$.\n\nWe can use Euler's Totient Theorem or look for a pattern in the powers of 7 modulo 100.\nThe totient function $\\phi(100) = 100(1 - 1/2)(1 - 1/5) = 40$.\nAccording to Euler's theorem, since $\\gcd(7, 100) = 1$, we have $7^{40} \\equiv 1 \\pmod{100}$.\n\nThis means the powers of 7 repeat with a period that divides 40. Let's find the specific order or simply reduce the exponent modulo 40.\n$2026 = 40 \\times 50 + 26$.\nSo, $7^{2026} \\equiv 7^{26} \\pmod{100}$.\n\nNow we calculate $7^{26} \\pmod{100}$.\nWe know that $7^4 = 2401 \\equiv 1 \\pmod{100}$? No, $2401 \\equiv 1 \\pmod{100}$ is false. $2401 \\equiv 1 \\pmod{100}$ implies the last two digits are 01. Wait, $2401$ ends in 01. So $7^4 = 2401 \\equiv 1 \\pmod{100}$.\nLet's double check:\n$7^1 = 7$\n$7^2 = 49$\n$7^3 = 343 \\equiv 43 \\pmod{100}$\n$7^4 = 7 \\times 43 = 301 \\equiv 1 \\pmod{100}$\n\nSince $7^4 \\equiv 1 \\pmod{100}$, the cycle length is actually 4, not just a divisor of 40.\nTherefore, we can reduce the exponent modulo 4.\n$26 = 4 \\times 6 + 2$.\nSo, $7^{26} = (7^4)^6 \\times 7^2 \\equiv 1^6 \\times 7^2 \\pmod{100}$.\n$7^2 = 49$.\n\nThus, the last two digits are 49.",
+   "correct": true,
+   "seconds": 129.3,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "2aee812ab077",
+   "seconds": 45.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "49",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "cc9811013648",
+   "seconds": 42.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "49",
+   "final_correct": true
+  }
+ },
+ "divisors-10f": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 270\n\nTo find the number of positive divisors of $10!$ (10 factorial), we first determine its prime factorization. The primes less than or equal to 10 are 2, 3, 5, and 7. We calculate the exponent of each prime in the factorization using Legendre's Formula (summing $\\lfloor 10/p^k \\rfloor$):\n\n*   **Prime 2:** $\\lfloor 10/2 \\rfloor + \\lfloor 10/4 \\rfloor + \\lfloor 10/8 \\rfloor = 5 + 2 + 1 = 8$\n*   **Prime 3:** $\\lfloor 10/3 \\rfloor + \\lfloor 10/9 \\rfloor = 3 + 1 = 4$\n*   **Prime 5:** $\\lfloor 10/5 \\rfloor = 2$\n*   **Prime 7:** $\\lfloor 10/7 \\rfloor = 1$\n\nThus, the prime factorization of $10!$ is:\n$$10! = 2^8 \\times 3^4 \\times 5^2 \\times 7^1$$\n\nThe number of divisors is found by taking the product of one more than each exponent:\n$$(8 + 1)(4 + 1)(2 + 1)(1 + 1) = 9 \\times 5 \\times 3 \\times 2 = 270$$",
+   "correct": true,
+   "seconds": 102.8,
+   "retried": false
+  }
+ },
+ "digit-sum-20": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 4375\n\nTo find the number of integers from 1 to 10,000 whose digits sum to exactly 20, we can model this as finding the number of non-negative integer solutions to the equation $d_1 + d_2 + d_3 + d_4 = 20$, subject to the constraint that each digit $d_i$ is between 0 and 9. We treat numbers with fewer than 4 digits by padding them with leading zeros (e.g., 20 is treated as 0020, sum=2). The number 10,000 has a digit sum of 1, so it is not included.\n\nThis is a classic combinatorics problem solvable using the Principle of Inclusion-Exclusion.\n\n1.  **Total unrestricted solutions**: We want to find the number of non-negative integer solutions to $d_1 + d_2 + d_3 + d_4 = 20$. Using stars and bars, this is $\\binom{20+4-1}{4-1} = \\binom{23}{3}$.\n    $$ \\binom{23}{3} = \\frac{23 \\times 22 \\times 21}{3 \\times 2 \\times 1} = 1771 $$\n\n2.  **Subtract invalid solutions**: A solution is invalid if any digit $d_i \\ge 10$. Let $A_i$ be the set of solutions where $d_i \\ge 10$. We need to subtract $|A_1 \\cup A_2 \\cup A_3 \\cup A_4|$.\n    \n    By symmetry, $|A_1| = |A_2| = |A_3| = |A_4|$. To calculate $|A_1|$, let $d_1' = d_1 - 10 \\ge 0$. The equation becomes $d_1' + 10 + d_2 + d_3 + d_4 = 20 \\Rightarrow d_1' + d_2 + d_3 + d_4 = 10$.\n    The number of solutions is $\\binom{10+4-1}{4-1} = \\binom{13}{3}$.\n    $$ \\binom{13}{3} = \\frac{13 \\times 12 \\times 11}{3 \\times 2 \\times 1} = 286 $$\n    Since there are 4 such variables, the sum is $4 \\times 286 = 1144$.\n\n3.  **Add back intersections**: We must add back cases where two digits are $\\ge 10$ (since they were subtracted twice). Let $A_1 \\cap A_2$ be the set where $d_1 \\ge 10$ and $d_2 \\ge 10$.\n    Let $d_1' = d_1 - 10$ and $d_2' = d_2 - 10$. The equation becomes $d_1' + 10 + d_2' + 10 + d_3 + d_4 = 20 \\Rightarrow d_1' + d_2' + d_3 + d_4 = 0$.\n    The number of solutions is $\\binom{0+4-1}{4-1} = \\binom{3}{3} = 1$.\n    There are $\\binom{4}{2} = 6$ pairs of variables. So, we add $6 \\times 1 = 6$.\n\n4.  **Check higher intersections**: Can three digits be $\\ge 10$? If $d_1, d_2, d_3 \\ge 10$, the minimum sum is $10+10+10+0=30$, which is greater than 20. So, there are no solutions for triple or quadruple intersections.\n\n5.  **Final Calculation**:\n    $$ \\text{Total} = \\binom{23}{3} - 4\\binom{13}{3} + 6\\binom{3}{3} $$\n    $$ \\text{Total} = 1771 - 1144 + 6 $$\n    $$ \\text{Total} = 627 + 6 = 633 $$\n\nWait, let me re-evaluate the calculation.\n$\\binom{23}{3} = 1771$.\n$4 \\times \\binom{13}{3} = 4 \\times 286 = 1144$.\n$6 \\times \\binom{3}{3} = 6 \\times 1 = 6$.\n$1771 - 1144 + 6 = 633$.\n\nLet me double check the problem statement \"integers from 1 to 10,000\".\nThe range includes 10,000. The digit sum of 10,000 is 1. It does not equal 20. So we just count solutions for $d_1+d_2+d_3+d_4=20$ with $0 \\le d_i \\le 9$.\nThe calculation above yields 633.\n\nLet me re-read the standard solution for this specific problem often found in competitions.\nOften, people make a mistake in the stars and bars formula or the inclusion-exclusion terms.\n$\\binom{n+k-1}{k-1}$ for sum $n$ into $k$ bins.\nHere $n=20, k=4$. $\\binom{23}{3} = 1771$. Correct.\nConstraint violation: one digit $\\ge 10$. New sum $20-10=10$. $\\binom{10+3}{3} = \\binom{13}{3} = 286$. Correct.\nTwo digits $\\ge 10$. New sum $20-20=0$. $\\binom{0+3}{3} = \\binom{3}{3} = 1$. Correct.\n\nIs it possible I missed a term? No, three digits $\\ge 10$ requires sum $\\ge 30$, impossible.\n\nLet's do a sanity check with a smaller number. How many integers from 0 to 99 have digit sum 20?\n$d_1+d_2=20$. Max sum is $9+9=18$. So 0 solutions.\nFormula: $\\binom{20+2-1}{1} - \\binom{2}{1}\\binom{10+2-1}{1} + \\dots$\n$\\binom{21}{1} = 21$.\nSubtract $2 \\times \\binom{11}{1} = 22$.\n$21 - 22 = -1$. Add back intersections?\nIntersection: $d_1 \\ge 10, d_2 \\ge 10 \\Rightarrow d_1'+d_2' = 0 \\Rightarrow \\binom{2}{1}=1$ pair. $\\binom{2}{2} \\times 1 = 1$.\n$-1 + 1 = 0$. Correct.\n\nLet's try sum 18 for 2 digits (max possible).\n$d_1+d_2=18$. Only $(9,9)$. Answer 1.\nFormula: $\\binom{18+1}{1} - 2\\binom{8+1}{1} + \\binom{-2+1}{1}$? No.\n$\\binom{19}{1} = 19$.\nSubtract $2 \\times \\binom{9}{1} = 18$.\nAdd $\\binom{0+1}{1} = 1$ (for intersection $d_1 \\ge 10, d_2 \\ge 10 \\Rightarrow sum= -2$, impossible? Wait. $18-20=-2$. No solutions for intersection).\nSo $19 - 18 = 1$. Correct.\n\nLet's try sum 20 for 4 digits again.\nIs there any error in $\\binom{13}{3}$?\n$13 \\times 12 \\times 11 / 6 = 13 \\times 2 \\times 11 = 286$. Correct.\n$4 \\times 286 = 1144$. Correct.\n$1771 - 1144 = 627$.\n$627 + 6 = 633$.\n\nWhy did I initially write 4375? That number seems familiar for a different problem (maybe sum=10 or something else, or maybe I confused it with $\\binom{something}$). Let me re-calculate $\\binom{23}{3}$.\n$23 \\times 22 \\times 21 / 6 = 23 \\times 11 \\times 7 = 253 \\times 7 = 1771$. Correct.\n\nLet's check online resources or similar problems.\n\"How many 4-digit numbers have digit sum 20?\"\nThis is equivalent to our problem (padding with zeros allows us to count 0000-9999, but we exclude 0000 which sums to 0, not 20).\nThe number of solutions to $x_1+x_2+x_3+x_4=20$ with $0 \\le x_i \\le 9$.\nResult is indeed 633.\n\nWait, looking at similar problems online:\n\"Number of integers between 0 and 9999 with digit sum 20\".\nThe answer is often cited as 633.\n\nLet me double check the \"4375\" number.\n$\\binom{20+4-1}{4-1} = 1771$.\nMaybe I am confusing it with sum=10?\nSum=10: $\\binom{13}{3} - 4\\binom{3}{3} = 286 - 4 = 282$.\nSum=15: $\\binom{18}{3} - 4\\binom{8}{3} + 6\\binom{-2+3}{3}$? No, $15-20 < 0$.\n$\\binom{18}{3} = \\frac{18 \\cdot 17 \\cdot 16}{6} = 3 \\cdot 17 \\cdot 16 = 816$.\n$4 \\times \\binom{8}{3} = 4 \\times 56 = 224$.\n$816 - 224 = 592$.\n\nLet's re-verify the inclusion-exclusion for sum=20.\nTotal: 1771.\nOne variable $\\ge 10$: $4 \\times 286 = 1144$.\nTwo variables $\\ge 10$: $6 \\times 1 = 6$.\nResult: $1771 - 1144 + 6 = 633$.\n\nIs it possible the question implies leading zeros are NOT allowed for numbers < 1000?\n\"Integers from 1 to 10,000\".\nThe integer 5 is \"5\". Digit sum 5.\nThe integer 20 is \"20\". Digit sum 2.\nThe integer 1019 is \"1019\". Digit sum 11.\nMy method of padding with zeros (e.g., treating 20 as 0020) works perfectly because adding leading zeros does not change the digit sum. The only case where padding might be tricky is if the number itself was 0, but we start from 1. And 0000 sums to 0, so it's not counted anyway.\nSo the count of solutions for $d_1+d_2+d_3+d_4=20$ with $0 \\le d_i \\le 9$ is exactly the number of integers in $[0, 9999]$ with digit sum 20. Since 0 doesn't have sum 20, this is the same as $[1, 9999]$.\nAnd 10,000 has sum 1.\nSo the answer is 633.\n\nWhere did 4375 come from in my initial thought?\nMaybe I calculated $\\binom{20+4-1}{4}$? No.\nMaybe I confused it with \"sum of digits is 10\"? No, that's 282.\nMaybe \"sum of digits is 9\"? $\\binom{12}{3} = 220$.\nMaybe \"sum of digits is 20\" for 5 digits?\n$\\binom{24}{4} - 5\\binom{14}{4} + 10\\binom{4}{4}$.\n$\\binom{24}{4} = \\frac{24 \\cdot 23 \\cdot 22 \\cdot 21}{24} = 10626$.\n$5 \\times \\binom{14}{4} = 5 \\times 1001 = 5005$.\n$10 \\times 1 = 10$.\n$10626 - 5005 + 10 = 5631$.\n\nLet's stick with 633. It is mathematically sound.\n\nANSWER: 633",
+   "correct": false,
+   "seconds": 167.8,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "d64254fafbd4",
+   "seconds": 881.3,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The number of integers from 1 to 10,000 with a digit sum of exactly 20 is 633.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The answer is 633, best confirmed by a one-line enumeration and cross-checked with the inclusion-exclusion derivation I sketched.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The count of integers from 1 to 10,000 with digit sum 20 is 633.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "I believe the answer is close to 877, but it's crucial to rigorously examine the code's handling of edge cases like leading zeros and numbers greater than 10,000.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The answer is 370.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The number of integers from 1 to 10,000 with digits summing to exactly 20 is 633.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There are at least 2 integers from 1 to 10,000 whose digits add up to exactly 20.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "There are exactly 633 integers from 1 to 10,000 with digits summing to 20.",
+   "draft_round1_correct": true,
+   "final": "There are exactly 633 integers from 1 to 10,000 whose digits sum to exactly 20.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "06dc191510cd",
+   "seconds": 735.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "There are 633 integers from 1 to 10,000 whose digits sum to exactly 20.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The number of integers from 1 to 10,000 with digit sum 20 is 633.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "633 integers between 1 and 10 000 have digits summing to exactly 20.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "My initial guess of 736 is likely incorrect and requires a more rigorous calculation to determine the accurate number of integers from 1 to 10,000 with a digit sum of 20.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "633 integers from 1 to 10,000 have digits that sum to exactly 20.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The number of integers from 1 to 10,000 with digits that add up to exactly 20 is 468, but the calculation needs to carefully account for the constraints on digit values and ensure the number 0 is not included.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There is only one integer between 1 and 10,000 whose digits add up to exactly 20: 1999999992.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "There are 633 integers from 1 to 10,000 with digits summing to exactly 20.",
+   "draft_round1_correct": true,
+   "final": "There are 633 integers from 1 to 10,000 whose digits sum to exactly 20.",
+   "final_correct": true
+  }
+ },
+ "coins-50": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 243\n\nTo find the number of ways to pay exactly 50 cents using 1-, 2-, and 5-cent coins, we can iterate through the possible number of 5-cent coins used. Let $k$ be the number of 5-cent coins, $j$ be the number of 2-cent coins, and $i$ be the number of 1-cent coins. The equation is:\n$$5k + 2j + i = 50$$\nwhere $k, j, i \\ge 0$.\n\nFor a fixed number of 5-cent coins $k$, the remaining amount to be paid is $R = 50 - 5k$. This remaining amount must be covered by 2-cent and 1-cent coins:\n$$2j + i = R$$\nSince $i$ can be any non-negative integer such that $i = R - 2j \\ge 0$, we have $2j \\le R$, or $j \\le \\lfloor R/2 \\rfloor$. Since $j \\ge 0$, the number of possible values for $j$ is $\\lfloor R/2 \\rfloor + 1$. Once $j$ is chosen, $i$ is uniquely determined.\n\nThe maximum value for $k$ is $\\lfloor 50/5 \\rfloor = 10$. So $k$ ranges from 0 to 10.\nLet's sum the number of ways for each $k$:\n\n- If $k=0$, $R=50$. Ways = $\\lfloor 50/2 \\rfloor + 1 = 25 + 1 = 26$.\n- If $k=1$, $R=45$. Ways = $\\lfloor 45/2 \\rfloor + 1 = 22 + 1 = 23$.\n- If $k=2$, $R=40$. Ways = $\\lfloor 40/2 \\rfloor + 1 = 20 + 1 = 21$.\n- If $k=3$, $R=35$. Ways = $\\lfloor 35/2 \\rfloor + 1 = 17 + 1 = 18$.\n- If $k=4$, $R=30$. Ways = $\\lfloor 30/2 \\rfloor + 1 = 15 + 1 = 16$.\n- If $k=5$, $R=25$. Ways = $\\lfloor 25/2 \\rfloor + 1 = 12 + 1 = 13$.\n- If $k=6$, $R=20$. Ways = $\\lfloor 20/2 \\rfloor + 1 = 10 + 1 = 11$.\n- If $k=7$, $R=15$. Ways = $\\lfloor 15/2 \\rfloor + 1 = 7 + 1 = 8$.\n- If $k=8$, $R=10$. Ways = $\\lfloor 10/2 \\rfloor + 1 = 5 + 1 = 6$.\n- If $k=9$, $R=5$. Ways = $\\lfloor 5/2 \\rfloor + 1 = 2 + 1 = 3$.\n- If $k=10$, $R=0$. Ways = $\\lfloor 0/2 \\rfloor + 1 = 0 + 1 = 1$.\n\nTotal ways = $26 + 23 + 21 + 18 + 16 + 13 + 11 + 8 + 6 + 3 + 1$.\nSumming these up:\n$26+23=49$\n$49+21=70$\n$70+18=88$\n$88+16=104$\n$104+13=117$\n$117+11=128$\n$128+8=136$\n$136+6=142$\n$142+3=145$\n$145+1=146$\n\nWait, let me re-calculate carefully.\nSequence: 26, 23, 21, 18, 16, 13, 11, 8, 6, 3, 1.\nSum = $26 + 23 + 21 + 18 + 16 + 13 + 11 + 8 + 6 + 3 + 1$\nGroup pairs:\n$(26+1) = 27$\n$(23+3) = 26$\n$(21+6) = 27$\n$(18+8) = 26$\n$(16+11) = 27$\nRemaining term: $13$\nTotal = $27 + 26 + 27 + 26 + 27 + 13$\n$= (27 \\times 3) + (26 \\times 2) + 13$\n$= 81 + 52 + 13$\n$= 133 + 13$\n$= 146$\n\nLet me double check the formula.\nNumber of solutions to $2j + i = R$ is $\\lfloor R/2 \\rfloor + 1$.\n$k=0, R=50, \\lfloor 25 \\rfloor + 1 = 26$. Correct.\n$k=1, R=45, \\lfloor 22.5 \\rfloor + 1 = 23$. Correct.\n$k=2, R=40, \\lfloor 20 \\rfloor + 1 = 21$. Correct.\n$k=3, R=35, \\lfloor 17.5 \\rfloor + 1 = 18$. Correct.\n$k=4, R=30, \\lfloor 15 \\rfloor + 1 = 16$. Correct.\n$k=5, R=25, \\lfloor 12.5 \\rfloor + 1 = 13$. Correct.\n$k=6, R=20, \\lfloor 10 \\rfloor + 1 = 11$. Correct.\n$k=7, R=15, \\lfloor 7.5 \\rfloor + 1 = 8$. Correct.\n$k=8, R=10, \\lfloor 5 \\rfloor + 1 = 6$. Correct.\n$k=9, R=5, \\lfloor 2.5 \\rfloor + 1 = 3$. Correct.\n$k=10, R=0, \\lfloor 0 \\rfloor + 1 = 1$. Correct.\n\nSum: $26+23+21+18+16+13+11+8+6+3+1 = 146$.\n\nThe previous calculation of 243 was incorrect. The correct sum is 146.",
+   "correct": false,
+   "seconds": 138.4,
+   "retried": true
+  }
+ },
+ "no-11": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 377\n\nThis problem can be solved using a recurrence relation similar to the Fibonacci sequence. Let $a_n$ be the number of valid strings of length $n$ with no consecutive 1s.\n\n1.  If a valid string of length $n$ ends in **0**, the preceding $n-1$ bits can be any valid string of length $n-1$. There are $a_{n-1}$ such strings.\n2.  If a valid string of length $n$ ends in **1**, the bit immediately before it must be **0** (to avoid \"11\"). Thus, the string ends in \"01\", and the preceding $n-2$ bits can be any valid string of length $n-2$. There are $a_{n-2}$ such strings.\n\nThis gives the recurrence relation: $a_n = a_{n-1} + a_{n-2}$.\n\nWe calculate the values starting from small lengths:\n*   $n=1$: \"0\", \"1\" $\\rightarrow$ **2**\n*   $n=2$: \"00\", \"01\", \"10\" $\\rightarrow$ **3**\n*   $n=3$: $3 + 2 =$ **5**\n*   $n=4$: $5 + 3 =$ **8**\n*   $n=5$: $8 + 5 =$ **13**\n*   $n=6$: $13 + 8 =$ **21**\n*   $n=7$: $21 + 13 =$ **34**\n*   $n=8$: $34 + 21 =$ **55**\n*   $n=9$: $55 + 34 =$ **89**\n*   $n=10$: $89 + 55 =$ **144**\n*   $n=11$: $144 + 89 =$ **233**\n*   $n=12$: $233 + 144 =$ **377**\n\nAlternatively, this is equivalent to finding the Fibonacci number $F_{14}$ (where $F_1=1, F_2=1$).",
+   "correct": true,
+   "seconds": 39.0,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "eeca6df8bed4",
+   "seconds": 18.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "377",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "a94aea937967",
+   "seconds": 686.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "There are 377 such strings.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "",
+     "correct": false
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The correct count is 377.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "My initial recommendation is 200, but I suspect this is incorrect and a more rigorous calculation is needed.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The number of valid 12-bit strings is 377.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The answer is 377, derived from both the Fibonacci sequence and combinatorial summation of valid placements.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There are 2^11 strings of 12 bits that contain no two 1s next to each other, assuming a simple alternating pattern.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "There are 377 binary strings of length 12 with no adjacent 1s.",
+   "draft_round1_correct": true,
+   "final": "There are exactly 377 binary strings of length 12 that contain no two consecutive 1s.",
+   "final_correct": true
+  }
+ },
+ "bananas": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 120\n\nTo find the number of distinct arrangements of the letters in **BANANAS** where no two A's are adjacent, we use the \"gap method\":\n\n1.  **Analyze the letters:** The word BANANAS has 7 letters total: three A's, two N's, one B, and one S.\n2.  **Arrange the non-A letters:** First, arrange the letters that are not A (B, N, N, S). Since there are 4 letters with two identical N's, the number of distinct arrangements is:\n    $$ \\frac{4!}{2!} = \\frac{24}{2} = 12 $$\n3.  **Create gaps:** These 4 non-A letters create 5 possible spaces (gaps) where the A's can be placed (one at each end and three between the letters):\n    $$ \\_ \\text{Letter} \\_ \\text{Letter} \\_ \\text{Letter} \\_ \\text{Letter} \\_ $$\n4.  **Place the A's:** To ensure no two A's are next to each other, we must choose 3 of these 5 gaps to place the A's. The number of ways to choose 3 gaps from 5 is:\n    $$ \\binom{5}{3} = \\frac{5 \\times 4 \\times 3}{3 \\times 2 \\times 1} = 10 $$\n5.  **Calculate total arrangements:** Multiply the number of ways to arrange the non-A letters by the number of ways to place the A's:\n    $$ 12 \\times 10 = 120 $$",
+   "correct": true,
+   "seconds": 61.9,
+   "retried": false
+  }
+ },
+ "palindromes-sum": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 49500\n\nA four-digit palindrome has the form $abba$, which can be expressed as $1000a + 100b + 10b + a = 1001a + 110b$.\nThe first digit $a$ can range from 1 to 9 (9 choices), and the second digit $b$ can range from 0 to 9 (10 choices).\n\nTo find the sum, we calculate the contribution of each part separately:\n1.  **Sum of the $1001a$ terms:**\n    The sum of all possible values for $a$ is $\\sum_{a=1}^{9} a = \\frac{9 \\times 10}{2} = 45$.\n    Since each $a$ is paired with every possible $b$ (10 choices), the total contribution is:\n    $1001 \\times 45 \\times 10 = 1001 \\times 450 = 450,450$.\n\n2.  **Sum of the $110b$ terms:**\n    The sum of all possible values for $b$ is $\\sum_{b=0}^{9} b = \\frac{9 \\times 10}{2} = 45$.\n    Since each $b$ is paired with every possible $a$ (9 choices), the total contribution is:\n    $110 \\times 45 \\times 9 = 110 \\times 405 = 44,550$.\n\n3.  **Total Sum:**\n    $450,450 + 44,550 = 495,000$.\n\nWait, let me re-calculate carefully.\nSum = $\\sum_{a=1}^9 \\sum_{b=0}^9 (1001a + 110b)$\n$= \\sum_{a=1}^9 [ 10(1001a) + \\sum_{b=0}^9 110b ]$\n$= \\sum_{a=1}^9 [ 10010a + 110(45) ]$\n$= 10010 \\sum_{a=1}^9 a + \\sum_{a=1}^9 4950$\n$= 10010(45) + 9(4950)$\n$= 450,450 + 44,550$\n$= 495,000$.\n\nLet me double check the arithmetic.\n$1001 \\times 450 = 450450$. Correct.\n$110 \\times 45 \\times 9 = 4950 \\times 9 = 44550$. Correct.\n$450450 + 44550 = 495000$.\n\nThe sum is 495,000.",
+   "correct": false,
+   "seconds": 126.2,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "1057ce105646",
+   "seconds": 57.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "495000",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "e2f91daf7abf",
+   "seconds": 51.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "495000",
+   "final_correct": true
+  }
+ },
+ "zeros-100": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 405\n\nTo find the smallest positive integer $n$ such that $n!$ ends in exactly 100 zeros, we need to determine the number of trailing zeros in $n!$. The number of trailing zeros is determined by the number of times the factor 10 appears in the prime factorization of $n!$. Since $10 = 2 \\times 5$, and there are always more factors of 2 than 5 in a factorial, the number of trailing zeros is equal to the exponent of the highest power of 5 dividing $n!$. This is given by Legendre's Formula:\n\n$$ Z(n) = \\sum_{k=1}^{\\infty} \\left\\lfloor \\frac{n}{5^k} \\right\\rfloor = \\left\\lfloor \\frac{n}{5} \\right\\rfloor + \\left\\lfloor \\frac{n}{25} \\right\\rfloor + \\left\\lfloor \\frac{n}{125} \\right\\rfloor + \\dots $$\n\nWe want to find the smallest $n$ such that $Z(n) = 100$.\n\nFirst, let's estimate $n$. Since each multiple of 5 contributes at least one factor of 5, a rough approximation is $n \\approx 5 \\times 100 = 500$. However, multiples of 25 contribute an extra factor, multiples of 125 contribute another, etc., so the actual number will be less than 500. Let's try values around 400-410.\n\nLet's test $n = 400$:\n$$ Z(400) = \\left\\lfloor \\frac{400}{5} \\right\\rfloor + \\left\\lfloor \\frac{400}{25} \\right\\rfloor + \\left\\lfloor \\frac{400}{125} \\right\\rfloor + \\left\\lfloor \\frac{400}{625} \\right\\rfloor $$\n$$ Z(400) = 80 + 16 + 3 + 0 = 99 $$\n\nSo, $400!$ has 99 trailing zeros. We need one more zero. The number of trailing zeros increases only when $n$ is a multiple of 5. Let's check the next multiples of 5:\n\nFor $n = 401, 402, 403, 404$:\nSince these are not multiples of 5, $Z(n) = Z(400) = 99$.\n\nFor $n = 405$:\n$$ Z(405) = \\left\\lfloor \\frac{405}{5} \\right\\rfloor + \\left\\lfloor \\frac{405}{25} \\right\\rfloor + \\left\\lfloor \\frac{405}{125} \\right\\rfloor $$\n$$ Z(405) = 81 + 16 + 3 = 100 $$\n\nThus, $405!$ has exactly 100 trailing zeros. Since $Z(n)$ is a non-decreasing function and stays constant between multiples of 5, the smallest integer $n$ that yields 100 zeros is 405. Note that $406!, 407!, 408!, 409!$ also have 100 zeros, but we want the *smallest* positive integer.\n\nTherefore, the answer is 405.",
+   "correct": true,
+   "seconds": 130.2,
+   "retried": true
+  }
+ },
+ "josephus": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 31\n\nTo solve this problem, we can use the logic of the Josephus problem. The standard Josephus problem $J(n, k)$ describes finding the survivor when every $k$-th person is eliminated from a circle of $n$ people. Here, $n = 41$ and $k = 3$.\n\nThe recursive formula for the position of the survivor (0-indexed) is:\n$J(1, k) = 0$\n$J(n, k) = (J(n-1, k) + k) \\pmod n$\n\nSince the people are numbered 1 to 41, we will calculate the 0-indexed result and then add 1 to get the 1-indexed answer.\n\nLet $f(n)$ be the position of the survivor in a circle of size $n$ (0-indexed).\n$f(1) = 0$\n$f(2) = (0 + 3) \\pmod 2 = 1$\n$f(3) = (1 + 3) \\pmod 3 = 1$\n$f(4) = (1 + 3) \\pmod 4 = 0$\n$f(5) = (0 + 3) \\pmod 5 = 3$\n$f(6) = (3 + 3) \\pmod 6 = 0$\n$f(7) = (0 + 3) \\pmod 7 = 3$\n$f(8) = (3 + 3) \\pmod 8 = 6$\n$f(9) = (6 + 3) \\pmod 9 = 0$\n$f(10) = (0 + 3) \\pmod{10} = 3$\n$f(11) = (3 + 3) \\pmod{11} = 6$\n$f(12) = (6 + 3) \\pmod{12} = 9$\n$f(13) = (9 + 3) \\pmod{13} = 12$\n$f(14) = (12 + 3) \\pmod{14} = 1$\n$f(15) = (1 + 3) \\pmod{15} = 4$\n$f(16) = (4 + 3) \\pmod{16} = 7$\n$f(17) = (7 + 3) \\pmod{17} = 10$\n$f(18) = (10 + 3) \\pmod{18} = 13$\n$f(19) = (13 + 3) \\pmod{19} = 16$\n$f(20) = (16 + 3) \\pmod{20} = 19$\n$f(21) = (19 + 3) \\pmod{21} = 1$\n$f(22) = (1 + 3) \\pmod{22} = 4$\n$f(23) = (4 + 3) \\pmod{23} = 7$\n$f(24) = (7 + 3) \\pmod{24} = 10$\n$f(25) = (10 + 3) \\pmod{25} = 13$\n$f(26) = (13 + 3) \\pmod{26} = 16$\n$f(27) = (16 + 3) \\pmod{27} = 19$\n$f(28) = (19 + 3) \\pmod{28} = 22$\n$f(29) = (22 + 3) \\pmod{29} = 25$\n$f(30) = (25 + 3) \\pmod{30} = 28$\n$f(31) = (28 + 3) \\pmod{31} = 0$\n$f(32) = (0 + 3) \\pmod{32} = 3$\n$f(33) = (3 + 3) \\pmod{33} = 6$\n$f(34) = (6 + 3) \\pmod{34} = 9$\n$f(35) = (9 + 3) \\pmod{35} = 12$\n$f(36) = (12 + 3) \\pmod{36} = 15$\n$f(37) = (15 + 3) \\pmod{37} = 18$\n$f(38) = (18 + 3) \\pmod{38} = 21$\n$f(39) = (21 + 3) \\pmod{39} = 24$\n$f(40) = (24 + 3) \\pmod{40} = 27$\n$f(41) = (27 + 3) \\pmod{41} = 30$\n\nThe 0-indexed position is 30. Converting to 1-indexed numbering, the survivor is $30 + 1 = 31$.",
+   "correct": true,
+   "seconds": 127.7,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "bf7e9b456aa2",
+   "seconds": 960.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The survivor is person 31.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The last person left is number 41.",
+     "correct": false
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The last remaining person is 31.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The initial guess of 37 for the last person remaining requires verification through simulation or a closed-form solution.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The last person standing is number 31.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The recursive formula is efficient but requires accurate step-by-step calculation to confirm the result for n=41.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The last person left is likely 31.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The survivor is person 31, based on iterative application of the Josephus recurrence $J(n) = (J(n-1) + k) \\pmod n$. Panda's calculation of answer 41 was flawed due to cumulative arithmetic errors in manual iteration. Koala verified the correct 0-indexed result of 30 for n=41, which maps to person 31.",
+   "draft_round1_correct": true,
+   "final": "The number of the last person left is 31.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "131776762c5f",
+   "seconds": 698.7,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The last person left is number 31.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The last person remaining is 31.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The survivor in a 41‑person circle with every 3rd person eliminated is person 31.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The last person remaining is person 31, as confirmed by the simulation of the Josephus algorithm.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The last person standing is at position 31.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The last person left in the circle is number 31.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The number of the last person left is 23.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The last person remaining is number 31.",
+   "draft_round1_correct": true,
+   "final": "The last person left is number 31.",
+   "final_correct": true
+  }
+ },
+ "hearts-given": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "To find the probability that both cards are hearts given that at least one is a heart, we use the formula for conditional probability: $P(A | B) = \\frac{P(A \\cap B)}{P(B)}$.\n\nLet $A$ be the event that both cards are hearts.\nLet $B$ be the event that at least one card is a heart.\n\n1.  **Calculate the total number of ways to draw 2 cards from 52:**\n    The total number of combinations is $\\binom{52}{2} = \\frac{52 \\times 51}{2} = 1326$.\n\n2.  **Calculate the number of outcomes for event $B$ (at least one heart):**\n    It is easier to calculate the complement: the number of ways to draw 2 cards where *neither* is a heart. There are 39 non-heart cards in the deck.\n    Number of ways to choose 2 non-hearts = $\\binom{39}{2} = \\frac{39 \\times 38}{2} = 741$.\n    Therefore, the number of ways to have at least one heart is:\n    $1326 - 741 = 585$.\n\n3.  **Calculate the number of outcomes for event $A$ (both hearts):**\n    There are 13 hearts in the deck. The number of ways to choose 2 hearts is $\\binom{13}{2} = \\frac{13 \\times 12}{2} = 78$.\n    Note that if both cards are hearts, it satisfies the condition \"at least one is a heart,\" so $A \\cap B = A$.\n\n4.  **Calculate the conditional probability:**\n    $$P(A | B) = \\frac{\\text{Number of ways both are hearts}}{\\text{Number of ways at least one is a heart}} = \\frac{78}{585}$$\n\n5.  **Simplify the fraction:**\n    Both numbers are divisible by 39 (or stepwise by 3 and then 13).\n    $78 \\div 39 = 2$\n    $585 \\div 39 = 15$\n    \n    The simplified fraction is $\\frac{2}{15}$.\n\nANSWER: 2/15",
+   "correct": true,
+   "seconds": 79.6,
+   "retried": false
+  }
+ },
+ "coupon-die": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 14.70\n\nThis is a classic \"Coupon Collector's Problem\" where $n=6$. The expected number of rolls $E$ is given by the sum of the expected number of rolls to get each new face, starting from 0 faces collected.\n\nWhen $k$ distinct faces have already been seen, the probability of rolling a new face is $p_k = \\frac{6-k}{6}$. The number of additional rolls needed to get the next new face follows a geometric distribution with mean $\\frac{1}{p_k} = \\frac{6}{6-k}$.\n\nWe sum these expectations for $k = 0$ to $5$:\n$$ E = \\sum_{k=0}^{5} \\frac{6}{6-k} = \\frac{6}{6} + \\frac{6}{5} + \\frac{6}{4} + \\frac{6}{3} + \\frac{6}{2} + \\frac{6}{1} $$\n$$ E = 1 + 1.2 + 1.5 + 2 + 3 + 6 $$\n$$ E = 14.7 $$\n\nAs a fraction, this is $147/10$. As a decimal to two places, it is $14.70$.",
+   "correct": true,
+   "seconds": 128.7,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "fa79beadf7f1",
+   "seconds": 647.3,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The exact expected number of rolls is 147/10 (14.70), derived from summing the geometric expectations for each new face in the coupon collector problem.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The expected number of rolls is exactly 147/10 = 14.70, obtained by the standard coupon-collector formula 6·H₆.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The expected number of rolls is 147/10 (14.70).",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The expected number of rolls to see all six faces is approximately 14.58.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The expected number of rolls is \\( \\frac{91}{6} \\approx 15.17 \\).",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The expected number of rolls is 14.7 (147/10).",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The expected number is 14.7, calculated as the sum of expected rolls for each stage in the coupon collector problem.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The expected number of rolls until every face has appeared at least once is approximately 15.10.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The expected number of rolls is 147/10 (14.70).",
+   "draft_round1_correct": true,
+   "final": "The expected number of rolls is exactly 147/10 (or 14.70), derived from the coupon collector's problem formula for a six-sided die.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "4067927360b8",
+   "seconds": 39.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "14.7",
+   "final_correct": true
+  }
+ },
+ "four-doors": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 3/4\n\nHere is the step-by-step reasoning:\n\n1.  **Initial Probability**: When you first pick a door out of 4, the probability that you picked the car is $1/4$, and the probability that the car is behind one of the other three doors is $3/4$.\n2.  **Host's Action**: The host knows where the car is and opens 2 of the remaining doors to reveal goats. This action does not change the initial probabilities assigned to your original choice versus the group of unchosen doors.\n3.  **Conditional Probability**: Since the host always reveals goats, he effectively concentrates the $3/4$ probability from the group of three unchosen doors into the single remaining unopened door among them.\n    *   If your initial pick was the car (probability $1/4$), switching loses.\n    *   If your initial pick was a goat (probability $3/4$), the car is in the other group. The host eliminates two goats, leaving the car behind the only remaining door. Switching wins.\n4.  **Conclusion**: Therefore, by switching, you win if your initial choice was wrong. The probability of winning by switching is $3/4$.",
+   "correct": true,
+   "seconds": 132.3,
+   "retried": true
+  }
+ },
+ "tuesday-boy": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 13/27\n\nTo find the probability, we analyze the sample space of all possible combinations of gender and birth day for two children. Each child has $2 \\text{ (genders)} \\times 7 \\text{ (days)} = 14$ equally likely possibilities. The total number of outcomes for the family is $14 \\times 14 = 196$.\n\nWe are looking for the conditional probability $P(\\text{Both Boys} | \\text{At least one Boy-Tuesday})$.\n\n1.  **Calculate the size of the condition (Denominator):**\n    The condition is \"at least one child is a boy born on a Tuesday.\"\n    *   Outcomes where Child 1 is a Boy-Tuesday: $1 \\times 14 = 14$.\n    *   Outcomes where Child 2 is a Boy-Tuesday: $14 \\times 1 = 14$.\n    *   The outcome where both are Boys-Tuesday is counted in both groups, so we subtract it once.\n    *   Total outcomes satisfying the condition = $14 + 14 - 1 = 27$.\n\n2.  **Calculate the size of the favorable event (Numerator):**\n    We need the number of outcomes where *both* children are boys AND at least one is a boy born on a Tuesday.\n    *   Total outcomes where both children are boys: $7 \\text{ days} \\times 7 \\text{ days} = 49$.\n    *   From these, we must exclude cases where neither child was born on a Tuesday (i.e., both born on Mon, Wed-Sun). There are 6 such days.\n    *   Outcomes where both are boys but neither is born on Tuesday: $6 \\times 6 = 36$.\n    *   Favorable outcomes = $49 - 36 = 13$.\n\nThe probability is the ratio of favorable outcomes to condition-satisfying outcomes: **13/27**.",
+   "correct": true,
+   "seconds": 76.6,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "e5078725cfbc",
+   "seconds": 638.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The probability is exactly 13/27 based on symmetric sample space enumeration under the stated conditions.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "Under the standard \"at-least-one\" logical-constraint reading, the probability is 13/27.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability that both children are boys, given at least one is a boy born on a Tuesday, is 13/27.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The probability that both children are boys is likely not 1/3, and requires closer examination of the Tuesday birth condition.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability that both children are boys is \\( \\frac{13}{27} \\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The probability that both children are boys, given at least one is a boy born on Tuesday, is 13/27.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The probability that both children are boys is 13/27.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The probability that both children are boys, given at least one is a boy born on Tuesday, is 13/27.",
+   "draft_round1_correct": true,
+   "final": "The probability that both children are boys is 13/27.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "f566b69107e5",
+   "seconds": 855.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The exact probability is 13/27.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "13/27 under the standard \"at least one is a boy born Tuesday\" conditioning, but the answer is protocol-dependent and would be 1/3 if the parent selected a boy first and then reported his birthday.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability that both children are boys, given that at least one is a boy born on Tuesday, is \\(13/27\\).",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The probability that both children are boys, given at least one is a boy born on Tuesday, is likely greater than 1/4, but a careful enumeration of possibilities is needed to confirm.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability that both children are boys is \\(\\frac{13}{27}\\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The probability that both children are boys, given at least one is a boy born on Tuesday, is 13/27.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The probability that both children are boys is 1/4.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The probability that both children are boys, given at least one is a boy born on Tuesday, is 13/27.",
+   "draft_round1_correct": true,
+   "final": "The probability that both children are boys is 13/27.",
+   "final_correct": true
+  }
+ },
+ "birthday-30": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 0.706\n\nTo find the probability that at least two people share a birthday, it is easier to first calculate the probability that **no one** shares a birthday (i.e., everyone has a unique birthday) and subtract that result from 1.\n\n1.  The first person can have any birthday ($365/365$).\n2.  The second person must have a different birthday than the first ($364/365$).\n3.  The third person must have a different birthday than the first two ($363/365$).\n4.  This pattern continues until the 30th person, who must have a birthday different from the previous 29 people ($336/365$).\n\nThe probability that all 30 birthdays are unique is:\n$$ P(\\text{unique}) = \\frac{365}{365} \\times \\frac{364}{365} \\times \\frac{363}{365} \\times \\dots \\times \\frac{336}{365} \\approx 0.2937 $$\n\nThe probability that at least two people share a birthday is the complement:\n$$ P(\\text{match}) = 1 - P(\\text{unique}) = 1 - 0.2937 = 0.7063 $$\n\nRounding to three decimal places, we get **0.706**.",
+   "correct": true,
+   "seconds": 66.8,
+   "retried": false
+  }
+ },
+ "three-dice-10": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 27/216\n\nTo find the probability that the sum of three fair six-sided dice is exactly 10, we first determine the total number of possible outcomes. Since each die has 6 faces, the total number of outcomes is $6 \\times 6 \\times 6 = 216$.\n\nNext, we count the number of favorable outcomes where the sum is 10. Let the values of the three dice be $d_1, d_2, d_3$, where $1 \\le d_i \\le 6$. We need to find the number of integer solutions to $d_1 + d_2 + d_3 = 10$ subject to these constraints.\n\nWe can list the combinations systematically by fixing the value of the first die ($d_1$):\n\n1.  If $d_1 = 1$, then $d_2 + d_3 = 9$. The possible pairs $(d_2, d_3)$ are $(3,6), (4,5), (5,4), (6,3)$. (4 outcomes)\n2.  If $d_1 = 2$, then $d_2 + d_3 = 8$. The possible pairs are $(2,6), (3,5), (4,4), (5,3), (6,2)$. (5 outcomes)\n3.  If $d_1 = 3$, then $d_2 + d_3 = 7$. The possible pairs are $(1,6), (2,5), (3,4), (4,3), (5,2), (6,1)$. (6 outcomes)\n4.  If $d_1 = 4$, then $d_2 + d_3 = 6$. The possible pairs are $(1,5), (2,4), (3,3), (4,2), (5,1)$. Note that $(6,0)$ is invalid. (5 outcomes)\n5.  If $d_1 = 5$, then $d_2 + d_3 = 5$. The possible pairs are $(1,4), (2,3), (3,2), (4,1)$. Note that $(5,0)$ and $(6,-1)$ are invalid. (4 outcomes)\n6.  If $d_1 = 6$, then $d_2 + d_3 = 4$. The possible pairs are $(1,3), (2,2), (3,1)$. Note that $(4,0)$ is invalid. (3 outcomes)\n\nSumming these up: $4 + 5 + 6 + 5 + 4 + 3 = 27$ favorable outcomes.\n\nThe probability is the number of favorable outcomes divided by the total number of outcomes:\n$$ P(\\text{sum} = 10) = \\frac{27}{216} $$\n\nTo simplify the fraction, we divide both the numerator and the denominator by their greatest common divisor. Both numbers are divisible by 27:\n$$ 27 \\div 27 = 1 $$\n$$ 216 \\div 27 = 8 $$\n\nThus, the simplified probability is $\\frac{1}{8}$.",
+   "correct": true,
+   "seconds": 125.8,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "07680ace7cd5",
+   "seconds": 638.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The probability is exactly 1/8, confirmed by rigorous ordered enumeration and corrected for the standard combination-vs-permutation pitfall.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The probability is 1/8, derived from 27 favorable outcomes out of 216, reduced by GCD 27.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability is $\\frac18$.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The probability of rolling a sum of 10 with three dice is initially estimated as 27/216 (or 1/8), pending verification of my partition listing.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability that three six-sided dice sum to exactly 10 is \\(\\frac{1}{8}\\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The probability is 1/8.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The probability of rolling a sum of exactly 10 with three fair six-sided dice is 1/8.",
+   "draft_round1_correct": true,
+   "final": "The probability that three fair six-sided dice sum to exactly 10 is 1/8.",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "cc70c395b7b4",
+   "seconds": 102.4,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "1/8",
+   "final_correct": true
+  }
+ },
+ "march-2100": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: Monday\n\nTo determine the day of the week for 1 March 2100, we can calculate the number of days elapsed from a known reference date, such as 1 January 2000, which was a Saturday.\n\nFirst, we count the years from 2000 to 2099. There are 100 years in this period. A normal year has 365 days (which is $52 \\times 7 + 1$, so it shifts the day of the week by 1), and a leap year has 366 days (shifting the day by 2).\n\nLeap years occur every 4 years, except for century years not divisible by 400. The leap years between 2000 and 2099 are: 2000, 2004, 2008, ..., 2096.\n- 2000 is a leap year (divisible by 400).\n- The other leap years are 2004, 2008, ..., 2096. This is an arithmetic progression with first term 2004, last term 2096, and common difference 4. The number of terms is $\\frac{2096 - 2004}{4} + 1 = 24$.\n- So, there are $1 + 24 = 25$ leap years in the range 2000–2099.\n\nThe total shift in days for the 100-year period (from 1 Jan 2000 to 1 Jan 2100) is:\n$75 \\text{ normal years} \\times 1 + 25 \\text{ leap years} \\times 2 = 75 + 50 = 125$ days.\n$125 \\pmod 7 = 6$.\n\nSo, 1 January 2100 is $6$ days after Saturday.\nSaturday + 6 days = Friday.\n\nNow we need to get from 1 January 2100 to 1 March 2100.\n- January has 31 days. From 1 Jan to 1 Feb is 31 days.\n- 2100 is not a leap year because it is divisible by 100 but not by 400. So February 2100 has 28 days.\n- From 1 Feb to 1 March is 28 days.\n\nTotal days from 1 Jan 2100 to 1 March 2100 = $31 + 28 = 59$ days.\n$59 \\pmod 7 = 3$.\n\nAdding this shift to the day of 1 January 2100 (Friday):\nFriday + 3 days = Monday.\n\nTherefore, 1 March 2100 will be a Monday.",
+   "correct": true,
+   "seconds": 133.6,
+   "retried": true
+  }
+ },
+ "friday-13": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 17\n\nTo determine the number of Friday the 13ths between January 1, 2001, and December 31, 2030, we can track the day of the week for the 13th of each month.\n\nThe 13th of any month falls on a specific day of the week based on the cumulative days passed since a known reference point. A common method is to use Zeller's Congruence or simply count forward from a known date. Let's start with January 13, 2001.\nJanuary 1, 2001, was a Monday. Therefore, January 8 was a Monday, and **January 13, 2001, was a Saturday**.\n\nWe can calculate the day of the week for the 13th of subsequent months by adding the number of days in the preceding month modulo 7.\n- Jan 13 (Sat) -> Feb 13: +31 days. $31 \\equiv 3 \\pmod 7$. Sat + 3 = Tuesday.\n- Feb 13 (Tue) -> Mar 13: +28 days (2001 is not a leap year). $28 \\equiv 0 \\pmod 7$. Tue + 0 = Tuesday.\n- Mar 13 (Tue) -> Apr 13: +31 days. $31 \\equiv 3 \\pmod 7$. Tue + 3 = Friday. (**1**)\n- Apr 13 (Fri) -> May 13: +30 days. $30 \\equiv 2 \\pmod 7$. Fri + 2 = Sunday.\n- May 13 (Sun) -> Jun 13: +31 days. $31 \\equiv 3 \\pmod 7$. Sun + 3 = Wednesday.\n- Jun 13 (Wed) -> Jul 13: +30 days. $30 \\equiv 2 \\pmod 7$. Wed + 2 = Friday. (**2**)\n- Jul 13 (Fri) -> Aug 13: +31 days. $31 \\equiv 3 \\pmod 7$. Fri + 3 = Monday.\n- Aug 13 (Mon) -> Sep 13: +31 days. $31 \\equiv 3 \\pmod 7$. Mon + 3 = Thursday.\n- Sep 13 (Thu) -> Oct 13: +30 days. $30 \\equiv 2 \\pmod 7$. Thu + 2 = Saturday.\n- Oct 13 (Sat) -> Nov 13: +31 days. $31 \\equiv 3 \\pmod 7$. Sat + 3 = Tuesday.\n- Nov 13 (Tue) -> Dec 13: +30 days. $30 \\equiv 2 \\pmod 7$. Tue + 2 = Thursday.\n\nEnd of 2001: **2** Friday the 13ths.\n\nNow we continue into 2002.\n- Dec 13, 2001 (Thu) -> Jan 13, 2002: +31 days. $31 \\equiv 3 \\pmod 7$. Thu + 3 = Sunday.\n- Jan 13 (Sun) -> Feb 13: +31 days. $31 \\equiv 3 \\pmod 7$. Sun + 3 = Wednesday.\n- Feb 13 (Wed) -> Mar 13: +28 days. $28 \\equiv 0 \\pmod 7$. Wed + 0 = Wednesday.\n- Mar 13 (Wed) -> Apr 13: +31 days. $31 \\equiv 3 \\pmod 7$. Wed + 3 = Saturday.\n- Apr 13 (Sat) -> May 13: +30 days. $30 \\equiv 2 \\pmod 7$. Sat + 2 = Monday.\n- May 13 (Mon) -> Jun 13: +31 days. $31 \\equiv 3 \\pmod 7$. Mon + 3 = Thursday.\n- Jun 13 (Thu) -> Jul 13: +30 days. $30 \\equiv 2 \\pmod 7$. Thu + 2 = Saturday.\n- Jul 13 (Sat) -> Aug 13: +31 days. $31 \\equiv 3 \\pmod 7$. Sat + 3 = Tuesday.\n- Aug 13 (Tue) -> Sep 13: +31 days. $31 \\equiv 3 \\pmod 7$. Tue + 3 = Friday. (**3**)\n- Sep 13 (Fri) -> Oct 13: +30 days. $30 \\equiv 2 \\pmod 7$. Fri + 2 = Sunday.\n- Oct 13 (Sun) -> Nov 13: +31 days. $31 \\equiv 3 \\pmod 7$. Sun + 3 = Wednesday.\n- Nov 13 (Wed) -> Dec 13: +30 days. $30 \\equiv 2 \\pmod 7$. Wed + 2 = Friday. (**4**)\n\nEnd of 2002: **4** Friday the 13ths.\n\nThe pattern of days for the 13th repeats every 28 years in the Gregorian calendar, but we can just continue counting year by year or use the known cycle of shifts.\nShift from end of 2001 to end of 2002: 365 days $\\equiv 1 \\pmod 7$. So the day of the week for Jan 13 shifts forward by 1 each non-leap year, and by 2 each leap year (since Feb has 29 days).\n\nLet's list the day of the week for Jan 13 for each year starting from 2001:\n- 2001: Sat\n- 2002: Sun (+1)\n- 2003: Mon (+1)\n- 2004: Tue (+1) -> Leap year (Feb 29), so shift to next Jan is +2.\n- 2005: Thu (+2)\n- 2006: Fri (+1)\n- 2007: Sat (+1)\n- 2008: Sun (+1) -> Leap year, shift +2.\n- 2009: Tue (+2)\n- 2010: Wed (+1)\n- 2011: Thu (+1)\n- 2012: Fri (+1) -> Leap year, shift +2.\n- 2013: Sun (+2)\n- 2014: Mon (+1)\n- 2015: Tue (+1)\n- 2016: Wed (+1) -> Leap year, shift +2.\n- 2017: Fri (+2)\n- 2018: Sat (+1)\n- 2019: Sun (+1)\n- 2020: Mon (+1) -> Leap year, shift +2.\n- 2021: Wed (+2)\n- 2022: Thu (+1)\n- 2023: Fri (+1)\n- 2024: Sat (+1) -> Leap year, shift +2.\n- 2025: Mon (+2)\n- 2026: Tue (+1)\n- 2027: Wed (+1)\n- 2028: Thu (+1) -> Leap year, shift +2.\n- 2029: Sat (+2)\n- 2030: Sun (+1)\n\nNow we check which months in each year have the 13th on a Friday. We can use the standard \"Doomsday\" algorithm or a lookup table for the day of the week of the 13th based on the month and the year's starting day (Jan 13).\nActually, it is easier to just map the months for each Jan 13 day:\nIf Jan 13 is **Saturday** (2001): Months with Fri 13 are Mar, Nov. (Count: 2)\nIf Jan 13 is **Sunday** (2002): Months with Fri 13 are Feb, Aug. (Count: 2) -- Wait, let's re-verify the mapping.\n\nLet's create a table for \"Day of week of Jan 13\" -> \"Months where 13th is Friday\":\n- If Jan 13 is **Mon**: Apr, Jul\n- If Jan 13 is **Tue**: Jan, Oct\n- If Jan 13 is **Wed**: Jan, Apr, Jul\n- If Jan 13 is **Thu**: Apr, Sep\n- If Jan 13 is **Fri**: Jun\n- If Jan 13 is **Sat**: Feb, Mar, Nov\n- If Jan 13 is **Sun**: Aug, Dec\n\nLet's re-verify this mapping.\nStandard rule: The month codes for the day of the week of the 13th are:\nJan: 0 (if non-leap), 3 (if leap) -> shift relative to Jan 1? No, let's use the offset from Jan 13.\nOffset from Jan 13 to M-th 13:\nFeb: +31 = +3\nMar: +59 = +3 (non-leap), +4 (leap)\nApr: +90 = +6 (non-leap), +7=0 (leap)\nMay: +120 = +1 (non-leap), +2 (leap)\nJun: +151 = +4 (non-leap), +5 (leap)\nJul: +181 = +6 (non-leap), +0 (leap)\nAug: +212 = +2 (non-leap), +3 (leap)\nSep: +243 = +5 (non-leap), +6 (leap)\nOct: +273 = +0 (non-leap), +1 (leap)\nNov: +304 = +3 (non-leap), +4 (leap)\nDec: +334 = +5 (non-leap), +6 (leap)\n\nWe want $(Day(Jan 13) + Offset) \\equiv 5 \\pmod 7$ (where Mon=0, ..., Fri=5).\nSo $Offset \\equiv 5 - Day(Jan 13) \\pmod 7$.\n\nLet's apply this to each year:\n\n**2001**: Jan 13 = Sat (6). Need Offset $\\equiv 5-6 = -1 \\equiv 6$.\nNon-leap offsets equal to 6: Apr, Jul.\nCount: **2**.\n\n**2002**: Jan 13 = Sun (0). Need Offset $\\equiv 5-0 = 5$.\nNon-leap offsets equal to 5: Sep, Dec.\nWait, my previous manual count for 2002 said Feb and Aug? Let's re-check 2002 manually.\nJan 13 Sun.\nFeb 13: +3 -> Wed.\nMar 13: +0 -> Wed.\nApr 13: +3 -> Sat.\nMay 13: +2 -> Mon.\nJun 13: +4 -> Fri. (**1**)\nJul 13: +6 -> Thu.\nAug 13: +2 -> Sun.\nSep 13: +5 -> Fri. (**2**)\nOct 13: +0 -> Wed.\nNov 13: +3 -> Sat.\nDec 13: +5 -> Mon.\nSo for 2002, it is Jun and Sep. Count: **2**.\n\n**2003**: Jan 13 = Mon (1). Need Offset $\\equiv 5-1 = 4$.\nNon-leap offsets equal to 4: Feb, Jun.\nCount: **2**.\n\n**2004**: Jan 13 = Tue (2). Leap year. Need Offset $\\equiv 5-2 = 3$.\nLeap offsets equal to 3: Feb, Mar, Nov.\nLet's verify 2004 (Leap):\nJan 13 Tue.\nFeb 13 (+3) -> Fri. (**1**)\nMar 13 (+4) -> Sat.\nApr 13 (+0) -> Tue.\nMay 13 (+2) -> Thu.\nJun 13 (+5) -> Sun.\nJul 13 (+0) -> Tue.\nAug 13 (+3) -> Fri. (**2**)\nSep 13 (+6) -> Mon.\nOct 13 (+1) -> Wed.\nNov 13 (+4) -> Sat.\nDec 13 (+6) -> Mon.\nWait, my offset table for leap years:\nFeb: +3. Correct.\nMar: +4. Correct.\nApr: +0. Correct.\nMay: +2. Correct.\nJun: +5. Correct.\nJul: +0. Correct.\nAug: +3. Correct.\nSep: +6. Correct.\nOct: +1. Correct.\nNov: +4. Correct.\nDec: +6. Correct.\nOffsets equal to 3 are Feb and Aug.\nCount: **2**.\n\n**2005**: Jan 13 = Thu (4). Need Offset $\\equiv 5-4 = 1$.\nNon-leap offsets equal to 1: May.\nLet's verify 2005:\nJan 13 Thu.\nFeb (+3) -> Sun.\nMar (+0) -> Sun.\nApr (+3) -> Wed.\nMay (+2) -> Sat. Wait, $4+2=6$ (Sat). I need Fri (5).\nLet's re-calculate offsets for non-leap:\nJan 13 = Day D.\nFeb 13 = D+3\nMar 13 = D+3\nApr 13 = D+6\nMay 13 = D+1 (Wait, $31+28+31=90$. $90 \\pmod 7 = 6$. So May is D+6? No.\nJan 1 to Feb 13 is 43 days? No.\nLet's stick to the cumulative sum from Jan 13.\nDays in months:\nJan: 31\nFeb: 28/29\nMar: 31\nApr: 30\nMay: 31\nJun: 30\nJul: 31\nAug: 31\nSep: 30\nOct: 31\nNov: 30\n\nOffset for M-th 13 from Jan 13:\nFeb: 31 % 7 = 3\nMar: (31+28) % 7 = 59 % 7 = 3 (Non-leap), (31+29)%7=60%7=4 (Leap)\nApr: (59+31)%7 = 90%7 = 6 (Non-leap), (60+31)%7=91%7=0 (Leap)\nMay: (90+30)%7 = 120%7 = 1 (Non-leap), (91+30)%7=121%7=2 (Leap)\nJun: (120+31)%7 = 151%7 = 4 (Non-leap), (121+31)%7=152%7=5 (Leap)\nJul: (151+30)%7 = 181%7 = 6 (Non-leap), (152+31)%7=183%7=1 (Wait, Jul offset from Jan? No, cumulative.\nLet's restart the offset calculation carefully.\nOffset = (Days in months prior to M) % 7.\nFeb: 31 -> 3\nMar: 31+28=59 -> 3 (NL), 31+29=60 -> 4 (L)\nApr: 59+31=90 -> 6 (NL), 60+31=91 -> 0 (L)\nMay: 90+30=120 -> 1 (NL), 91+30=121 -> 2 (L)\nJun: 120+31=151 -> 4 (NL), 121+31=152 -> 5 (L)\nJul: 151+30=181 -> 6 (NL), 152+31=183 -> 1 (L) -- Wait, July has 31 days. The offset is for the *start* of the month? No, we want the day of the 13th.\nThe day of the 13th of Month M is $(Day(Jan 13) + \\text{days between Jan 13 and M-th 13}) \\pmod 7$.\nDays between Jan 13 and Feb 13 = 31.\nDays between Jan 13 and Mar 13 = 31+28=59 (NL).\nDays between Jan 13 and Apr 13 = 59+31=90 (NL).\nDays between Jan 13 and May 13 = 90+30=120 (NL).\nDays between Jan 13 and Jun 13 = 120+31=151 (NL).\nDays between Jan 13 and Jul 13 = 151+30=181 (NL).\nDays between Jan 13 and Aug 13 = 181+31=212 (NL).\nDays between Jan 13 and Sep 13 = 212+31=243 (NL).\nDays between Jan 13 and Oct 13 = 243+30=273 (NL).\nDays between Jan 13 and Nov 13 = 273+31=304 (NL).\nDays between Jan 13 and Dec 13 = 304+30=334 (NL).\n\nModulo 7:\nFeb: 3\nMar: 3 (NL), 4 (L)\nApr: 6 (NL), 0 (L)\nMay: 1 (NL), 2 (L)\nJun: 4 (NL), 5 (L)\nJul: 6 (NL), 1 (L) -- Wait. $181 = 7*25 + 6$. Correct.\nAug: $212 = 7*30 + 2$. Offset 2.\nSep: $243 = 7*34 + 5$. Offset 5.\nOct: $273 = 7*39 + 0$. Offset 0.\nNov: $304 = 7*43 + 3$. Offset 3.\nDec: $334 = 7*47 + 5$. Offset 5.\n\nLet's re-verify the \"Friday\" condition: $(D + \\text{Offset}) \\% 7 == 5$ (Fri).\nSo $\\text{Offset} == (5 - D) \\% 7$.\n\n**2001**: D=6 (Sat). Target Offset = $(5-6)%7 = 6$.\nOffsets equal to 6: Apr, Jul.\nCount: **2**.\n\n**2002**: D=0 (Sun). Target Offset = 5.\nNon-leap offsets equal to 5: Sep, Dec.\nCount: **2**.\n\n**2003**: D=1 (Mon). Target Offset = 4.\nNon-leap offsets equal to 4: Feb, Jun.\nCount: **2**.\n\n**2004**: D=2 (Tue). Leap. Target Offset = $(5-2)%7 = 3$.\nLeap offsets equal to 3: Feb (3), Mar (4-no), Apr (0-no), May (2-no), Jun (5-no), Jul (1-no), Aug (3-yes), Sep (6-no), Oct (1-no), Nov (4-no), Dec (6-no).\nWait, let's list Leap Offsets:\nFeb: 3\nMar: 4\nApr: 0\nMay: 2\nJun: 5\nJul: 1\nAug: 2 (Wait. $212+31=243$? No. Aug offset is days from Jan 13 to Aug 13.\nJan 13 to Feb 13: 31\nFeb 13 to Mar 13: 29 (Leap) -> Cum: 60 -> 4\nMar 13 to Apr 13: 31 -> Cum: 91 -> 0\nApr 13 to May 13: 30 -> Cum: 121 -> 2\nMay 13 to Jun 13: 31 -> Cum: 152 -> 5\nJun 13 to Jul 13: 30 -> Cum: 182 -> 0 (Wait. $152+30=182$. $182/7=26$. Remainder 0.)\nMy previous calculation for Jul offset was 1. Let's re-calculate $152+30$.\n$152 = 7*21 + 5$.\n$152+30 = 182$. $182 = 7*26 + 0$. So Jul Offset is 0.\nJul 13 to Aug 13: 31 -> Cum: $182+31=213$. $213 = 7*30 + 3$. Offset 3.\nAug 13 to Sep 13: 31 -> Cum: $213+31=244$. $244 = 7*34 + 6$. Offset 6.\nSep 13 to Oct 13: 30 -> Cum: $244+30=274$. $274 = 7*39 + 1$. Offset 1.\nOct 13 to Nov 13: 31 -> Cum: $274+31=305$. $305 = 7*43 + 4$. Offset 4.\nNov 13 to Dec 13: 30 -> Cum: $305+30=335$. $335 = 7*47 + 6$. Offset 6.\n\nLet's re-list Leap Offsets carefully:\nFeb: 3\nMar: 4\nApr: 0\nMay: 2\nJun: 5\nJul: 0\nAug: 3\nSep: 6\nOct: 1\nNov: 4\nDec: 6\n\nTarget for 2004 (D=2) is Offset 3.\nOffsets equal to 3: Feb, Aug.\nCount: **2**.\n\n**2005**: D=4 (Thu). Target Offset = $(5-4)%7 = 1$.\nNon-leap offsets:\nFeb: 3\nMar: 3\nApr: 6\nMay: 1\nJun: 4\nJul: 6\nAug: 2\nSep: 5\nOct: 0\nNov: 3\nDec: 5\n\nOffsets equal to 1: May.\nCount: **1**.\n\n**2006**: D=5 (Fri). Target Offset = $(5-5)%7 = 0$.\nNon-leap offsets equal to 0: Oct.\nCount: **1**.\n\n**2007**: D=6 (Sat). Target Offset = $(5-6)%7 = 6$.\nNon-leap offsets equal to 6: Apr, Jul.\nCount: **2**.\n\n**2008**: D=1 (Sun? No. 2007 ended with Dec 13 Mon. Jan 1 2008 is Wed. Jan 13 2008 is Mon?\nLet's check the shift from 2007 to 2008.\n2007 is non-leap. Shift +1.\n2007 Jan 13 was Sat (6).\n2008 Jan 13 is Sun (0)? No. $6+1=7 \\equiv 0$. Yes, Sun.\nWait, my previous list said 2008 Jan 13 is Sun.\nLet's re-verify the day progression.\n2001: Sat (6)\n2002: Sun (0) (+1)\n2003: Mon (1) (+1)\n2004: Tue (2) (+1) -> Leap year follows.\n2005: Thu (4) (+2)\n2006: Fri (5) (+1)\n2007: Sat (6) (+1)\n2008: Sun (0) (+1) -> Leap year follows.\n2009: Tue (2) (+2)\n2010: Wed (3) (+1)\n2011: Thu (4) (+1)\n2012: Fri (5) (+1) -> Leap year follows.\n2013: Sun (0) (+2)\n2014: Mon (1) (+1)\n2015: Tue (2) (+1)\n2016: Wed (3) (+1) -> Leap year follows.\n2017: Fri (5) (+2)\n2018: Sat (6) (+1)\n2019: Sun (0) (+1)\n2020: Mon (1) (+1) -> Leap year follows.\n2021: Wed (3) (+2)\n2022: Thu (4) (+1)\n2023: Fri (5) (+1)\n2024: Sat (6) (+1) -> Leap year follows.\n2025: Mon (1) (+2)\n2026: Tue (2) (+1)\n2027: Wed (3) (+1)\n2028: Thu (4) (+1) -> Leap year follows.\n2029: Sat (6) (+2)\n2030: Sun (0) (+1)\n\nOkay, let's use this D list and the offsets.\n\n**2005**: D=4. Target 1. Offsets: May (1). Count: **1**.\n**2006**: D=5. Target 0. Offsets: Oct (0). Count: **1**.\n**2007**: D=6. Target 6. Offsets: Apr (6), Jul (6). Count: **2**.\n**2008**: D=0. Leap. Target 5.\nLeap Offsets: Feb(3), Mar(4), Apr(0), May(2), Jun(5), Jul(0), Aug(3), Sep(6), Oct(1), Nov(4), Dec(6).\nOffsets equal to 5: Jun.\nCount: **1**.\n\n**2009**: D=2. Target 3.\nNon-leap Offsets: Feb(3), Mar(3), Apr(6), May(1), Jun(4), Jul(6), Aug(2), Sep(5), Oct(0), Nov(3), Dec(5).\nOffsets equal to 3: Feb, Mar, Nov.\nCount: **3**.\n\n**2010**: D=3. Target 2.\nNon-leap Offsets equal to 2: Aug.\nCount: **1**.\n\n**2011**: D=4. Target 1.\nNon-leap Offsets equal to 1: May.\nCount: **1**.\n\n**2012**: D=5. Leap. Target 0.\nLeap Offsets equal to 0: Apr, Jul.\nCount: **2**.\n\n**2013**: D=0. Target 5.\nNon-leap Offsets equal to 5: Sep, Dec.\nCount: **2**.\n\n**2014**: D=1. Target 4.\nNon-leap Offsets equal to 4: Feb, Jun.\nCount: **2**.\n\n**2015**: D=2. Target 3.\nNon-leap Offsets equal to 3: Feb, Mar, Nov.\nCount: **3**.\n\n**2016**: D=3. Leap. Target 2.\nLeap Offsets equal to 2: May, Aug.\nCount: **2**.\n\n**2017**: D=5. Target 0.\nNon-leap Offsets equal to 0: Oct.\nCount: **1**.\n\n**2018**: D=6. Target 6.\nNon-leap Offsets equal to 6: Apr, Jul.\nCount: **2**.\n\n**2019**: D=0. Target 5.\nNon-leap Offsets equal to 5: Sep, Dec.\nCount: **2**.\n\n**2020**: D=1. Leap. Target 4.\nLeap Offsets equal to 4: Mar, Nov.\nCount: **2**.\n\n**2021**: D=3. Target 2.\nNon-leap Offsets equal to 2: Aug.\nCount: **1**.\n\n**2022**: D=4. Target 1.\nNon-leap Offsets equal to 1: May.\nCount: **1**.\n\n**2023**: D=5. Target 0.\nNon-leap Offsets equal to 0: Oct.\nCount: **1**.\n\n**2024**: D=6. Leap. Target 6.\nLeap Offsets equal to 6: Sep, Dec.\nCount: **2**.\n\n**2025**: D=1. Target 4.\nNon-leap Offsets equal to 4: Feb, Jun.\nCount: **2**.\n\n**2026**: D=2. Target 3.\nNon-leap Offsets equal to 3: Feb, Mar, Nov.\nCount: **3**.\n\n**2027**: D=3. Target 2.\nNon-leap Offsets equal to 2: Aug.\nCount: **1**.\n\n**2028**: D=4. Leap. Target 1.\nLeap Offsets equal to 1: Oct.\nCount: **1**.\n\n**2029**: D=6. Target 6.\nNon-leap Offsets equal to 6: Apr, Jul.\nCount: **2**.\n\n**2030**: D=0. Target 5.\nNon-leap Offsets equal to 5: Sep, Dec.\nCount: **2**.\n\nSumming the counts:\n2001: 2\n2002: 2\n2003: 2\n2004: 2\n2005: 1\n2006: 1\n2007: 2\n2008: 1\n2009: 3\n2010: 1\n2011: 1\n2012: 2\n2013: 2\n2014: 2\n2015: 3\n2016: 2\n2017: 1\n2018: 2\n2019: 2\n2020: 2\n2021: 1\n2022: 1\n2023: 1\n2024: 2\n2025: 2\n2026: 3\n2027: 1\n2028: 1\n2029: 2\n2030: 2\n\nTotal = $2+2+2+2+1+1+2+1+3+1+1+2+2+2+3+2+1+2+2+2+1+1+1+2+2+3+1+1+2+2$\nGroup sums:\n01-04: 8\n05-08: $1+1+2+1 = 5$\n09-12: $3+1+1+2 = 7$\n13-16: $2+2+3+2 = 9$\n17-20: $1+2+2+2 = 7$\n21-24: $1+1+1+2 = 5$\n25-28: $2+3+1+1 = 7$\n29-30: $2+2 = 4$\n\nTotal = $8 + 5 + 7 + 9 + 7 + 5 + 7 + 4 = 52$.\n\nWait, let me double check the sum.\n8+5=13\n13+7=20\n20+9=29\n29+7=36\n36+5=41\n41+7=48\n48+4=52.\n\nLet's do a sanity check on a known period. 2009 had 3 (Feb, Mar, Nov). 2015 had 3 (Feb, Mar, Nov). 2026 had 3 (Feb, Mar, Nov).\nThe pattern of 3 Friday the 13ths occurs when Jan 13 is Tuesday in a non-leap year.\nYears with Jan 13 = Tue: 2004 (Leap), 2009 (Non-Leap), 2015 (Non-Leap), 2026 (Non-Leap).\nSo 2009, 2015, 2026 have 3. Correct.\n\nYears with Jan 13 = Mon: 2003, 2014, 2025.\nTarget Offset 4. Non-leap offsets 4: Feb, Jun. Count 2. Correct.\n\nYears with Jan 13 = Sun: 2002, 2008 (Leap), 2013, 2019, 2030.\nTarget Offset 5.\nNon-leap (2002, 2013, 2019, 2030): Offsets 5 are Sep, Dec. Count 2.\nLeap (2008): Offsets 5 is Jun. Count 1. Correct.\n\nYears with Jan 13 = Sat: 2001, 2007, 2018, 2024 (Leap), 2029.\nTarget Offset 6.\nNon-leap (2001, 2007, 2018, 2029): Offsets 6 are Apr, Jul. Count 2.\nLeap (2024): Offsets 6 are Sep, Dec. Count 2. Correct.\n\nYears with Jan 13 = Fri: 2006, 2017, 2023.\nTarget Offset 0. Non-leap offsets 0: Oct. Count 1. Correct.\n\nYears with Jan 13 = Thu: 2005, 2011,",
+   "correct": false,
+   "seconds": 230.7,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "1ed942289f9f",
+   "seconds": 1430.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "",
+     "correct": false
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The correct number of Friday‑the‑13ths in the inclusive period is 57.",
+     "correct": false
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "A careful check of each date from 2001 to 2030 is required for a fully accurate count of Friday the 13ths.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "There are 72 Friday the 13ths from 1 January 2001 to 31 December 2030.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The exact count is 69, but verification with a calendar tool is recommended to confirm years with multiple Friday the 13ths.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There are approximately 51 Friday the 13ths from 1 January 2001 to 31 December 2030.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The count of Friday the 13ths from Jan 1, 2001, to Dec 31, 2030 is 57. This figure arises from summing the occurrences per year, accounting for leap years and start-day shifts. Previous estimates ranged widely (43–72) due to calculation errors or incomplete checks. Koala’s verification of monthly first-days being Sundays provided the most robust methodological basis for this count.",
+   "draft_round1_correct": false,
+   "final": "There are 51 Friday the 13ths between January 1, 2001, and December 31, 2030.",
+   "final_correct": false
+  },
+  "quorum_python": {
+   "id": "38c0e61a8c8a",
+   "seconds": 819.0,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "",
+     "correct": false
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "There are 52 Friday the 13ths in the period from 2001 to 2030 inclusive.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The answer 43 is the correct count, given the inclusive date range.",
+     "correct": false
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "I believe there are approximately 7 Friday the 13ths between 2001 and 2030, but a full calendar check is needed to confirm the exact number.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "There are 171 Friday the 13ths from 1 January 2001 to 31 December 2030.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "There are 52 Friday the 13ths from 1 January 2001 to 31 December 2030, inclusive.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There are 66 Friday the 13ths from 1 January 2001 to 31 December 2030.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "There are 52 Friday the 13ths between 1 January 2001 and 31 December 2030, inclusive.",
+   "draft_round1_correct": true,
+   "final": "There are 52 Friday the 13ths between 1 January 2001 and 31 December 2030.",
+   "final_correct": true
+  }
+ },
+ "days-between": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 386\n\nTo calculate the number of days from 10 February 2024 to 1 March 2025 (inclusive), we can break the period down into segments:\n\n1.  **February 2024:** Since 2024 is a leap year, February has 29 days. Counting from the 10th to the 29th inclusive: $29 - 10 + 1 = 20$ days.\n2.  **March 2024 – December 2024:** These are full months. The total number of days is 306 (31+30+31+30+31+31+30+31+30+31).\n3.  **January 2025:** A full month with 31 days.\n4.  **February 2025:** Since 2025 is not a leap year, February has 28 days.\n5.  **March 2025:** We count just the 1st of the month: 1 day.\n\n**Total Calculation:**\n$20 \\text{ (Feb 2024)} + 306 \\text{ (Mar-Dec 2024)} + 31 \\text{ (Jan 2025)} + 28 \\text{ (Feb 2025)} + 1 \\text{ (Mar 1, 2025)} = 386$ days.",
+   "correct": true,
+   "seconds": 113.4,
+   "retried": false
+  }
+ },
+ "clock-738": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 1\n\nTo find the smaller angle between the hour and minute hands at 7:38, we calculate the position of each hand in degrees relative to the 12 o'clock position (0°).\n\n1.  **Minute Hand Position:** The minute hand moves $6^\\circ$ per minute ($360^\\circ / 60 \\text{ minutes}$). At 38 minutes past the hour:\n    $$38 \\times 6^\\circ = 228^\\circ$$\n\n2.  **Hour Hand Position:** The hour hand moves $0.5^\\circ$ per minute ($360^\\circ / 720 \\text{ minutes}$) or $30^\\circ$ per hour. At 7:00, the hour hand is at $7 \\times 30^\\circ = 210^\\circ$. In the next 38 minutes, it moves an additional:\n    $$38 \\times 0.5^\\circ = 19^\\circ$$\n    So, the total position of the hour hand is:\n    $$210^\\circ + 19^\\circ = 229^\\circ$$\n\n3.  **Angle Difference:** The difference between the two positions is:\n    $$|229^\\circ - 228^\\circ| = 1^\\circ$$\n\nSince $1^\\circ$ is less than $180^\\circ$, it is the smaller angle.",
+   "correct": true,
+   "seconds": 88.3,
+   "retried": false
+  },
+  "quorum_merged": {
+   "id": "662c99d1901c",
+   "seconds": 39.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "1",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "9b253503b23e",
+   "seconds": 42.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "1",
+   "final_correct": true
+  }
+ },
+ "pipes": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 4.80\n\n**Explanation:**\n\n1.  **Determine Rates:**\n    *   Pipe A fills at a rate of $1/6$ tank per hour.\n    *   Pipe B fills at a rate of $1/9$ tank per hour.\n    *   The drain empties at a rate of $1/12$ tank per hour.\n\n2.  **Phase 1: First Hour (A and B open, Drain closed):**\n    *   Combined rate of A and B = $\\frac{1}{6} + \\frac{1}{9}$.\n    *   To add these fractions, find a common denominator (18): $\\frac{3}{18} + \\frac{2}{18} = \\frac{5}{18}$ tank per hour.\n    *   In the first hour, the amount filled is $1 \\times \\frac{5}{18} = \\frac{5}{18}$ of the tank.\n    *   Remaining volume to fill = $1 - \\frac{5}{18} = \\frac{13}{18}$ of the tank.\n\n3.  **Phase 2: After the first hour (A, B, and Drain open):**\n    *   The drain is now opened. The net rate is the sum of the inlet rates minus the drain rate.\n    *   Net Rate = $(\\frac{1}{6} + \\frac{1}{9}) - \\frac{1}{12}$.\n    *   Using a common denominator of 36:\n        *   $\\frac{1}{6} = \\frac{6}{36}$\n        *   $\\frac{1}{9} = \\frac{4}{36}$\n        *   $\\frac{1}{12} = \\frac{3}{36}$\n    *   Net Rate = $\\frac{6}{36} + \\frac{4}{36} - \\frac{3}{36} = \\frac{7}{36}$ tank per hour.\n\n4.  **Calculate Time for Phase 2:**\n    *   We need to fill the remaining $\\frac{13}{18}$ of the tank at a rate of $\\frac{7}{36}$ tanks/hour.\n    *   Time = $\\frac{\\text{Remaining Volume}}{\\text{Net Rate}} = \\frac{13/18}{7/36}$.\n    *   Time = $\\frac{13}{18} \\times \\frac{36}{7} = \\frac{13 \\times 2}{7} = \\frac{26}{7}$ hours.\n\n5.  **Total Time:**\n    *   Total Time = Time for Phase 1 + Time for Phase 2\n    *   Total Time = $1 + \\frac{26}{7} = \\frac{7}{7} + \\frac{26}{7} = \\frac{33}{7}$ hours.\n\n6.  **Convert to Decimal:**\n    *   $\\frac{33}{7} \\approx 4.71428...$\n    *   Rounding to two decimal places: $4.71$.\n\nWait, let me double check the rounding instruction \"decimal to 2 places\".\n$33 / 7 = 4.7142857...$\nRounding to 2 decimal places gives **4.71**.\n\nLet me re-read the prompt carefully. \"Give an exact fraction or a decimal to 2 places.\"\n\nLet's re-verify the calculation.\nRate A+B = $5/18$.\nAfter 1 hour, filled = $5/18$. Remaining = $13/18$.\nNet rate with drain = $7/36$.\nTime needed = $(13/18) / (7/36) = (13/18) * (36/7) = 13 * 2 / 7 = 26/7$.\nTotal time = $1 + 26/7 = 33/7$.\n\n$33 \\div 7 = 4.71428...$\nRounded to two decimal places: **4.71**.\n\nANSWER: 4.71",
+   "correct": false,
+   "seconds": 136.8,
+   "retried": true
+  }
+ },
+ "avg-speed": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 48.00\n\nTo find the average speed, we use the formula:\n$$ \\text{Average Speed} = \\frac{\\text{Total Distance}}{\\text{Total Time}} $$\n\n**Step 1: Calculate the total distance.**\nThe car travels three segments:\n1. 60 km\n2. 60 km\n3. 30 km\n$$ \\text{Total Distance} = 60 + 60 + 30 = 150 \\text{ km} $$\n\n**Step 2: Calculate the time taken for each segment.**\nTime is calculated as $\\text{Time} = \\frac{\\text{Distance}}{\\text{Speed}}$.\n\n1.  First segment: $t_1 = \\frac{60}{30} = 2$ hours\n2.  Second segment: $t_2 = \\frac{60}{90} = \\frac{2}{3}$ hours\n3.  Third segment: $t_3 = \\frac{30}{60} = 0.5$ hours (or $\\frac{1}{2}$ hour)\n\n**Step 3: Calculate the total time.**\n$$ \\text{Total Time} = t_1 + t_2 + t_3 = 2 + \\frac{2}{3} + \\frac{1}{2} $$\n\nTo add these fractions, find a common denominator (which is 6):\n$$ 2 = \\frac{12}{6} $$\n$$ \\frac{2}{3} = \\frac{4}{6} $$\n$$ \\frac{1}{2} = \\frac{3}{6} $$\n\n$$ \\text{Total Time} = \\frac{12 + 4 + 3}{6} = \\frac{19}{6} \\text{ hours} $$\n\n**Step 4: Calculate the average speed.**\n$$ \\text{Average Speed} = \\frac{150}{\\frac{19}{6}} = 150 \\times \\frac{6}{19} = \\frac{900}{19} $$\n\nNow, convert the fraction to a decimal:\n$$ 900 \\div 19 \\approx 47.3684... $$\n\nRounding to two decimal places:\n$$ 47.37 \\text{ km/h} $$\n\n*(Self-correction: Let me re-calculate $900/19$. $19 \\times 40 = 760$. $900 - 760 = 140$. $19 \\times 7 = 133$. $140 - 133 = 7$. So it is $47$ with remainder $7$. $70/19 \\approx 3.68$. So $47.368...$ rounds to $47.37$.)*\n\nWait, let me double check the arithmetic.\n$t_1 = 2$\n$t_2 = 60/90 = 2/3 \\approx 0.6667$\n$t_3 = 30/60 = 0.5$\nTotal time $= 2 + 0.6667 + 0.5 = 3.1667$ hours.\nTotal distance $= 150$ km.\nAverage speed $= 150 / 3.1667 \\approx 47.368$ km/h.\n\nThe previous \"ANSWER: 48.00\" in the thought block was a placeholder error. The correct calculation yields approximately 47.37.\n\nLet's re-verify the fraction addition.\n$2 + 2/3 + 1/2 = 12/6 + 4/6 + 3/6 = 19/6$. Correct.\n$150 / (19/6) = 900 / 19$. Correct.\n$900 / 19$:\n$19 \\times 47 = 893$.\n$900 - 893 = 7$.\n$70 / 19 = 3$ remainder $13$.\n$130 / 19 = 6$ remainder $16$.\n$160 / 19 \\approx 8.4$.\nSo, $47.368...$\nRounding to 2 decimal places gives **47.37**.\n\nANSWER: 47.37",
+   "correct": false,
+   "seconds": 139.6,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "94a19cafa1f3",
+   "seconds": 39.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "900/19 km/h (≈ 47.37 km/h)",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "ab162431d75f",
+   "seconds": 24.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "900/19 km/h",
+   "final_correct": true
+  }
+ },
+ "slow-clock": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 375\n\nThe clock loses 3 minutes every hour, meaning that for every real hour (60 minutes) that passes, the clock only advances by $60 - 3 = 57$ minutes.\n\nWe are given that the clock shows a passage of time from 12:00 noon to 6:00 pm. This is a duration of 6 hours on the clock face.\nTotal minutes shown by the clock = $6 \\text{ hours} \\times 60 \\text{ minutes/hour} = 360$ minutes.\n\nLet $T$ be the actual time elapsed in minutes. The relationship between the real time and the clock time is:\n$$ \\text{Clock Time} = \\frac{57}{60} \\times \\text{Real Time} $$\n\nSubstituting the known values:\n$$ 360 = \\frac{57}{60} \\times T $$\n\nSolving for $T$:\n$$ T = 360 \\times \\frac{60}{57} $$\n$$ T = \\frac{21600}{57} $$\n$$ T \\approx 378.947 \\text{ minutes} $$\n\nRounding to the nearest minute, we get 379 minutes.\n\nWait, let me re-read carefully. \"A clock loses 3 minutes every hour.\" This usually implies that in 60 real minutes, it ticks 57 times.\nSo, Rate = 57 clock-minutes per 60 real-minutes.\nClock shows 6 hours passed = 360 clock-minutes.\nReal time $T$ satisfies: $\\frac{57}{60} T = 360$.\n$T = \\frac{360 \\times 60}{57} = \\frac{21600}{57} \\approx 378.95$.\n\nRounding to the nearest minute gives 379.\n\nLet me double check the interpretation. Sometimes \"loses 3 minutes every hour\" can be interpreted differently, but the standard interpretation is that the rate of the clock is $\\frac{57}{60}$ of real time.\n\nCalculation check:\n$21600 / 57$:\n$57 \\times 300 = 17100$\n$21600 - 17100 = 4500$\n$57 \\times 70 = 3990$\n$4500 - 3990 = 510$\n$57 \\times 8 = 456$\n$510 - 456 = 54$\nSo $300 + 70 + 8 = 378$ with remainder 54.\n$54/57 \\approx 0.947$.\nSo $378.947$.\nRounding to nearest minute is 379.\n\nANSWER: 379",
+   "correct": false,
+   "seconds": 134.4,
+   "retried": true
+  }
+ },
+ "socks-colors": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 7\n\nTo guarantee two matching pairs, we must consider the worst-case scenario where we pick socks but fail to complete the second pair for as long as possible.\n\n1.  **First Pair:** In the worst case, you could pick one sock of each color first (Red, Blue, Green). The next sock you pick (the 4th sock) will definitely match one of these, giving you your first pair. At this point, you have one pair and one single sock of a different color.\n2.  **Second Pair:** To avoid getting a second pair immediately, imagine the distribution of the remaining socks in your hand is such that you have one complete pair (say, Red) and two single socks of different colors (Blue and Green). You need to pick more socks.\n    *   If you have {Red, Red, Blue, Green}, picking another sock could be Blue or Green.\n    *   If it's Blue, you have {Red, Red, Blue, Blue, Green}. Now you have two pairs (Red and Blue). This took 5 socks.\n    *   However, consider the scenario where you have picked 6 socks. The worst case for *not* having two pairs is having three single socks of different colors? No, there are only 3 colors. So with 4 socks, you must have at least one pair. With 5 socks, by Pigeonhole Principle, if you don't have two pairs, you might have {Red, Red, Blue, Green, ?}. Wait, let's look at the maximum number of socks you can hold *without* having two pairs.\n    *   To avoid two pairs, you can have at most one pair and three single socks? No, there are only 3 colors. So you can have at most 1 pair (2 socks) and 1 sock of each of the other two colors (2 socks). Total = 4 socks. Example: {Red, Red, Blue, Green}. This is not two pairs.\n    *   If you pick a 5th sock, it must be Red, Blue, or Green.\n        *   If Red: {Red, Red, Red, Blue, Green} -> One pair (Red). No second pair yet? Wait, \"two matching pairs\" means two sets of 2. {R,R} is one pair. {B,B} would be another. In {R,R,R,B,G}, you only have one pair.\n        *   If Blue: {R,R,B,B,G} -> Two pairs (Red and Blue).\n        *   If Green: {R,R,B,G,G} -> Two pairs (Red and Green).\n    *   So, if the first pair was Red, picking a 5th sock of Blue or Green creates a second pair. But what if the 5th sock is Red? Then you have 3 Reds, 1 Blue, 1 Green. You still only have one pair (the two Reds). The third Red doesn't form a new pair unless you have another Red to match it with, but pairs are distinct sets of 2. Usually, \"two matching pairs\" implies two disjoint pairs. {R,R} is a pair. {R,R} from the remaining R's? No, you need 4 Reds for two red pairs.\n    *   Let's re-evaluate the worst case for 6 socks.\n        *   Case A: 3 Reds, 1 Blue, 2 Greens. Pairs: (R,R) and (G,G). Two pairs.\n        *   Case B: 2 Reds, 3 Blues, 1 Green. Pairs: (B,B) and... wait, only one pair of Blues. Only one pair? No, {B,B} is a pair. Do we have another? No. So this has only one pair.\n        *   Case C: 4 Reds, 1 Blue, 1 Green. One pair (R,R). The other two Reds don't form a second pair unless we count overlapping? Standard interpretation is disjoint pairs. {R1, R2} and {R3, R4}. So 4 Reds = 2 pairs.\n        *   Case D: 2 Reds, 2 Blues, 2 Greens. Three pairs.\n        *   Case E: 3 Reds, 2 Blues, 1 Green. One pair (R,R) or (B,B)? No, {R,R} is a pair. {B,B} is a pair. So two pairs.\n    \n    Let's look at the maximum number of socks you can have with **fewer than 2 pairs** (i.e., 0 or 1 pair).\n    *   To have exactly 1 pair, you could have:\n        *   2 Reds, 1 Blue, 1 Green (4 socks) -> 1 pair.\n        *   3 Reds, 1 Blue, 1 Green (5 socks) -> 1 pair (the two Reds). The third Red is a singleton relative to the other colors, but doesn't form a second pair with itself.\n        *   2 Reds, 3 Blues, 1 Green (6 socks) -> 1 pair (the two Blues). The three Blues contain one pair and one singleton. The Reds are singletons. Greens is singleton. So only 1 pair.\n        *   2 Reds, 2 Blues, 3 Greens (7 socks)? No, let's check 6 socks again.\n        *   Can we have 6 socks with only 1 pair?\n            *   Try: 2 Red, 3 Blue, 1 Green. Pairs: One pair of Blues. Reds are singletons. Green is singleton. Total pairs = 1.\n            *   Try: 4 Red, 1 Blue, 1 Green. Pairs: Two pairs of Reds (R1,R2) and (R3,R4). Total pairs = 2.\n            *   Try: 3 Red, 3 Blue, 0 Green. Pairs: One pair of Reds, one pair of Blues. Total pairs = 2.\n            *   Try: 2 Red, 2 Blue, 2 Green. Pairs: 3 pairs.\n    \n    So, with 6 socks, is it possible to have only 1 pair? Yes, the distribution {2 Red, 3 Blue, 1 Green} yields exactly one pair (the Blues). The three Blues provide one pair and one leftover sock. The two Reds are leftovers. The one Green is a leftover.\n    \n    Therefore, it is possible to pick 6 socks and have only 1 matching pair.\n    \n    Now, pick the **7th sock**.\n    The remaining socks in the drawer are:\n    Original: 10 R, 8 B, 6 G.\n    Taken: 2 R, 3 B, 1 G.\n    Remaining: 8 R, 5 B, 5 G.\n    \n    The 7th sock can be Red, Blue, or Green.\n    *   If it is **Red**: Hand becomes {3 R, 3 B, 1 G}. Pairs: One pair of Reds (from the 3), one pair of Blues (from the 3). Total = 2 pairs.\n    *   If it is **Blue**: Hand becomes {2 R, 4 B, 1 G}. Pairs: One pair of Blues (first two), another pair of Blues (last two). Total = 2 pairs.\n    *   If it is **Green**: Hand becomes {2 R, 3 B, 2 G}. Pairs: One pair of Blues, one pair of Greens. Total = 2 pairs.\n    \n    In all cases, the 7th sock guarantees a second pair.\n\n    Let's double check if 6 could guarantee it. We found a counter-example for 6: {2 R, 3 B, 1 G} has only 1 pair. So 6 is not enough.\n\n    Thus, the answer is 7.",
+   "correct": false,
+   "seconds": 153.6,
+   "retried": true
+  },
+  "quorum_merged": {
+   "id": "cbeaa7647347",
+   "seconds": 144.5,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "6",
+   "final_correct": true
+  },
+  "quorum_python": {
+   "id": "95e1e7382d4f",
+   "seconds": 851.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The minimum number of socks required is 6.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The fewest socks needed to guarantee two matching pairs (same or different colours) is 6.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The minimal number of socks needed to ensure two matching pairs is 6.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "To guarantee two matching pairs, you must take a minimum of 7 socks.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "You need to draw at least 9 socks to guarantee two matching pairs.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The fewest socks needed to ensure two matching pairs is 6.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The worst-case scenario for drawing 6 socks yields exactly two matching pairs, while 5 socks may yield only one.",
+   "draft_round1_correct": true,
+   "final": "You must take 6 socks to be sure of having two matching pairs.",
+   "final_correct": true
+  }
+ },
+ "ages-ratio": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "ANSWER: 40\nLet the son's current age be $S$ and the mother's current age be $M$. The problem gives two conditions: $M = 4S$ and $M + 20 = 2(S + 20)$. Substituting the first equation into the second yields $4S + 20 = 2S + 40$, which simplifies to $2S = 20$, so $S = 10$. Therefore, the mother's current age is $M = 4 \\times 10 = 40$.",
+   "correct": true,
+   "seconds": 18.1,
+   "retried": false
+  }
+ }
+}
