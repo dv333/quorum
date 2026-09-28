@@ -1508,6 +1508,14 @@ async def test_agents_are_told_about_python_checks_only_when_a_sandbox_exists(fa
     assert not any("@Python:" in m[0]["content"] for m, _ in client.turn_calls())
 
 
+async def test_a_question_that_quotes_code_gets_python_checks(fake_python):
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("What does this print?\n\n```python\nprint(-7 // 2)\n```")
+    await eng.task
+    assert all("@Python:" in m[0]["content"] for m, _ in client.turn_calls())
+
+
 async def test_a_code_review_gets_no_python_checks(fake_python):
     client = FakeClient(lambda h, r, m: reply("AGREE"))
     eng = make_debate(client, max_rounds=1)

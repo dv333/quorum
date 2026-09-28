@@ -193,6 +193,9 @@ CODE_ROLES = [
 ]
 _CODE_Q = re.compile(r"```|diff --git|^[-+]{3} [ab]/|\bcode review\b|\breview (this|the) (code|change|diff|pr)\b",
                      re.I | re.M)  # fmt: skip
+# A review of a change, as opposed to a question that only quotes some code ("what does this print?")
+_REVIEW_Q = re.compile(r"```diff|diff --git|^[-+]{3} [ab]/|^@@ |\bcode review\b|\breview (this|the) (code|change|diff|pr)\b",
+                       re.I | re.M)  # fmt: skip
 
 
 ROLE_FOCUS = {**dict(DEFAULT_ROLES), **{name: focus for name, focus, _ in CODE_ROLES}}
@@ -202,6 +205,11 @@ def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_pa
     """A debate about code: a repository is attached, the code-review pack is used, or the question holds a diff or
     code."""
     return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_CODE_Q.search(question))
+
+
+def is_code_review(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
+    """A review of a change or a repository, where the code can't run on its own."""
+    return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_REVIEW_Q.search(question))
 
 
 def code_roles(question: str, n: int) -> List[str]:
@@ -1823,9 +1831,9 @@ class DebateEngine:
 
     def _python_on(self) -> bool:
         """Agents can check calculations with Python: a sandbox exists, and this isn't a code review (the reviewed
-        code can't run on its own)."""
+        code can't run on its own). A question that quotes code ("what does this print?") gets checks."""
         d = self.debate()
-        return bool(pyrun.sandbox()) and not is_code_debate(self._question(d["topic"]), d["pack"], d.get("repo_path"))
+        return bool(pyrun.sandbox()) and not is_code_review(self._question(d["topic"]), d["pack"], d.get("repo_path"))
 
     async def _python_checks(self, msg_id: int, content: str) -> Optional[str]:
         """Runs the programs a reply asked for (@Python:), shows what they printed under it, and returns that for the
