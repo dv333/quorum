@@ -953,6 +953,39 @@ async def test_trivial_conundrum_is_answered_directly_by_the_chair():
     assert chair["status"] == "done" and chair["content"]
 
 
+async def test_the_chair_thinks_before_a_direct_answer():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client)
+    await eng.post_user_message("A bat and a ball cost $1.10 together; the bat costs $1 more. What does the ball cost?")
+    await eng.task
+    direct = [(m, kw) for _, m, kw in client.calls if "answer it yourself" in m[0]["content"]]
+    assert len(direct) == 1 and direct[0][1]["think"] is True
+    assert "check it before you write" in direct[0][0][1]["content"]
+
+
+async def test_a_direct_answer_that_only_thought_is_asked_again_without_thinking():
+    class ThinkingOnly(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if "answer it yourself" in messages[0]["content"] and kw.get("think"):
+                self.calls.append((model, messages, kw))
+                yield Chunk("thinking", "hmm " * 50)
+                yield Chunk("done", stats={})
+                return
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = ThinkingOnly(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client)
+    await eng.post_user_message("What is 17 x 23?")
+    await eng.task
+    direct = [kw for _, m, kw in client.calls if "answer it yourself" in m[0]["content"]]
+    assert [kw["think"] for kw in direct] == [True, False]
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["content"] == "VERDICT TEXT" and "answering without thinking" in chair["thinking"]
+
+
 async def test_a_code_review_is_never_answered_directly():
     client = FakeClient(lambda h, r, m: reply("AGREE"))
     client.intake_replies = ['{"action": "direct"}']
