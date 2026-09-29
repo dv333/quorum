@@ -695,6 +695,40 @@ def check_unsourced_figures(text: str, sources: str, limit: int = 4) -> List[Dic
     return problems
 
 
+_SOURCE_NAMED = re.compile(
+    r"\bet al\b\.?"
+    r"|\b[A-Z][A-Za-z'’-]+(?: (?:and|&) [A-Z][A-Za-z'’-]+)? \((?:19|20)\d\d\)"  # Cochrane (2019)
+    r"|\([A-Z][A-Za-z'’-]+(?: et al\.?)?,? (?:19|20)\d\d\)"  # (Smith, 2019)
+    r"|\b(?:19|20)\d\d\s+(?:[\w*’'-]+\s+){0,4}?(?:study|studies|meta-analys[ie]s|survey|report|trial|paper)\b"
+    r"|\bJournal of\b|\bThe Lancet\b|\bNEJM\b|\bNew England Journal\b|\bBMJ\b|\bJAMA\b|\bCochrane\b|\bPLOS\b"
+    r"|\bHarvard Business Review\b|\b(?:McKinsey|Gartner|Forrester|Deloitte|Pew Research|Nielsen)\b"
+    r"|\baccording to (?:a|an|the) (?:[\w-]+ ){0,3}(?:study|survey|report|analysis|paper)\b"
+)
+
+
+def named_sources(text: str, question: str = "", limit: int = 8) -> List[str]:
+    """The sentences of an answer that name a study, journal, survey or report, other than ones the user named. Without
+    research these come from a model's memory, and models invent them ("Cochrane (2019) meta-analyses indicate 18–23%")."""
+    asked = question.lower()
+    out: List[str] = []
+    for sentence in re.split(r"(?<!\bal\.)(?<!\be\.g\.)(?<=[.!?])\s+|\n+", text or ""):
+        sentence = sentence.strip()
+        hits = [m.group(0).strip("() ").lower() for m in _SOURCE_NAMED.finditer(sentence)]
+        if any(h not in asked for h in hits) and sentence not in out:
+            out.append(sentence)
+    return out[:limit]
+
+
+def keeps_structure(original: str, revised: str) -> bool:
+    """A rewrite keeps the answer whole: its bottom line, every section, and most of its length."""
+    sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
+    return bool(
+        re.search(r"BOTTOM\s*LINE", revised, re.I)
+        and sections(original) <= sections(revised)
+        and len(revised) >= 0.6 * len(original)
+    )
+
+
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
     """Calculations written out in the answer ("30 × 4.5 ÷ 8 ≈ 17") whose result is off by more than 15%."""
     problems = []
@@ -2731,17 +2765,49 @@ class DebateEngine:
                 revised = re.split(
                     r"\n[ \t*_#]*(?:an |the )?audit (?:found|flagged|identified)\b", revised, flags=re.I
                 )[0].strip()
-                # A revision has to keep the answer whole: its bottom line and its sections
-                sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
-                if (
-                    re.search(r"BOTTOM\s*LINE", revised, re.I)
-                    and sections(row["content"]) <= sections(revised)
-                    and len(revised) >= 0.6 * len(row["content"])
-                ):
+                if keeps_structure(row["content"], revised):
                     content = shorten_bottom_line(plain_answer(revised))
                     meta["evidence"].update(revised=True, original=row["content"])
             except Exception as e:
                 log.warning("answer revision failed: %s", e)
+        self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
+
+    async def _drop_unchecked_sources(self, msg_id: int) -> None:
+        """Without research nothing was looked up, so a study, journal or survey the answer names came from a model's
+        memory, and models invent them. The chair rewrites those sentences once to say what's generally known."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not row or row["status"] != "done" or not row["content"]:
+            return
+        question = self._question(row["topic"])
+        passages = named_sources(row["content"], question)
+        if not passages:
+            return
+        d = self.debate()
+        chair = self._chair_label(d)
+        self.bus.publish(
+            {"type": "debate_updated", "debate": {"phase": f"{chair} is taking out sources nobody checked…"}}
+        )
+        meta = json.loads(row["meta_json"] or "{}")
+        meta["unchecked_sources"] = {"passages": passages, "revised": False}
+        content = row["content"]
+        try:
+            revised = strip_thinking(
+                await self._complete(
+                    chair,
+                    "unsourced",
+                    d["chair_endpoint_id"],
+                    d["chair_model"],
+                    prompts.unchecked_sources_messages(row["content"], passages),
+                    await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                )
+            ).strip()
+            if keeps_structure(row["content"], revised):
+                content = shorten_bottom_line(plain_answer(revised))
+                meta["unchecked_sources"].update(
+                    revised=True, left=named_sources(content, question), original=row["content"]
+                )
+        except Exception as e:
+            log.warning("removing unchecked sources failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
 
     async def _keep_review_findings(self, msg_id: int) -> None:
@@ -3073,6 +3139,8 @@ class DebateEngine:
                 self.partials.pop(row["id"], None)
             self._set(answer_pending=None)
             await self._audit_answer(row["id"], claims, studies)
+            if not d["research_enabled"]:
+                await self._drop_unchecked_sources(row["id"])
             if is_code_debate(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
             done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])

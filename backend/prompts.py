@@ -63,9 +63,10 @@ PYTHON_HELP = """
   a program prints, don't work it out in your head. Start your message with a line
   @Python:
   followed by a ```python block that prints the result (for "what does this code print", the code itself), and stop
-  there, before stating any answer (even if the question asks for the answer first: you give it after the output). Quorum runs it (standard library only, no files
-  or network, 10 seconds) and shows you what it printed, then you finish your message. Make sure the program answers
-  the question exactly as asked; if its output surprises you, find out why before you trust either."""
+  there, before stating any answer (even if the question asks for the answer first: you give it after the output).
+  Quorum runs it (standard library only, no files or network, 10 seconds) and shows you what it printed, then you
+  finish your message. Make sure the program answers the question exactly as asked; if its output surprises you, find
+  out why before you trust either."""
 
 
 PYTHON_FOLLOWUP = """{results}
@@ -76,6 +77,13 @@ why (a program can also misread the question). Don't write another @Python block
 
 def python_followup(results: str) -> str:
     return PYTHON_FOLLOWUP.format(results=results)
+
+
+NO_SOURCES_HELP = """
+- Nobody in this debate can look anything up, so nothing you cite can be checked. Don't name studies, papers,
+  journals, surveys, reports or their authors, and don't quote statistics as if from one ("a 2024 study found 18%").
+  Say what's generally known in plain words ("reminder texts usually cut no-shows"), and call a number an estimate
+  when it's yours. Sources and figures the user gave are fine to use."""
 
 
 def agent_system_prompt(
@@ -101,7 +109,7 @@ How to debate:
 - Keep it under {WORD_CAP} words. Use markdown only when it helps (short lists, code).
 - The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 - If the user addresses you by name (for example @{handle}), answer them directly first.
-- Speak only as yourself. Never write messages for other agents, the user, {RESEARCHER_NAME} or the Coder.{RESEARCH_HELP if research else ""}{CODER_HELP if coder else ""}{PYTHON_HELP if python else ""}
+- Speak only as yourself. Never write messages for other agents, the user, {RESEARCHER_NAME} or the Coder.{RESEARCH_HELP if research else NO_SOURCES_HELP}{CODER_HELP if coder else ""}{PYTHON_HELP if python else ""}
 
 End EVERY message with exactly these two lines:
 STANCE: AGREE | DISAGREE | REFINE
@@ -343,6 +351,13 @@ def verdict_messages(
             "\nKey studies (checked against their pages; lead with these and use their names, years and numbers "
             f"exactly, without inventing other details):\n{studies}\n"
         )
+    if not (research or studies or claims or search_failed):
+        found += (
+            "\nWeb research was off, so nothing was checked against sources. Don't name studies, papers, journals, "
+            "surveys, reports or their authors, and don't give statistics as if from one, even when an agent did: say "
+            "what's generally known in plain words, and call a number an estimate. Sources and figures the user gave "
+            "are fine.\n"
+        )
     if search_failed:
         found += (
             "\nWeb research failed for this question, so nothing was checked against current sources. Say so plainly "
@@ -381,7 +396,7 @@ The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_li
 
 Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
-{ANSWER_FORMAT}""",
+{answer_format(sourced=bool(research or studies or claims))}""",
         },
     ]
 
@@ -390,12 +405,25 @@ Write the final answer in markdown. Combine the strongest arguments from all age
 # Researcher
 # ---------------------------------------------------------------------------
 
+SOURCED_POINTS = (
+    'Name the key studies or sources in the sentence itself (like "a 2025 BMJ meta-analysis of 99 trials") with their '
+    "numbers (effect sizes, how many people or trials, how long) where the research gives them; [n] citations are only "
+    "for the checked claims."
+)
+UNSOURCED_POINTS = "Nothing was looked up, so name no studies or sources and give no statistics from them."
+
+
+def answer_format(sourced: bool = True) -> str:
+    """The answer's structure. Without research, it asks for no named studies: models invent them from memory."""
+    return ANSWER_FORMAT.replace("{points}", SOURCED_POINTS if sourced else UNSOURCED_POINTS)
+
+
 ANSWER_FORMAT = """Use exactly this structure, with no preamble:
 
 BOTTOM LINE: <one sentence a busy person could act on, wrapping the key recommendation in **bold**>
 
 ## Key points
-- 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. Name the key studies or sources in the sentence itself (like "a 2025 BMJ meta-analysis of 99 trials") with their numbers (effect sizes, how many people or trials, how long) where the research gives them; [n] citations are only for the checked claims.
+- 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. {points}
 
 ## Diagram
 Include this section only if a picture genuinely helps (a decision, a process, a comparison or a timeline). Write one small Mermaid diagram in a ```mermaid code block: a "flowchart TD" or "flowchart LR" with at most 8 nodes and no styling, every node written as an id with a quoted label, like A["Check budget"] --> B["Buy"]. Otherwise leave this section out entirely.
@@ -826,6 +854,30 @@ An audit found these problems:
 {issues}
 
 Where a problem says the answer skips something the question asks about, add a key point (or a sentence in the right section) covering it from the research. Fix each flagged passage with the smallest change that makes it true to the evidence (correct it, add the caveat, or say plainly that it's uncertain) and keep everything else word for word, including every section and heading, named studies and numbers. Write the fixes for the reader: never say "unverified", "the provided evidence", "research findings" or anything about the audit. If the fixes mean no option is best for everyone, make the bottom line a conditional recommendation (who should choose which), in one or two sentences. Output only the corrected answer.""",
+        },
+    ]
+
+
+def unchecked_sources_messages(answer: str, passages: List[str]) -> List[Dict[str, str]]:
+    listed = "\n".join(f"- {p}" for p in passages)
+    return [
+        {
+            "role": "system",
+            "content": "You are the chair of an AI council. You correct your final answer so it doesn't cite sources nobody checked.",
+        },
+        {
+            "role": "user",
+            "content": f"""Your answer:
+{answer}
+
+Nothing was looked up for this answer, so these sentences name studies, journals, surveys or reports from memory, and
+such names and their numbers are often wrong:
+{listed}
+
+Rewrite each of these sentences to say what's generally known in plain words, without naming the source, its authors
+or its year, and without its exact figures (a rough range labelled as an estimate is fine). Keep sources and figures
+that appear in the question. Keep everything else word for word, including every section and heading. Output only the
+corrected answer.""",
         },
     ]
 
