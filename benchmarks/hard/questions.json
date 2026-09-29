@@ -1,0 +1,459 @@
+{
+ "format": "\n\nStart your reply with one line of the form ANSWER: <the exact value or output>, then explain briefly.",
+ "strict": true,
+ "questions": [
+  {
+   "id": "py-fib-sign",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ndef g(n):\n    if n <= 1:\n        return n\n    return g(n - 1) + g(n - 2) * (1 if n % 3 else -1)\n\nprint(g(12))\n```",
+   "answer": "0",
+   "accept": [
+    "0"
+   ]
+  },
+  {
+   "id": "py-slice",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ns = \"abracadabra\"\nprint(s[::-3] + s[1:-1:4])\n```",
+   "answer": "aacbbar",
+   "accept": [
+    "aacbbar"
+   ]
+  },
+  {
+   "id": "py-nonlocal",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nx = 10\n\ndef outer():\n    x = 1\n    def inner():\n        nonlocal x\n        x += 5\n        return x\n    return inner\n\nf = outer()\nf()\nprint(f() + x)\n```",
+   "answer": "21",
+   "accept": [
+    "21"
+   ]
+  },
+  {
+   "id": "py-mississippi",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nd = {}\nfor i, ch in enumerate(\"mississippi\"):\n    d[ch] = d.get(ch, 0) + i\nbest = max(d, key=d.get)\nprint(best, d[best])\n```",
+   "answer": "i 22",
+   "accept": [
+    "i 22"
+   ]
+  },
+  {
+   "id": "py-finally",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ndef f():\n    try:\n        return 1\n    finally:\n        return 2\n\nprint(f() * 10 + len([f() for _ in range(3)]))\n```",
+   "answer": "23",
+   "accept": [
+    "23"
+   ]
+  },
+  {
+   "id": "py-zip-iter",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nit = iter(range(11))\npairs = list(zip(it, it))\nprint(len(pairs), next(it, -1))\n```",
+   "answer": "5 -1",
+   "accept": [
+    "5 -1"
+   ]
+  },
+  {
+   "id": "py-grid",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ngrid = [[0] * 3] * 3\ngrid[0][0] = 1\ngrid[1][1] += 2\ngrid[2] = [5, 5, 5]\nprint(sum(map(sum, grid)))\n```",
+   "answer": "21",
+   "accept": [
+    "21"
+   ]
+  },
+  {
+   "id": "py-for-else",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nn = 0\nfor i in range(6):\n    for j in range(i):\n        if (i + j) % 4 == 0:\n            break\n        n += 1\n    else:\n        n += 10\nprint(n)\n```",
+   "answer": "37",
+   "accept": [
+    "37"
+   ]
+  },
+  {
+   "id": "py-floordiv",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nprint(-7 // 2 + -7 % 3 + 7 // -2 + 7 % -3)\n```",
+   "answer": "-8",
+   "accept": [
+    "-8"
+   ]
+  },
+  {
+   "id": "py-bools",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nprint(sum([True, True, 3]) * (True + True) ** 3)\n```",
+   "answer": "40",
+   "accept": [
+    "40"
+   ]
+  },
+  {
+   "id": "py-class-attr",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nclass A:\n    items = []\n    def add(self, x):\n        self.items.append(x)\n        return len(self.items)\n\na, b = A(), A()\na.add(1)\nb.add(2)\nb.items = [9]\nprint(a.add(3) + len(b.items))\n```",
+   "answer": "4",
+   "accept": [
+    "4"
+   ]
+  },
+  {
+   "id": "py-remove-loop",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nx = [1, 3, 5, 6, 7, 9, 10]\nfor i in x:\n    if i % 2:\n        x.remove(i)\nprint(x)\n```",
+   "answer": "[3, 6, 9, 10]",
+   "accept": [
+    "[3, 6, 9, 10]"
+   ]
+  },
+  {
+   "id": "py-lru-calls",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nfrom functools import lru_cache\n\ncalls = 0\n\n@lru_cache(maxsize=None)\ndef c(n):\n    global calls\n    calls += 1\n    return 1 if n < 2 else c(n - 1) + c(n - 2)\n\nc(30)\nc(35)\nprint(calls)\n```",
+   "answer": "36",
+   "accept": [
+    "36"
+   ]
+  },
+  {
+   "id": "py-split",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nt = \" a  b ,c \"\nprint(len(t.split()), len(t.split(\" \")), len(t.split(\",\")))\n```",
+   "answer": "3 6 2",
+   "accept": [
+    "3 6 2"
+   ]
+  },
+  {
+   "id": "py-skip-threes",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ns = 0\nfor k in range(1, 100):\n    if k % 3 == 0 or \"3\" in str(k):\n        continue\n    s += k\nprint(s)\n```",
+   "answer": "2772",
+   "accept": [
+    "2772"
+   ]
+  },
+  {
+   "id": "py-send",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ndef gen():\n    total = 0\n    while True:\n        x = yield total\n        if x is None:\n            break\n        total += x * 2 if total % 2 else x\n\ng = gen()\nnext(g)\nfor v in [5, 7, 11, 4]:\n    last = g.send(v)\nprint(last)\n```",
+   "answer": "49",
+   "accept": [
+    "49"
+   ]
+  },
+  {
+   "id": "py-sort-key",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nwords = [\"b10\", \"a2\", \"b9\", \"a10\", \"c1\", \"b1\"]\nprint(sorted(words, key=lambda s: (s[0], -int(s[1:])))[2:5])\n```",
+   "answer": "['b10', 'b9', 'b1']",
+   "accept": [
+    "['b10', 'b9', 'b1']"
+   ]
+  },
+  {
+   "id": "py-int-bases",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nprint(int(\"0b101\", 0) + int(\"17\", 8) + int(\"z\", 36) + int(\"0x1F\", 16))\n```",
+   "answer": "86",
+   "accept": [
+    "86"
+   ]
+  },
+  {
+   "id": "py-bits",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nprint(bin(37 ^ 21).count(\"1\") * (37 & 21) - (37 | 21))\n```",
+   "answer": "-43",
+   "accept": [
+    "-43"
+   ]
+  },
+  {
+   "id": "py-default-dict",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nfrom collections import defaultdict\n\nd = defaultdict(list)\nfor w in \"the quick brown fox jumps over the lazy dog\".split():\n    d[len(w)].append(w)\nprint(len(d), len(d[3]), d[5][-1])\n```",
+   "answer": "3 4 jumps",
+   "accept": [
+    "3 4 jumps"
+   ]
+  },
+  {
+   "id": "py-str-mul",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\ns = \"ab\" * 3\nprint(s.count(\"aba\") + s.find(\"ba\", 2) + s.rfind(\"b\", 0, 4))\n```",
+   "answer": "7",
+   "accept": [
+    "7"
+   ]
+  },
+  {
+   "id": "py-dict-order",
+   "kind": "python",
+   "question": "What exactly does this Python 3 program print?\n\n```python\nd = {\"a\": 1, \"b\": 2, \"c\": 3}\ndel d[\"a\"]\nd[\"a\"] = 4\nd[\"b\"] = 5\nprint(\"\".join(d), sum(d.values()))\n```",
+   "answer": "bca 12",
+   "accept": [
+    "bca 12"
+   ]
+  },
+  {
+   "id": "not-6-10-15",
+   "kind": "reasoning",
+   "question": "How many integers from 1 to 1000 are divisible by none of 6, 10 and 15?",
+   "answer": "734",
+   "accept": [
+    "734"
+   ]
+  },
+  {
+   "id": "zeros-base12",
+   "kind": "reasoning",
+   "question": "Written in base 12, how many zeros does 200! (200 factorial) end with?",
+   "answer": "97",
+   "accept": [
+    "97"
+   ]
+  },
+  {
+   "id": "stairs-123",
+   "kind": "reasoning",
+   "question": "You climb a 15-step staircase taking 1, 2 or 3 steps at a time. In how many different orders can you reach the top?",
+   "answer": "5768",
+   "accept": [
+    "5768"
+   ]
+  },
+  {
+   "id": "digitsum-2-100",
+   "kind": "reasoning",
+   "question": "What is the sum of the decimal digits of 2 to the power 100?",
+   "answer": "115",
+   "accept": [
+    "115"
+   ]
+  },
+  {
+   "id": "last-two-7",
+   "kind": "reasoning",
+   "question": "What are the last two digits of 7 to the power 2026?",
+   "answer": "49",
+   "accept": [
+    "49"
+   ]
+  },
+  {
+   "id": "divisors-10f",
+   "kind": "reasoning",
+   "question": "How many positive divisors does 10! (10 factorial) have?",
+   "answer": "270",
+   "accept": [
+    "270"
+   ]
+  },
+  {
+   "id": "digit-sum-20",
+   "kind": "reasoning",
+   "question": "How many integers from 1 to 10,000 have digits that add up to exactly 20?",
+   "answer": "633",
+   "accept": [
+    "633"
+   ]
+  },
+  {
+   "id": "coins-50",
+   "kind": "reasoning",
+   "question": "In how many ways can you pay exactly 50 cents using any number of 1-, 2- and 5-cent coins? (Only the number of each coin matters, not the order.)",
+   "answer": "146",
+   "accept": [
+    "146"
+   ]
+  },
+  {
+   "id": "no-11",
+   "kind": "reasoning",
+   "question": "How many strings of 12 bits (0s and 1s) contain no two 1s next to each other?",
+   "answer": "377",
+   "accept": [
+    "377"
+   ]
+  },
+  {
+   "id": "bananas",
+   "kind": "reasoning",
+   "question": "How many distinct arrangements of the letters of the word BANANAS are there in which no two A's are next to each other?",
+   "answer": "120",
+   "accept": [
+    "120"
+   ]
+  },
+  {
+   "id": "palindromes-sum",
+   "kind": "reasoning",
+   "question": "What is the sum of all four-digit palindromes (like 1221)?",
+   "answer": "495000",
+   "accept": [
+    "495000"
+   ]
+  },
+  {
+   "id": "zeros-100",
+   "kind": "reasoning",
+   "question": "What is the smallest positive integer n such that n! (n factorial) ends in exactly 100 zeros?",
+   "answer": "405",
+   "accept": [
+    "405"
+   ]
+  },
+  {
+   "id": "josephus",
+   "kind": "reasoning",
+   "question": "41 people stand in a circle, numbered 1 to 41. Starting from person 1, every 3rd person still in the circle is removed (first 3, then 6, and so on, wrapping around). What is the number of the last person left?",
+   "answer": "31",
+   "accept": [
+    "31"
+   ]
+  },
+  {
+   "id": "hearts-given",
+   "kind": "reasoning",
+   "question": "Two cards are drawn from a standard 52-card deck without replacement. Given that at least one of them is a heart, what is the probability that both are hearts? Give a fraction in lowest terms.",
+   "answer": "2/15",
+   "accept": [
+    "2/15"
+   ]
+  },
+  {
+   "id": "coupon-die",
+   "kind": "reasoning",
+   "question": "You roll a fair six-sided die until every face has appeared at least once. What is the expected number of rolls? Give the exact value as a fraction or a decimal to 2 places.",
+   "answer": "147/10",
+   "accept": [
+    "147/10",
+    "14.7"
+   ]
+  },
+  {
+   "id": "four-doors",
+   "kind": "reasoning",
+   "question": "A game show has 4 doors: a car behind one, goats behind three. You pick a door. The host, who knows where the car is, opens 2 of the other doors, both with goats. You switch to the one remaining closed door. What is the probability you win the car? Give a fraction.",
+   "answer": "3/4",
+   "accept": [
+    "3/4"
+   ]
+  },
+  {
+   "id": "tuesday-boy",
+   "kind": "reasoning",
+   "question": "A family has two children. You learn that at least one of them is a boy born on a Tuesday. Assuming each child is equally likely to be a boy or a girl and equally likely to be born on any day of the week, independently, what is the probability that both children are boys? Give a fraction.",
+   "answer": "13/27",
+   "accept": [
+    "13/27"
+   ]
+  },
+  {
+   "id": "birthday-30",
+   "kind": "reasoning",
+   "question": "In a room of 30 people with birthdays spread evenly over 365 days (ignore leap years), what is the probability that at least two share a birthday? Give it to 3 decimal places.",
+   "answer": "0.706",
+   "accept": [
+    "0.706"
+   ]
+  },
+  {
+   "id": "three-dice-10",
+   "kind": "reasoning",
+   "question": "Three fair six-sided dice are rolled. What is the probability that they sum to exactly 10? Give a fraction in lowest terms.",
+   "answer": "1/8",
+   "accept": [
+    "1/8"
+   ]
+  },
+  {
+   "id": "march-2100",
+   "kind": "reasoning",
+   "question": "What day of the week will 1 March 2100 be?",
+   "answer": "Monday",
+   "accept": [
+    "Monday"
+   ]
+  },
+  {
+   "id": "friday-13",
+   "kind": "reasoning",
+   "question": "How many Friday the 13ths are there from 1 January 2001 to 31 December 2030, inclusive?",
+   "answer": "52",
+   "accept": [
+    "52"
+   ]
+  },
+  {
+   "id": "days-between",
+   "kind": "reasoning",
+   "question": "How many days are there from 10 February 2024 to 1 March 2025, counting both of those dates?",
+   "answer": "386",
+   "accept": [
+    "386"
+   ]
+  },
+  {
+   "id": "clock-738",
+   "kind": "reasoning",
+   "question": "What is the smaller angle, in degrees, between the hour and minute hands of a clock at 7:38?",
+   "answer": "1",
+   "accept": [
+    "1"
+   ]
+  },
+  {
+   "id": "pipes",
+   "kind": "reasoning",
+   "question": "An empty tank has two inlet pipes and a drain. Pipe A alone fills it in 6 hours, pipe B alone in 9 hours, and the drain alone empties a full tank in 12 hours. A and B are opened at the same time; the drain is opened 1 hour later. How many hours after A and B were opened is the tank full? Give an exact fraction or a decimal to 2 places.",
+   "answer": "33/7",
+   "accept": [
+    "33/7",
+    "4.71"
+   ]
+  },
+  {
+   "id": "avg-speed",
+   "kind": "reasoning",
+   "question": "A car drives 60 km at 30 km/h, then 60 km at 90 km/h, then 30 km at 60 km/h. What is its average speed over the whole trip, in km/h? Give an exact fraction or a decimal to 2 places.",
+   "answer": "900/19",
+   "accept": [
+    "900/19",
+    "47.37"
+   ]
+  },
+  {
+   "id": "slow-clock",
+   "kind": "reasoning",
+   "question": "A clock loses 3 minutes every hour. It is set to the right time at 12:00 noon. When it shows 6:00 pm the same day, how many real minutes have passed since noon? Round to the nearest minute.",
+   "answer": "379",
+   "accept": [
+    "379"
+   ]
+  },
+  {
+   "id": "socks-colors",
+   "kind": "reasoning",
+   "question": "A drawer holds 10 red, 8 blue and 6 green socks, unsorted. In the dark, what is the fewest socks you must take to be sure of having 2 matching pairs (two pairs, which may be the same colour)?",
+   "answer": "6",
+   "accept": [
+    "6"
+   ]
+  },
+  {
+   "id": "ages-ratio",
+   "kind": "reasoning",
+   "question": "A mother is 4 times as old as her son. In 20 years she will be twice as old as him. How old is the mother now?",
+   "answer": "40",
+   "accept": [
+    "40"
+   ]
+  }
+ ]
+}

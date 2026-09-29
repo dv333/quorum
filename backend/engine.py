@@ -15,7 +15,7 @@ from datetime import date
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-from . import coder, db, firecrawl, inventory, prompts
+from . import coder, db, firecrawl, inventory, prompts, pyrun
 from .config import (
     MAX_NUM_CTX,
     MAX_ROUNDS_LIMIT,
@@ -193,6 +193,9 @@ CODE_ROLES = [
 ]
 _CODE_Q = re.compile(r"```|diff --git|^[-+]{3} [ab]/|\bcode review\b|\breview (this|the) (code|change|diff|pr)\b",
                      re.I | re.M)  # fmt: skip
+# A review of a change, as opposed to a question that only quotes some code ("what does this print?")
+_REVIEW_Q = re.compile(r"```diff|diff --git|^[-+]{3} [ab]/|^@@ |\bcode review\b|\breview (this|the) (code|change|diff|pr)\b",
+                       re.I | re.M)  # fmt: skip
 
 
 ROLE_FOCUS = {**dict(DEFAULT_ROLES), **{name: focus for name, focus, _ in CODE_ROLES}}
@@ -202,6 +205,11 @@ def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_pa
     """A debate about code: a repository is attached, the code-review pack is used, or the question holds a diff or
     code."""
     return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_CODE_Q.search(question))
+
+
+def is_code_review(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
+    """A review of a change or a repository, where the code can't run on its own."""
+    return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_REVIEW_Q.search(question))
 
 
 def code_roles(question: str, n: int) -> List[str]:
@@ -747,6 +755,15 @@ def quote_in_source(quote: str, text: str) -> bool:
 CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
 
 
+def _add_stats(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    """Two calls that wrote one message, counted as one."""
+    out = {**a, **b}
+    for k in ("tokens", "duration_ms", "prompt_tokens"):
+        if a.get(k) is not None and b.get(k) is not None:
+            out[k] = a[k] + b[k]
+    return out
+
+
 class DebateEngine:
     def __init__(
         self,
@@ -774,6 +791,7 @@ class DebateEngine:
         self._concluding = False
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
+        self._no_python: set = set()  # seats whose model trips over Python checks (gpt-oss calls its own Python tool)
         self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
         # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
         self._ctx_by_model: Dict[str, int] = {}
@@ -1112,13 +1130,27 @@ class DebateEngine:
         self._set(status="concluding")
         row = self._insert_message(topic=d["topic"], round_no=0, author_kind="chair", status="streaming")
         try:
-            messages = prompts.direct_answer_messages(label, self._question(d["topic"]), self._prior_topics(d["topic"]))
+            messages = prompts.direct_answer_messages(
+                label, self._question(d["topic"]), self._prior_topics(d["topic"]), python=self._python_on()
+            )
             # The chair thinks before a direct answer. Without it, questions that only look simple (puzzles, sums, dates)
             # went wrong: the answer came first and the working under it sometimes reached a different number
             think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], True)
-            stats = await self._stream_into(
-                row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
-            )
+            try:
+                stats = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
+                )
+            except Exception as e:
+                if not (pyrun.tool_call_error(e) and self._python_on()):
+                    raise
+                # gpt-oss called a Python tool of its own: it answers without checks
+                messages = prompts.direct_answer_messages(
+                    label, self._question(d["topic"]), self._prior_topics(d["topic"])
+                )
+                self._restart_reply(row["id"], "(it tried to call a Python tool of its own; answering without checks)")
+                stats = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
+                )
             partial = self.partials[row["id"]]
             if not strip_thinking(partial["content"]).strip() and think:
                 # It spent its whole budget thinking: one more try, answering straight away
@@ -1127,6 +1159,18 @@ class DebateEngine:
                 stats = await self._stream_into(
                     row["id"], d["chair_endpoint_id"], d["chair_model"], messages, no_think, None, label, "answer"
                 )
+            first = strip_thinking(partial["content"]).strip()
+            output = await self._python_checks(row["id"], first) if first else None
+            if output:
+                follow = messages + [
+                    {"role": "assistant", "content": pyrun.before_output(first)},
+                    {"role": "user", "content": prompts.python_followup(output)},
+                ]
+                no_think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+                more = await self._stream_into(
+                    row["id"], d["chair_endpoint_id"], d["chair_model"], follow, no_think, None, label, "answer"
+                )
+                stats = _add_stats(stats, more)
             self._finish_message(
                 row["id"],
                 content=strip_thinking(partial["content"]).strip() or "…",
@@ -1689,12 +1733,14 @@ class DebateEngine:
             think = await self._thinking_flag(seat["endpoint_id"], seat["model"], wanted)
             partial = self.partials[msg_id]
 
-            async def attempt(flag: Optional[Union[bool, str]]) -> Dict[str, Any]:
+            async def attempt(
+                flag: Optional[Union[bool, str]], msgs: Optional[List[Dict[str, str]]] = None
+            ) -> Dict[str, Any]:
                 return await self._stream_into(
                     msg_id,
                     seat["endpoint_id"],
                     seat["model"],
-                    messages,
+                    msgs or messages,
                     flag,
                     self._keep_alive(seat, upcoming),
                     seat["handle"],
@@ -1702,9 +1748,24 @@ class DebateEngine:
                     BRIEF_TURN_TOKENS if brief else None,
                 )
 
+            async def first_try() -> Dict[str, Any]:
+                nonlocal messages
+                try:
+                    return await attempt(think)
+                except Exception as e:
+                    if not pyrun.tool_call_error(e) or seat["id"] in self._no_python:
+                        raise
+                    # gpt-oss has a Python tool of its own and calls it when told it can run Python, which Ollama
+                    # can't parse: this agent goes without Python checks
+                    log.warning("seat %s (%s) called a tool; no Python checks for it", seat["handle"], seat["model"])
+                    self._no_python.add(seat["id"])
+                    messages = self._turn_context(seat, round_no, exclude_id=msg_id)
+                    self._restart_reply(msg_id, "(it tried to call a Python tool of its own; answering without checks)")
+                    return await attempt(think)
+
             retried = False
             try:
-                stats = await attempt(think)
+                stats = await first_try()
             except Exception as e:
                 # A server error, or a reply the server couldn't parse (deepseek-r1's thinking sometimes trips
                 # Ollama's parser): one more try, answering straight away
@@ -1730,6 +1791,19 @@ class DebateEngine:
                     if stats.get("cut")
                     else "returned an empty reply"
                 )
+            output = await self._python_checks(msg_id, content)
+            if output:
+                # It asked for a Python check: it finishes its message with what the program printed
+                follow = messages + [
+                    {"role": "assistant", "content": pyrun.before_output(content)},
+                    {"role": "user", "content": prompts.python_followup(output)},
+                ]
+                try:
+                    more = await attempt(await self._thinking_flag(seat["endpoint_id"], seat["model"], False), follow)
+                    stats = _add_stats(stats, more)
+                except Exception as e:  # the turn stands with the check's output; only its last words are missing
+                    log.warning("seat %s (%s) couldn't finish after its check: %s", seat["handle"], seat["model"], e)
+                content = strip_thinking(partial["content"])
             st = parse_stance(content)
             self._finish_message(
                 msg_id,
@@ -1785,6 +1859,27 @@ class DebateEngine:
 
     def _queue_research(self, request: str, requested_by: Optional[str], kind: str) -> None:
         self.research_queue.append({"request": request, "requested_by": requested_by, "kind": kind})
+
+    def _python_on(self) -> bool:
+        """Agents can check calculations with Python: a sandbox exists, and this isn't a code review (the reviewed
+        code can't run on its own). A question that quotes code ("what does this print?") gets checks."""
+        d = self.debate()
+        return bool(pyrun.sandbox()) and not is_code_review(self._question(d["topic"]), d["pack"], d.get("repo_path"))
+
+    async def _python_checks(self, msg_id: int, content: str) -> Optional[str]:
+        """Runs the programs a reply asked for (@Python:), shows what they printed under it, and returns that for the
+        model to finish its reply with. None when it asked for none."""
+        programs = pyrun.parse_requests(content) if self._python_on() else []
+        if not programs:
+            return None
+        self._log(msg_id, "(running its Python check)")
+        results = [await pyrun.run(code) for code in programs]
+        text = pyrun.results_text(programs, results)
+        partial = self.partials[msg_id]
+        partial["content"] = f"{pyrun.before_output(content).rstrip()}\n\n{text}\n\n"
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        self.bus.publish({"type": "message_updated", "message": serialize_message(row, partial)})
+        return text
 
     def _coder(self) -> Optional[str]:
         """The coding agent for this conundrum (Claude Code or Codex), when a repository is attached."""
@@ -2139,6 +2234,7 @@ class DebateEngine:
                 role={"role": seat["role"], "focus": seat.get("role_focus") or ""} if seat.get("role") else None,
                 coder=bool(self._coder()),
                 roster=roster,
+                python=self._python_on() and seat["id"] not in self._no_python,
             )
 
         others = [s for s in self.seats() if s["id"] != seat["id"]]

@@ -90,6 +90,12 @@ def _plain_math(text: str) -> str:
     return re.sub(r"\\[()\[\]]|\$", "", text)
 
 
+def answer_line(content: str) -> str:
+    """The value after 'ANSWER:' (what a question set with "strict" asks for), else the bottom line."""
+    m = re.search(r"^\W*ANSWER\W*[:：]\s*(.+)$", content or "", re.I | re.M)
+    return re.sub(r"[*_`]", "", m.group(1)).strip() if m else bottom_line(content)
+
+
 def bottom_line(content: str) -> str:
     """The answer's first line after 'BOTTOM LINE:', else its first line."""
     m = re.search(r"BOTTOM\s*LINE\s*[:：]\s*(.+)", content or "", re.I)
@@ -100,17 +106,17 @@ def bottom_line(content: str) -> str:
 # ------------------------------------------------------------------ running
 
 
-def ask_single(q: Dict[str, Any], model: str) -> Dict[str, Any]:
+def ask_single(q: Dict[str, Any], model: str, fmt: str = FORMAT, strict: bool = False) -> Dict[str, Any]:
     """The model alone. Like an agent in Quorum, it gets one more try without thinking when it sends no answer (a
     thinking model can use its whole context thinking), so the comparison is fair."""
     started = time.monotonic()
-    text, retried = _chat(model, q["question"] + FORMAT, think=None), False
+    text, retried = _chat(model, q["question"] + fmt, think=None), False
     if not text:
-        text, retried = _chat(model, q["question"] + FORMAT, think=False), True
+        text, retried = _chat(model, q["question"] + fmt, think=False), True
     return {
         "model": model,
         "text": text,
-        "correct": graded(q, text),
+        "correct": graded(q, answer_line(text) if strict else text),
         "seconds": round(time.monotonic() - started, 1),
         "retried": retried,
     }
@@ -131,9 +137,9 @@ def _chat(model: str, prompt: str, think: Optional[bool]) -> str:
     return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
 
 
-def ask_quorum(q: Dict[str, Any]) -> Dict[str, Any]:
+def ask_quorum(q: Dict[str, Any], fmt: str = FORMAT, strict: bool = False) -> Dict[str, Any]:
     started = time.monotonic()
-    body = {"question": q["question"] + FORMAT, "research_enabled": False, "max_rounds": ROUNDS}
+    body = {"question": q["question"] + fmt, "research_enabled": False, "max_rounds": ROUNDS}
     debate_id = cli.post("/debates", body)["debate"]["id"]
     print(f"    quorum: {cli.APP_URL}/#q/{debate_id}", flush=True)
     fixed = False
@@ -149,7 +155,7 @@ def ask_quorum(q: Dict[str, Any]) -> Dict[str, Any]:
         if d["status"] in ("concluded", "failed", "cancelled"):
             break
         time.sleep(3)
-    return {"id": debate_id, "seconds": round(time.monotonic() - started, 1), **grade_debate(q, snap)}
+    return {"id": debate_id, "seconds": round(time.monotonic() - started, 1), **grade_debate(q, snap, strict)}
 
 
 def _patch(debate_id: str, fields: Dict[str, Any]) -> None:
@@ -160,7 +166,7 @@ def _patch(debate_id: str, fields: Dict[str, Any]) -> None:
     urllib.request.urlopen(req, timeout=30).read()
 
 
-def grade_debate(q: Dict[str, Any], snap: Dict[str, Any]) -> Dict[str, Any]:
+def grade_debate(q: Dict[str, Any], snap: Dict[str, Any], strict: bool = False) -> Dict[str, Any]:
     d = snap["debate"]
     seats = {s["id"]: s for s in snap["seats"]}
     first = [m for m in snap["messages"] if m["author_kind"] == "seat" and m["round"] == 1 and m["status"] == "done"]
@@ -177,7 +183,8 @@ def grade_debate(q: Dict[str, Any], snap: Dict[str, Any]) -> Dict[str, Any]:
     draft1 = next((x for x in drafts if x["round"] == 1), None)
     verdict = next((v for v in snap["verdicts"] if v["topic"] == d["topic"]), None)
     final = next((m for m in snap["messages"] if verdict and m["id"] == verdict["message_id"]), None)
-    final_line = bottom_line(final["content"]) if final and final["status"] == "done" else ""
+    last = answer_line if strict else bottom_line
+    final_line = last(final["content"]) if final and final["status"] == "done" else ""
     draft_line = bottom_line(draft1["content"]) if draft1 else ""
     return {
         "status": d["status"],
@@ -282,13 +289,18 @@ def report(results: Dict[str, Any], questions: List[Dict[str, Any]]) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--questions", default=str(QUESTIONS), help="question set (default: benchmarks/debate)")
     ap.add_argument("--ids", default="", help="comma-separated question ids (default: all)")
     ap.add_argument("--report", action="store_true", help="only write the report from results.json")
     ap.add_argument("--no-single", action="store_true", help="skip the single-model baseline")
+    ap.add_argument("--no-quorum", action="store_true", help="only ask the single model")
     ap.add_argument("--out", default=str(OUT), help="folder for results.json and the report")
     ap.add_argument("--redo-empty", action="store_true", help="ask the single model again where it sent no answer")
     args = ap.parse_args()
-    questions = json.loads(QUESTIONS.read_text())["questions"]
+    qset = json.loads(Path(args.questions).read_text())
+    questions = qset["questions"]
+    # A harder set asks for an ANSWER: line and grades only that line, the same way for the model alone and Quorum
+    fmt, strict = qset.get("format", FORMAT), bool(qset.get("strict"))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     path = out / "results.json"
@@ -304,13 +316,13 @@ def main() -> None:
                 r.pop("single")
             print(q["id"], flush=True)
             if model and "single" not in r:
-                r["single"] = ask_single(q, model)
+                r["single"] = ask_single(q, model, fmt, strict)
                 print(
                     f"    alone: {'right' if r['single']['correct'] else 'wrong'} ({r['single']['seconds']}s)",
                     flush=True,
                 )
-            if "quorum" not in r:
-                r["quorum"] = ask_quorum(q)
+            if "quorum" not in r and not args.no_quorum:
+                r["quorum"] = ask_quorum(q, fmt, strict)
                 qr = r["quorum"]
                 agents = sum(a["correct"] for a in qr["agents"])
                 print(f"    quorum: agents {agents}/{len(qr['agents'])}, draft {qr['draft_round1_correct']}, "

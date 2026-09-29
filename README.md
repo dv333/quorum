@@ -208,6 +208,9 @@ runs on your computer (stdio).
   preferring official documentation. Before the answer is written, every claim it relies on is checked against a
   source and backed by an exact quote; the answer can't state a contradicted claim, must keep caveats, and is audited
   (and corrected) against that evidence. When the evidence can't pick a winner, the answer says so.
+- **Calculations are run, not guessed.** When an answer depends on a count, a probability, a date or what code
+  prints, an agent (or the chair) writes a short Python program and Quorum runs it in a sandbox: no network, no
+  files outside its own folder, no other programs, 10 seconds. The agent finishes its message with what it printed.
 - **Topic packs.** Pick a kind of debate (Review code, Stress-test a decision, Brainstorm ideas and more) or write
   your own in a few lines of JSON. Packs can build the council around suitable models, like coding models for code
   review, and suggest one to add when you have none.
@@ -413,6 +416,21 @@ two questions per round. Choose with `QUORUM_CODER=claude|codex|off`.
 Code debates also get **specialist reviewers** for what the change touches: a Security expert, a Performance &
 reliability (PSR) expert and a Test engineer always; a Database, Network, Concurrency or API & compatibility expert
 when the question or diff involves them; plus the Skeptic.
+
+</details>
+
+<details>
+<summary><b>Python checks: how the sandbox works</b></summary>
+
+An agent asks for a check by writing `@Python:` and a Python code block; Quorum runs the program and shows what it
+printed under the message, and the agent finishes its turn with that output. The chair can do the same before a
+direct answer, and the final answer trusts a check's output over mental arithmetic. At most two programs per turn.
+
+Programs run with your Python's standard library in a temporary folder, with a few seconds of CPU and no environment
+from your shell. The sandbox is `sandbox-exec` on macOS and [bubblewrap](https://github.com/containers/bubblewrap)
+(`bwrap`) on Linux: no network, no writing outside that folder, no starting other programs. Without either (Windows,
+or Linux without `bwrap`), checks are off and agents aren't told about them. Code reviews never run code. Turn checks
+off with `QUORUM_PYTHON=off`.
 
 </details>
 
