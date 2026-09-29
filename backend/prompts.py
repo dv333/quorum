@@ -904,7 +904,7 @@ The answer:
 Check only these five things:
 1. Fit: advice that contradicts the user's own numbers or situation, or leaves them worse off by those numbers (for example, building savings at a few percent while carrying debt at 24%). Work out the key numbers before you judge.
 2. Made-up precision: a specific statistic, percentage or study result stated as fact, with no basis in the question and no arithmetic shown.
-3. Contradictions: two parts of the answer that disagree, or details that lean further than the bottom line.
+3. Contradictions: two parts of the answer that disagree (compare every number and recommendation in the bottom line with the key points and details: a $2,000–$3,000 buffer in one place and $3,000–$4,000 in another is a contradiction), details that lean further than the bottom line, and a wrong unit or word that changes the meaning ("runs under 60 km" for 60 minutes).
 4. Possibly out of date: prices, incentives, tax rules, laws, versions or product facts that change over time, stated as current.
 5. Missing: the one thing an expert would tell this user first that the answer leaves out.
 Don't flag style, format, length or tone. Advice and judgment calls are fine unless they fail check 1.{agents} Quote the answer's words exactly. If nothing fails, return an empty list.

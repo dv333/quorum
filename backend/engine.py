@@ -2763,13 +2763,27 @@ class DebateEngine:
         ledger = " ".join(f"{c.get('claim', '')} {c.get('quote', '')} {c.get('caveat', '')}" for c in claims)
         return " ".join([pages, self._research_digest(topic, limit_words=6000), ledger, question])
 
-    def _auditor(self, d: Dict[str, Any]) -> Tuple[str, int, str]:
+    async def _size(self, endpoint_id: int, model: str) -> float:
+        """Billions of parameters, as the model server reports them (a tag like "qwen3.8:latest" doesn't say), else
+        from the tag."""
+        try:
+            meta = await self.meta_lookup(endpoint_id, model, self.debate()["num_ctx"])
+        except Exception:
+            meta = None
+        m = re.match(r"\s*(\d+(?:\.\d+)?)\s*([BM])", str((meta or {}).get("params") or ""), re.I)
+        if m:
+            return float(m.group(1)) / (1000 if m.group(2).upper() == "M" else 1)
+        return model_size(model)
+
+    async def _auditor(self, d: Dict[str, Any]) -> Tuple[str, int, str]:
         """Who checks the chair's answer: the largest council model other than the chair's, so the answer isn't
-        audited by the model that wrote it (falls back to the chair when every seat runs the same model)."""
+        audited by the model that wrote it (falls back to the chair when every seat runs the same model). Sizes come
+        from the model server: judged by name, "qwen3.8:latest" (27B) once lost to "gpt-oss:20b"."""
         others = [s for s in self.seats() if s["model"] != d["chair_model"]]
         if not others:
             return self._chair_label(d), d["chair_endpoint_id"], d["chair_model"]
-        s = max(others, key=lambda s: model_size(s["model"]))
+        sizes = [await self._size(s["endpoint_id"], s["model"]) for s in others]
+        s = others[max(range(len(others)), key=lambda i: sizes[i])]  # ties: the first, as seats are largest first
         return s["handle"], s["endpoint_id"], s["model"]
 
     async def _audit_answer(
@@ -2783,7 +2797,7 @@ class DebateEngine:
         d = self.debate()
         chair = self._chair_label(d)
         think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
-        auditor, a_ep, a_model = self._auditor(d)
+        auditor, a_ep, a_model = await self._auditor(d)
         try:
             text = await self._complete(
                 auditor,
@@ -2927,21 +2941,23 @@ class DebateEngine:
             return
         d = self.debate()
         question = self._question(row["topic"])
-        critic, c_ep, c_model = self._auditor(d)
+        critic, c_ep, c_model = await self._auditor(d)
         self.bus.publish({"type": "debate_updated", "debate": {"phase": f"{critic} is checking the answer…"}})
         raw: List[Any] = []
-        try:
-            text = await self._complete(
-                critic,
-                "critique",
-                c_ep,
-                c_model,
-                prompts.critique_messages(question, row["content"], list(self._handles().values())),
-                await self._thinking_flag(c_ep, c_model, False),
-            )
-            raw = parse_json_loose(text).get("problems") or []
-        except Exception as e:
-            log.warning("answer critique failed: %s", e)
+        critique = prompts.critique_messages(question, row["content"], list(self._handles().values()))
+        # The critic thinks: without it, it missed contradictions between sections and made-up figures. If it
+        # thinks until the limit and replies with nothing, it tries once more without thinking
+        for wanted in (True, False):
+            try:
+                text = await self._complete(
+                    critic, "critique", c_ep, c_model, critique, await self._thinking_flag(c_ep, c_model, wanted)
+                )
+            except Exception as e:
+                log.warning("answer critique failed: %s", e)
+                continue
+            if text.strip():
+                raw = parse_json_loose(text).get("problems") or []
+                break
         problems = (
             self._code_checks(row["content"], question)
             + [
@@ -3042,7 +3058,7 @@ class DebateEngine:
             if parts[-1] and len(parts[-1]) + len(line) > REVIEW_PART_CHARS:
                 parts.append("")
             parts[-1] += line + "\n"
-        auditor, a_ep, a_model = self._auditor(d)
+        auditor, a_ep, a_model = await self._auditor(d)
         think = await self._thinking_flag(a_ep, a_model, False)
         missing: List[Dict[str, str]] = []
         seen = set()
@@ -3231,7 +3247,7 @@ class DebateEngine:
         too, the chair's latest draft stands in, labelled. A stalled Ollama once cost a 32-minute debate its answer."""
         partial = self.partials.setdefault(msg_id, {"content": "", "thinking": ""})
         chair = (self._chair_label(d), d["chair_endpoint_id"], d["chair_model"])
-        backup = self._auditor(d)
+        backup = await self._auditor(d)
         writers = [chair] + ([backup] if backup[2] != chair[2] else [])
         errors: List[str] = []
         for i, (label, ep_id, model) in enumerate(writers):

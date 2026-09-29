@@ -1863,3 +1863,41 @@ async def test_the_critic_runs_only_without_research_and_never_on_a_review():
     await eng.post_user_message(DIFF_Q)
     await eng.task
     assert not client.calls_with("You check an AI council's final answer")
+
+
+async def test_the_critic_is_the_largest_other_model_by_its_real_size():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1, models=["small:latest", "big:latest", "gpt-oss:20b"])
+    sizes = {"small:latest": "4.3B", "big:latest": "27.8B", "gpt-oss:20b": "20.9B"}
+
+    async def meta(endpoint_id, model, num_ctx):
+        return {"thinking": True, "params": sizes.get(model)}
+
+    eng.meta_lookup = meta
+    await eng.post_user_message("I have card debt. Pay it off?")
+    await eng.task
+    critic = [model for model, m, _ in client.calls if m[0]["content"].startswith("You check an AI council's final")]
+    assert critic == ["big:latest"]  # judged by name, "big:latest" would count as 0 and lose to gpt-oss:20b
+
+
+async def test_the_critic_thinks_and_retries_without_thinking_when_it_only_thought():
+    class ThinkingCritic(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if messages[0]["content"].startswith("You check an AI council's final") and kw.get("think"):
+                self.calls.append((model, messages, kw))
+                yield Chunk("thinking", "hmm " * 20)
+                yield Chunk("done", stats={})
+                return
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = ThinkingCritic(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS
+    client.critique_reply = FLAG
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
+    await eng.task
+    thinks = [kw["think"] for _, m, kw in client.calls if m[0]["content"].startswith("You check an AI council's final")]
+    assert thinks == [True, False]
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert json.loads(chair["meta_json"])["critique"]["revised"]  # the second try's flag was acted on
