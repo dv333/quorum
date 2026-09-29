@@ -50,3 +50,25 @@ def test_starter_pack_scales_with_memory():
     assert starter_pack(int(6 * GB))[0] == "qwen3:4b"
     for pack in (starter_pack(int(g * GB)) for g in (6, 16, 36)):
         assert len({m.split(":")[0].rstrip("0123456789.") for m in pack}) == 3  # three families
+
+
+async def test_a_stream_that_ends_without_its_final_message_is_an_error(monkeypatch):
+    """Ollama can stall and drop a request mid-reply; that's an error, not an empty answer."""
+    import json
+
+    import httpx
+    import pytest
+
+    from backend import providers
+    from backend.providers import ChatClient, Endpoint, ProviderError
+
+    def reply(request):
+        lines = [{"message": {"content": "BOTTOM"}, "done": False}]  # no {"done": true} line
+        return httpx.Response(200, text="\n".join(json.dumps(x) for x in lines))
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(providers.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(reply), **kw))
+    ep = Endpoint(id=1, name="local", kind="ollama", base_url="http://127.0.0.1:11434", api_key=None)
+    with pytest.raises(ProviderError, match="stopped mid-reply"):
+        async for _ in ChatClient().stream(ep, "m", [{"role": "user", "content": "hi"}]):
+            pass

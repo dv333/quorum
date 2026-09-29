@@ -3029,6 +3029,50 @@ class DebateEngine:
                 )
         return out
 
+    async def _write_answer(
+        self, msg_id: int, d: Dict[str, Any], vmessages: List[Dict[str, str]]
+    ) -> Tuple[str, Dict[str, Any], str]:
+        """The final answer: (content, stats, error). The chair writes it, with one retry. If it can't (a server
+        error, or a reply that stalls or comes back empty), the largest other council model writes it; if that fails
+        too, the chair's latest draft stands in, labelled. A stalled Ollama once cost a 32-minute debate its answer."""
+        partial = self.partials.setdefault(msg_id, {"content": "", "thinking": ""})
+        chair = (self._chair_label(d), d["chair_endpoint_id"], d["chair_model"])
+        backup = self._auditor(d)
+        writers = [chair] + ([backup] if backup[2] != chair[2] else [])
+        errors: List[str] = []
+        for i, (label, ep_id, model) in enumerate(writers):
+            # The debate already did the reasoning; thinking can exhaust the context window before any answer is
+            # written, so it's off here
+            think = await self._thinking_flag(ep_id, model, False)
+            for attempt in range(2 if i == 0 else 1):
+                partial["content"] = ""
+                try:
+                    stats = await self._stream_into(msg_id, ep_id, model, vmessages, think, None, label, "answer")
+                except Exception as e:
+                    log.warning("%s (%s) couldn't write the answer: %s", label, model, e)
+                    errors.append(str(e))
+                    self._log(msg_id, f"({label} failed: {e})")
+                    continue
+                content = strip_thinking(partial["content"]).strip()
+                if content:
+                    return content, stats, ""
+                errors.append("returned an empty answer")
+                self._log(msg_id, "(empty answer)")
+            if i + 1 < len(writers):
+                nxt = writers[i + 1]
+                self._log(msg_id, f"({label} couldn't write the answer; {nxt[0]} ({nxt[2]}) writes it instead)")
+        drafts = self._drafts(d["topic"])
+        if drafts:
+            last = drafts[-1]
+            text = re.sub(r"(?im)^\s*CHANGED\s*:.*$", "", last["content"]).strip()
+            note = (
+                f"*The full answer couldn't be written ({errors[-1]}), so this is the chair's draft after round "
+                f"{last['round']}. Ask a follow-up to get more detail.*"
+            )
+            self._log(msg_id, "(showing the chair's latest draft instead)")
+            return f"{text}\n\n{note}", {}, ""
+        return "", {}, " and ".join(dict.fromkeys(errors)) or "returned no answer"
+
     def _failure_note(self, d: Dict[str, Any], error: str) -> str:
         """Why there's no answer: the chair's error, every role that timed out or failed, and what to try next."""
         rows = db.query(
@@ -3095,31 +3139,10 @@ class DebateEngine:
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:
-                # The debate already did the reasoning; chair thinking can exhaust the context window
-                # before any answer is written, so it's off here.
-                think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
-                chair_label = self._chair_label(d)
-                stats = await self._stream_into(
-                    row["id"], d["chair_endpoint_id"], d["chair_model"], vmessages, think, None, chair_label, "answer"
-                )
-                partial = self.partials[row["id"]]
-                if not strip_thinking(partial["content"]).strip():
-                    # Some models still spend the whole budget "thinking" in plain text; retry once
-                    self._log(row["id"], "(empty answer, retrying)")
-                    partial["content"] = ""
-                    stats = await self._stream_into(
-                        row["id"],
-                        d["chair_endpoint_id"],
-                        d["chair_model"],
-                        vmessages,
-                        think,
-                        None,
-                        chair_label,
-                        "answer",
-                    )
-                content = strip_thinking(partial["content"]).strip()
+                content, stats, error = await self._write_answer(row["id"], d, vmessages)
                 if not content:
-                    raise RuntimeError("returned an empty answer twice")
+                    raise RuntimeError(error)
+                partial = self.partials[row["id"]]
                 self._finish_message(
                     row["id"],
                     content=content,
