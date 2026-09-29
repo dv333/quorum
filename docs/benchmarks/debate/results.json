@@ -1,0 +1,2448 @@
+{
+ "py-01": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "2\n\n**Explanation:**\nThe output is `2` due to how Python handles **mutable default arguments**.\n\n1.  The list `items=[]` is created only **once** when the function `f` is defined, not every time the function is called. This means all calls to `f` (that do not provide an explicit `items` argument) share the exact same list object in memory.\n2.  When `f(1)` is executed, it appends `1` to this shared list. The list becomes `[1]`.\n3.  When `f(2)` is executed inside the print statement, it appends `2` to that *same* existing list. The list becomes `[1, 2]`.\n4.  `len([1, 2])` evaluates to `2`, which is then printed.",
+   "correct": true,
+   "seconds": 32.1
+  },
+  "quorum": {
+   "id": "12904446df25",
+   "seconds": 409.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 2 due to shared mutable default state, but this pattern represents a fundamental design flaw rather than a reliable language feature.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints `2` because the mutable default list is shared across calls; the security concern is real in multi-caller contexts but is low-stakes for this standalone snippet.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints “2”; repeated calls will grow the default list, risking memory/performance issues.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will likely print 3, but it’s crucial to verify this with execution tracing to be absolutely sure about Python’s default argument behavior.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `2` due to the mutable default argument behavior.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `2` because the default list is shared across all calls to `f`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 2",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 1.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 2.",
+   "draft_round1_correct": true,
+   "final": "The program prints 2.",
+   "final_correct": true
+  }
+ },
+ "py-02": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "The program prints:\n\n**6**\n\n**Explanation:**\nIn Python 3, the `round()` function uses a strategy called **\"round half to even\"** (also known as banker's rounding). This means that when a number is exactly halfway between two integers, it rounds to the nearest *even* integer.\n\n1.  **`round(2.5)`**: The number 2.5 is equidistant from 2 and 3. Since 2 is even, it rounds down to **2**.\n2.  **`round(3.5)`**: The number 3.5 is equidistant from 3 and 4. Since 4 is even, it rounds up to **4**.\n\nThe calculation becomes `2 + 4`, which results in **6**. (Note: In Python 3, `round()` returns an integer, not a float).",
+   "correct": true,
+   "seconds": 22.3
+  },
+  "quorum": {
+   "id": "9f08ca9d3ed7",
+   "seconds": 499.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 6, because Python 3's round-half-to-even gives round(2.5)=2 and round(3.5)=4, and both operands are exactly representable in binary floating-point so no ulp error interferes.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `6.0` because Python 3’s `round` rounds ties to the nearest even integer.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print 7.0, but we need to confirm this by actually running the code to rule out floating-point imprecision.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `6` due to Python 3's round half to even behavior.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `6` because Python 3's `round()` function rounds 2.5 to 2 and 3.5 to 4 using bankers rounding.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints `6`, using Python's round-to-even rule.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 6.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 6.",
+   "draft_round1_correct": true,
+   "final": "The program prints 6.",
+   "final_correct": true
+  }
+ },
+ "py-03": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "**False**\n\n**Explanation:**\nThis occurs because computers represent floating-point numbers using binary (base-2) rather than decimal (base-10). The fraction `0.1` cannot be represented exactly in binary (it becomes a repeating fraction), so it is stored as an approximation. When you add the approximations of `0.1` and `0.2`, the result has a tiny rounding error that makes it slightly different from the stored approximation of `0.3`. Therefore, the equality check returns `False`.",
+   "correct": true,
+   "seconds": 21.2
+  },
+  "quorum": {
+   "id": "a260e63119d7",
+   "seconds": 490.8,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints False because IEEE 754 binary approximations of decimal fractions lead to bitwise mismatches during exact equality checks.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints `False` because 0.1+0.2 is not bit-equal to 0.3 in IEEE 754 double precision, and this result is deterministic across all Python 3 implementations.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "False, because 0.1+0.2 is not exactly 0.3 due to binary floating‑point representation.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints `False` due to floating-point representation inaccuracies.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `False` due to floating-point arithmetic precision issues.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `False` because floating-point arithmetic introduces small errors, making `0.1 + 0.2` slightly greater than `0.3`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints `False` due to IEEE 754 floating-point precision issues.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python program prints `False` because of floating-point arithmetic precision issues.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints False.",
+   "draft_round1_correct": true,
+   "final": "The program prints False because 0.1 + 0.2 is not bit-equal to 0.3 in IEEE 754 double-precision floating-point arithmetic.",
+   "final_correct": true
+  }
+ },
+ "py-04": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "6\n\n**Explanation:**\nThe list comprehension creates three lambda functions. In Python, closures capture variables by reference (late binding), not by value. By the time the lambdas are called, the loop has finished and the variable `i` holds its final value, which is 2. Therefore, every function in the list returns 2 when called, resulting in a sum of $2 + 2 + 2 = 6$.",
+   "correct": true,
+   "seconds": 22.8
+  },
+  "quorum": {
+   "id": "d23ba21a649d",
+   "seconds": 499.8,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 6 due to late-bound closure references sharing a single loop variable, requiring default-argument binding to safely isolate state in production systems.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 6, because all three lambdas close over the same comprehension-local `i` which retains its final value of 2.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "It prints 6.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 3 because in Python 3, each lambda function captures its own copy of `i` at the point of creation, not at the point of execution.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The output of the program is `5` due to late binding closures capturing the same variable by reference.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `6` because all lambdas reference the final value of `i` (2) due to late binding.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 6 because all lambdas reference the same `i` variable, which is updated to 2 before any are called.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python program prints 9.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 6.",
+   "draft_round1_correct": true,
+   "final": "The program prints 6.",
+   "final_correct": true
+  }
+ },
+ "py-05": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "4\n\n**Explanation:**\n1.  `a = [1, 2, 3]` creates a list object in memory.\n2.  `b = a` assigns the variable `b` to point to that **same** list object (aliasing). Both variables now reference the same data.\n3.  `b += [4]` is an augmented assignment. For lists, this performs an **in-place** modification (equivalent to `b.extend([4])`). It modifies the existing list object rather than creating a new one (which would happen if you used `b = b + [4]`).\n4.  Because `a` and `b` point to the same object, the change is visible through `a`. The list becomes `[1, 2, 3, 4]`.\n5.  `len(a)` returns 4.",
+   "correct": true,
+   "seconds": 26.3
+  },
+  "quorum": {
+   "id": "7da4ed466a7a",
+   "seconds": 400.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 4; list `+=` can outperform concatenation at scale, but its in-place mutation introduces hidden side effects that undermine reliability, so it should only be used when explicit aliasing is intentional and verified safe.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 4 because `+=` on a list mutates in place and `a`/`b` share the same object.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `4` because `b += [4]` mutates the shared list.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 4 because `+=` modifies the original list when aliased.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `4` because `b += [4]` modifies the list `a` in place.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `4` because `b += [4]` modifies the original list referenced by both `a` and `b`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 3",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program will print 4 because the `+=` operator creates a new list reference, not a new list instance.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 4.",
+   "draft_round1_correct": true,
+   "final": "The program prints 4.",
+   "final_correct": true
+  }
+ },
+ "py-06": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "2\n\n**Explanation:**\n1. `t = (1, 2)` creates a tuple object in memory.\n2. `u = t` makes `u` point to that same tuple object.\n3. `u += (3,)` performs an augmented assignment. Because tuples are **immutable**, Python cannot modify the existing object in place. Instead, it calculates the sum `(1, 2) + (3,)`, creates a **new** tuple object `(1, 2, 3)`, and rebinds `u` to point to this new object.\n4. The original tuple `(1, 2)` remains unchanged in memory. Since `t` still points to that original object, `len(t)` returns 2.",
+   "correct": true,
+   "seconds": 17.9
+  },
+  "quorum": {
+   "id": "8a746bd7a4eb",
+   "seconds": 397.4,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints `2` because rebinding `u` leaves the original immutable tuple untouched and bound to `t`.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 2, because `+=` on an immutable tuple rebinds `u` to a new object while `t` still references the original 2-element tuple.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints the integer `2`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program likely prints 2, but I'm hesitant to be fully confident until we examine the mechanics of the `+=` operator with tuples more closely.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `2` because tuples are immutable, so `t` remains unchanged.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `2` because `t` remains unchanged after `u += (3,)` creates a new tuple.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 3 because the operation modifies the tuple in place.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 3.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 2.",
+   "draft_round1_correct": true,
+   "final": "The program prints 2.",
+   "final_correct": true
+  }
+ },
+ "py-07": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "-4\n\n**Explanation:**\nThe `//` operator in Python performs **floor division**. This means it divides the numbers and then rounds the result down to the nearest integer (towards negative infinity).\n\nMathematically, $-7$ divided by $2$ is $-3.5$. Rounding $-3.5$ down results in $-4$.",
+   "correct": true,
+   "seconds": 15.7
+  },
+  "quorum": {
+   "id": "17c70c6ec607",
+   "seconds": 409.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints `-4` because Python 3’s `//` operator performs floor division (rounding toward negative infinity), not truncation toward zero.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "print(-7 // 2)` prints `-4` in all Python 3 versions, because `//` is floor division and floor(-3.5) = -4.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints -4, because Python’s floor division rounds toward negative infinity.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints -4 because of floor division rounding down.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program outputs `-4` because floor division rounds towards negative infinity.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `-4` because Python's `//` operator performs floor division, rounding `-3.5` down to `-4`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program outputs -4 due to floor division rounding towards negative infinity.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python 3 program prints -4.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints -4.",
+   "draft_round1_correct": true,
+   "final": "The program prints -4 because Python 3's floor division operator (//) rounds the result toward negative infinity, not toward zero.",
+   "final_correct": true
+  }
+ },
+ "py-08": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "The output is:\n\n**2**\n\n**Explanation:**\nIn Python, the modulo operator (`%`) calculates the remainder based on **floor division**. This means the result always has the same sign as the divisor (or is non-negative if the divisor is positive).\n\nMathematically, Python solves for $r$ in the equation:\n$$a = (a // n) \\times n + r$$\n\nFor `-7 % 3`:\n1.  The floor division `-7 // 3` results in `-3` (rounding down to negative infinity).\n2.  Multiply the divisor by this quotient: $-3 \\times 3 = -9$.\n3.  Subtract this from the original number to find the remainder: $-7 - (-9) = 2$.",
+   "correct": true,
+   "seconds": 23.8
+  },
+  "quorum": {
+   "id": "917e91da20b2",
+   "seconds": 361.4,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The output is `2` because Python uses floor division for modulo operations.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "-7 % 3` prints `2` in Python 3, because the operator floors toward negative infinity, keeping the result in [0, b) for positive b.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `2`, because Python’s modulo follows floor division, not the mathematic convention of a remainder sharing the dividend’s sign.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 2 due to Python's implementation of the modulo operator following the Euclidean definition of remainder.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `2` because Python's modulus operation with a negative dividend yields a positive remainder.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `2` because Python's modulo operation returns a remainder with the same sign as the divisor.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 2.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "In Python 3, the expression `-7 % 3` evaluates to `-1`.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 2.",
+   "draft_round1_correct": true,
+   "final": "The program prints 2.",
+   "final_correct": true
+  }
+ },
+ "py-09": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "-3\n\n**Explanation:**\nIn Python, the `int()` function converts a floating-point number to an integer by **truncating towards zero** (simply removing the decimal part), rather than rounding to the nearest whole number. Therefore, `-3.7` becomes `-3`.",
+   "correct": true,
+   "seconds": 12.5
+  },
+  "quorum": {
+   "id": "08129bd8b360",
+   "seconds": 403.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints -3 because int() truncates toward zero rather than flooring to negative infinity.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "print(int(-3.7))` outputs `-3`, because Python's `int()` truncates floats toward zero rather than flooring them.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints “-3” (followed by a newline).",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints -4, because the `int()` function truncates towards zero.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program outputs `-3` by truncating the decimal part of `-3.7`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `-3` because Python's `int()` truncates toward zero when converting floats to integers.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints the integer -3.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python 3 program `print(int(-3.7))` prints `-3`.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "-3",
+   "draft_round1_correct": true,
+   "final": "The program prints -3 because Python's int() function truncates floating-point numbers toward zero, effectively discarding the fractional part rather than flooring to negative infinity.",
+   "final_correct": true
+  }
+ },
+ "py-10": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "14\n\n**Explanation:**\nThe variable `g` is a **generator expression**, not a list. Generators are iterators that compute values on demand and can only be iterated over once.\n\n1.  The first call to `sum(g)` iterates through the generator, calculating $0^2 + 1^2 + 2^2 + 3^2$, which equals **14**. After this call, the generator is \"exhausted\" (empty).\n2.  The second call to `sum(g)` attempts to iterate over the same exhausted generator. Since there are no values left, it returns **0**.\n3.  The final result is $14 + 0 = 14$.",
+   "correct": true,
+   "seconds": 18.7
+  },
+  "quorum": {
+   "id": "a0ca368f54ec",
+   "seconds": 451.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The output is 14, but the core vulnerability is silent iterator exhaustion causing undetected logic failures in streaming or security-critical code.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 14, because the second `sum(g)` iterates over an already-exhausted generator and contributes 0.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 14.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 14 because the generator is exhausted after the first sum.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `12` due to the generator being exhausted after the first summation.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `14` because the generator is exhausted after the first `sum(g)`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 14.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 40.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 14.",
+   "draft_round1_correct": true,
+   "final": "The program prints 14.",
+   "final_correct": true
+  }
+ },
+ "py-11": {
+  "quorum": {
+   "id": "ce2a675987a2",
+   "seconds": 538.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program outputs `1 c` because identical hashes and equality cause successive insertions to update the value in place while preserving the first inserted key.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints `1 c` because `1`, `1.0`, and `True` are equal and co-hash in Python 3, so all three writes target one dict slot.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints “1 c” because all three keys collide, leaving only the last assignment.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program's output is likely \"3 c\", pending verification that True overwrites 1.0 during dictionary key assignment.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `3 c` due to type equivalence in Python dictionaries.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `1 c` because `1`, `1.0`, and `True` are considered equal keys in Python, leading to the last assignment overwriting the others.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The output depends on hash randomization and isn't fixed.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints: `3 a",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 1 c.",
+   "draft_round1_correct": true,
+   "final": "The program prints 1 c because 1, 1.0, and True are treated as identical keys in a Python dictionary, causing all assignments to overwrite the same entry with the value 'c'.",
+   "final_correct": true
+  },
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "The program prints:\n\n**1 c**\n\n### Explanation\n\nIn Python, integers, floats, and booleans are treated as equivalent keys in dictionaries if their values are numerically equal.\n\n1.  `d[1] = 'a'` creates an entry with key `1`.\n2.  `d[1.0] = 'b'` looks up the key `1.0`. Since `1 == 1.0` and `hash(1) == hash(1.0)`, it finds the existing entry and overwrites the value `'a'` with `'b'`.\n3.  `d[True] = 'c'` looks up the key `True`. Since `True == 1` (and `True` is essentially `1` in Python) and `hash(True) == hash(1)`, it finds the same entry again and overwrites the value `'b'` with `'c'`.\n\nConsequently, the dictionary contains only **one** item (`len(d)` is `1`), and accessing any of those keys (including `d[1]`) returns the last assigned value, which is `'c'`.",
+   "correct": true,
+   "seconds": 28.1,
+   "retried": false
+  }
+ },
+ "py-12": {
+  "quorum": {
+   "id": "5ad98740ee99",
+   "seconds": 457.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 5 due to shallow reference aliasing from list multiplication, and list comprehensions should be preferred for creating independent mutable structures.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints `5` because `[[0]*2]*2` creates two references to one shared inner list, so mutating `x[0][0]` is visible through `x[1][0]`.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `5` because the two inner lists are the same object.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 5 because the list multiplication creates references to the same inner list.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `5` due to shared list references.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `5` because the list multiplication creates references to the same inner list.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 5 because the nested lists share references, so modifying the first element of the first row changes all rows' first elements.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints the value of the first element of the first sublist in the list of lists, which is 5.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 5.",
+   "draft_round1_correct": true,
+   "final": "The program prints 5 because list multiplication in Python replicates references, not objects, causing x[0] and x[1] to point to the same mutable list.",
+   "final_correct": true
+  },
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "5\n\n**Explanation:**\nThe expression `[[0] * 2] * 2` creates a list containing two references to the **same** inner list object, rather than two independent lists.\n\n1. `[0] * 2` creates a single list: `[0, 0]`.\n2. The outer brackets and multiplication (`[...] * 2`) create a new list where both `x[0]` and `x[1]` point to that exact same object in memory.\n3. When you execute `x[0][0] = 5`, you modify the shared inner list.\n4. Therefore, when you access `x[1][0]`, you see the updated value `5`.",
+   "correct": true,
+   "seconds": 19.0,
+   "retried": false
+  }
+ },
+ "py-13": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "olh\n\n**Explanation:**\nThe code uses Python's slice notation `[start:stop:step]`. By omitting `start` and `stop` but providing a negative `step` of `-2`, the program iterates backwards through the string starting from the last character. It selects every second character:\n\n1.  **Index 4**: `'o'`\n2.  **Index 2**: `'l'`\n3.  **Index 0**: `'h'`\n\nConcatenating these results in the string `olh`.",
+   "correct": true,
+   "seconds": 19.9
+  },
+  "quorum": {
+   "id": "fdf4ccabcbf5",
+   "seconds": 532.5,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The output is 'olo'; slicing is reliable and $O(N)$ optimized, but the allocation overhead of immutable strings makes memory reuse preferable in high-throughput scenarios.",
+     "correct": false
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "s[::-2]` prints `olh` because negative-step slicing starts at index 4, steps by −2 (4→2→0), and a None stop with negative step resolves to −1, so index 0 is included.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `'olh'`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints `olh` by taking every second character from the end of the string \"hello\".",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `hlo` because it slices the string `'hello'` backwards, taking every second character.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `olh` because slicing with a step of -2 traverses the string backward, selecting characters at indices 4, 2, and 0.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints the substring 'olh'.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python program uses slicing to create a new string, `s[::-2]`, which iterates over the original string `s` in reverse order, stepping backwards by 2 characters each time.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 'olh'.",
+   "draft_round1_correct": true,
+   "final": "The program prints olh.",
+   "final_correct": true
+  }
+ },
+ "py-14": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "1\n\n**Explanation:**\n1.  **`bool('False')`**: The argument is a non-empty string (note the quotes), which is considered \"truthy\" in Python. Therefore, it evaluates to `True`. In arithmetic operations, `True` acts as the integer `1`.\n2.  **`bool(0.0)`**: The argument is zero, which is considered \"falsy\". Therefore, it evaluates to `False`. In arithmetic operations, `False` acts as the integer `0`.\n3.  **Addition**: The expression effectively becomes `1 + 0`, resulting in the integer `1`.",
+   "correct": true,
+   "seconds": 16.8
+  },
+  "quorum": {
+   "id": "5a7a64503470",
+   "seconds": 481.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The output is the integer 1 because boolean addition coerces the values into integers, which is counterintuitive for those expecting a boolean result.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints exactly `1`, because `bool('False')` is `True` (non-empty string), `bool(0.0)` is `False`, and `True + False` is integer addition yielding `1`.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `1`; the intermediate booleans are shared singletons, so memory usage is minimal.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 1 because `bool('False')` is True (1) and `bool(0.0)` is False (0), leading to a sum of 1.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `1`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `1` because `bool('False')` is `True` and `bool(0.0)` is `False`, summing to `1`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program outputs the integer 1.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 2.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 1.",
+   "draft_round1_correct": true,
+   "final": "The program prints 1.",
+   "final_correct": true
+  }
+ },
+ "py-15": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "4\n\n**Explanation:**\n1.  `{1, 2, 2, 3}` creates a set. Since sets only store unique elements, the duplicate `2` is removed, resulting in `{1, 2, 3}`.\n2.  The `|` operator performs a **union** between the two sets. Combining `{1, 2, 3}` and `{3, 4}` results in the set `{1, 2, 3, 4}`.\n3.  `len()` counts the number of elements in that resulting set, which is 4.",
+   "correct": true,
+   "seconds": 16.2
+  },
+  "quorum": {
+   "id": "58281ba5f16d",
+   "seconds": 433.7,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints exactly `4`, because set union of {1,2,3} and {3,4} yields a 4-element set.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The correct output is 4, because set literals remove duplicates and the union operator produces a set of unique elements.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The code will print 4, although a more rigorous analysis is warranted.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `4`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `4` because the union of the two sets contains four unique elements.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "<4>",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python program prints 3, as the duplicate element in the first set is ignored.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 4.",
+   "draft_round1_correct": true,
+   "final": "The program prints 4.",
+   "final_correct": true
+  }
+ },
+ "py-16": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "2\n\n**Explanation:**\nIn Python, the `finally` block is always executed before a function returns, regardless of whether an exception occurred or a return statement was hit in the `try` block. If the `finally` block contains its own `return` statement, it overrides and discards any return value that was set in the `try` block. Therefore, although `return 1` is encountered first, the execution continues into the `finally` block, executes `return 2`, and returns `2`.",
+   "correct": true,
+   "seconds": 15.6
+  },
+  "quorum": {
+   "id": "0862aab98ac2",
+   "seconds": 422.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 2 because the finally block's return overrides the try block's return.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints `2` because a `return` in `finally` overrides the pending return from the `try` block per the Python 3 spec.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `2`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 2 because the `finally` block overrides the `try` block's return value.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `2` because the `finally` block's return statement overrides the `try` block's return.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The Python program prints 2.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 2 because the finally block's return statement overrides the pending return from the try block.",
+   "draft_round1_correct": true,
+   "final": "The program prints 2 because a return statement in a finally block always overrides any pending return from the try block.",
+   "final_correct": true
+  }
+ },
+ "py-17": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "12\n\n**Explanation:**\nThe code executes in two main steps:\n1.  **`range(1, 10, 3)`**: This generates a sequence of numbers starting at **1**, incrementing by **3**, and stopping before it reaches **10**. The resulting sequence is `[1, 4, 7]`. (The next number would be 10, which is excluded because the stop value is exclusive).\n2.  **`sum(...)`**: This adds the numbers in that sequence together: $1 + 4 + 7 = 12$.",
+   "correct": true,
+   "seconds": 16.5
+  },
+  "quorum": {
+   "id": "a352632a7e84",
+   "seconds": 454.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints exactly 12.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints exactly 12, because range(1,10,3) yields {1,4,7} whose sum is 12.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 12 followed by a newline; the visible result is the number 12.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 12, because the sum of the sequence 1, 4, and 7 is 12.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints 12, but initially, there was a mistake in the calculation.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `12` because `range(1, 10, 3)` generates `[1, 4, 7]`, which sums to 12.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints 12 because range(1, 10, 3) generates the numbers 1, 4, 7 and their sum is 12.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 12.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 12 (followed by a newline).",
+   "draft_round1_correct": true,
+   "final": "The program prints 12.",
+   "final_correct": true
+  }
+ },
+ "py-18": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "The program prints:\n\n**7%**\n\n**Explanation:**\n1.  **`%d`**: This format specifier expects an integer. When applied to a float like `7.9`, it truncates the decimal part (it does not round), resulting in `7`.\n2.  **`%%`**: In Python's old-style string formatting, doubling the percent sign is the escape sequence required to print a literal `%` character.",
+   "correct": true,
+   "seconds": 25.1
+  },
+  "quorum": {
+   "id": "aa717feef989",
+   "seconds": 773.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints \"7%\" because %d truncates the float 7.9 and %% renders a literal percent sign.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints `7%` because `%d` truncates the float 7.9 to integer 7 and `%%` yields a literal percent sign.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints 7%.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print \"7%\", but testing across Python 3 versions is necessary to confirm consistent behavior, especially when older versions are involved.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `7%`.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `7%` because `%d` truncates `7.9` to `7`, and `%%` outputs a single `%`.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints `7%` due to the integer formatting of the float.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints `'7.9%'`.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 7%.",
+   "draft_round1_correct": true,
+   "final": "The program prints 7%.",
+   "final_correct": true
+  }
+ },
+ "py-19": {
+  "quorum": {
+   "id": "866d8fcfd6cf",
+   "seconds": 442.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints 6 due to late-binding name resolution, but the explanation must explicitly account for execution context dependencies.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The program prints 6, because Python resolves the global `x` at call time when it is 6.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The correct output is `6` because the function reads the global `x` when called.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program will print 5 because the function `h` captures the value of `x` before it's modified.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `5` because `h()` accesses the global scope where `x` was initially set to `5`.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `6` because the function `h` references the global variable `x`, which is updated to `6` before the function is called.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints `5` because the function `h()` returns the value of `x` at the time it was defined, and the subsequent reassignment does not affect that value within the function's scope.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "This Python program prints 5 because the function `h()` captures the value of `x` at its definition, which is 5.",
+     "correct": false
+    }
+   ],
+   "draft_round1": "The program prints 6.",
+   "draft_round1_correct": true,
+   "final": "The program prints 6.",
+   "final_correct": true
+  },
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "6\n\n**Explanation:**\nIn Python, variable lookup happens dynamically at runtime. When `h()` is called, it looks for the variable `x` in the global scope. Since `x` was reassigned to `6` before the function was invoked, the function retrieves the current value of `x`, which is 6. It does not capture the value of `x` (5) at the moment the function was defined.",
+   "correct": true,
+   "seconds": 13.1,
+   "retried": false
+  }
+ },
+ "py-20": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "apple\n\n**Explanation:**\nIn Python, the `max()` function compares strings lexicographically based on their Unicode code points (ASCII values). It compares the characters from left to right.\n\n1.  It compares the first character of `'apple'` (`'a'`) with the first character of `'Banana'` (`'B'`).\n2.  In ASCII/Unicode, uppercase letters have lower values than lowercase letters. `'B'` has a value of 66, while `'a'` has a value of 97.\n3.  Since 97 is greater than 66, `'apple'` is considered \"larger\" than `'Banana'`.\n\nTherefore, `max()` returns `'apple'`.",
+   "correct": true,
+   "seconds": 23.5
+  },
+  "quorum": {
+   "id": "974418ae5627",
+   "seconds": 478.2,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The output is `apple` because the lowercase 'a' (code point 97) is greater than the uppercase 'B' (code point 66).",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "print(max('apple', 'Banana'))` outputs `apple` because Python 3 compares strings by raw Unicode code point, where uppercase `B` (66) sorts before lowercase `a` (97).",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program outputs the string “apple”.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 'B' by comparing strings lexicographically.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `'Banana'` due to Python's default case-sensitive string comparison.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `'apple'` because uppercase letters have lower Unicode values than lowercase letters in lexicographical comparisons.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The program prints `'apple'` because the lexicographical comparison favors lowercase letters due to their higher Unicode values.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 'apple' because it is the first string where 'a' is greater than the corresponding character in 'Banana'.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints \"apple\".",
+   "draft_round1_correct": true,
+   "final": "The program prints apple because Python 3 compares strings by Unicode code points, where the lowercase 'a' (97) is greater than the uppercase 'B' (66).",
+   "final_correct": true
+  }
+ },
+ "py-21": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "512\n\n**Explanation:**\nIn Python, the exponentiation operator (`**`) is **right-associative**. This means that when multiple exponents are chained together without parentheses, they are evaluated from right to left.\n\nTherefore, `2 ** 3 ** 2` is interpreted as `2 ** (3 ** 2)`:\n1. First, it calculates the exponent: $3^2 = 9$.\n2. Then, it calculates the base raised to that result: $2^9 = 512$.\n\n(If it were left-associative, it would be $(2^3)^2 = 8^2 = 64$, but that is not how Python works.)",
+   "correct": true,
+   "seconds": 21.3
+  },
+  "quorum": {
+   "id": "f0b9f1ddb727",
+   "seconds": 415.0,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "While 512 is correct, the group should emphasize that this outcome depends strictly on right-associativity (not precedence), and warn against left-to-right assumptions common in other operators or languages.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "print(2 ** 3 ** 2)` prints 512 because `**` is right-associative in Python, so the expression evaluates as `2 ** (3 ** 2) = 2 ** 9 = 512`.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `512`.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints 512 because Python evaluates the rightmost exponentiation first.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `512` due to right-associative evaluation of the exponentiation operator.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The program prints `512` because Python's `**` operator is right-associative, evaluating `3 ** 2` first.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The output is 512 because exponentiation is right-associative in Python.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The program prints 512, but the explanation is incorrect.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints 512.",
+   "draft_round1_correct": true,
+   "final": "The program prints 512.",
+   "final_correct": true
+  }
+ },
+ "py-22": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "The program prints:\n**[1, 2]**\n\n### Explanation\n1.  **The List:** The list is `[1, 2, 3]`, which has a length of 3.\n2.  **The Slice Syntax:** The code uses slicing `[-4:2]`. This asks for elements starting from index `-4` up to (but not including) index `2`.\n3.  **Negative Index Handling:** In Python, negative indices count from the end of the list. However, if a negative start index is \"too far\" back (specifically, if it falls before the beginning of the list), Python clamps it to `0` (the very start).\n    *   The length is 3. Index `-3` corresponds to the first element (`1`).\n    *   Index `-4` is out of bounds on the left side, so it defaults to index `0`.\n4.  **The Result:** The slice effectively becomes `[0:2]`. This extracts elements at indices `0` and `1`, which are `1` and `2`.",
+   "correct": true,
+   "seconds": 83.2,
+   "retried": false
+  },
+  "quorum": {
+   "id": "3d17a31d5320",
+   "seconds": 719.6,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The program prints [1, 2] because Python clamps out-of-bounds negative slice indices to 0 during normalization.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "[1, 2]` is printed, because −4 clamps to 0 on a length-3 list, making the effective slice `[0:2]`.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The program prints `[1, 2]` because the slice `[-4:2]` clamps the negative start to `0` and excludes the element at index 2.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The program prints `[2]` because the slice `[-4:2]` effectively becomes `[0:2]`, including elements at indices 0 and 1.",
+     "correct": false
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The program prints `[1]` because the slice starts from the first element due to out-of-bounds negative index.",
+     "correct": false
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The slice is not empty, so the computational cost of an empty slice is not applicable to this case.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "The code prints [1] because negative start index -4 aligns with index 0, slicing only up to index 1.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The program prints [1, 2] because Python's slice start index clamps to 0 when the negative offset exceeds the list's length, including elements at indices 0 and 1.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The program prints [1, 2] because Python's slice normalization clamps out-of-bounds negative start indices to 0, resulting in an effective slice of [0:2].",
+   "draft_round1_correct": true,
+   "final": "The program prints [1, 2].",
+   "final_correct": true
+  }
+ },
+ "bat-ball": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "$0.05\n\n**Explanation:**\nLet $x$ be the cost of the ball. Since the bat costs $1.00 more than the ball, the bat costs $x + 1.00$. The total cost is the sum of both:\n$$x + (x + 1.00) = 1.10$$\n$$2x + 1.00 = 1.10$$\n$$2x = 0.10$$\n$$x = 0.05$$\n\nSo, the ball costs $0.05 (and the bat costs $1.05).",
+   "correct": true,
+   "seconds": 21.6,
+   "retried": false
+  },
+  "quorum": {
+   "id": "7f6732c4e108",
+   "seconds": 566.0,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The ball costs $0.05.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The ball costs exactly $0.05; the arithmetic is unambiguous and the $0.10 answer is the classic trap that fails the total-cost check.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The ball costs $0.05, given the standard interpretation of the problem.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The ball costs $0.05, as derived from the algebraic equation B + b = 1.10 and B = b + 1.00.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The ball costs $0.05.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The ball costs $0.05.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "The ball costs $0.05 based on precise algebraic summation against the total.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The ball costs $0.05 because algebra",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The ball costs $0.05.",
+   "draft_round1_correct": true,
+   "final": "The ball costs $0.05.",
+   "final_correct": true
+  }
+ },
+ "lily-pads": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "Day 47\n\n**Explanation:** Since the patch of lily pads doubles in size every day, the coverage on any given day is exactly twice that of the previous day. Therefore, if the lake is fully covered on Day 48, it must have been half-covered exactly one day prior.",
+   "correct": true,
+   "seconds": 9.1,
+   "retried": false
+  },
+  "quorum": {
+   "id": "5aa5e45e009e",
+   "seconds": 523.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "Day 47.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The lily pads cover half the lake on day 47, because working backward from full coverage on day 48, the previous day's area is exactly half.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The lake is half covered on day 47.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The problem's simplicity might mask a nuanced constraint about consistent growth that's not explicitly addressed, thus invalidating the straightforward answer.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The lily pads cover half the lake on day 47.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The lily pad covers half the lake on day 47 because exponential growth means the patch doubles daily, reaching full coverage on day 48.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "Day 47 is correct only under the assumption of discrete daily measurement intervals.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "Day 47 is the mathematically correct answer assuming uniform exponential growth conditions.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The lily pads cover half the lake on day 47.",
+   "draft_round1_correct": true,
+   "final": "The lily pads cover half the lake on Day 47.",
+   "final_correct": true
+  }
+ },
+ "widgets": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "5 minutes\n\nEach machine produces 1 widget in 5 minutes. Since the machines work simultaneously, 100 machines will each produce 1 widget in that same 5-minute period, yielding exactly 100 widgets. The time stays the same because the number of machines and widgets scale proportionally.",
+   "correct": true,
+   "seconds": 11.3,
+   "retried": false
+  },
+  "quorum": {
+   "id": "e34908edad2c",
+   "seconds": 15.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "5",
+   "final_correct": true
+  }
+ },
+ "compound": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "$1,157.63\n\n**Explanation:**\nTo find the future value of an investment with compound interest, use the formula $A = P(1 + r)^t$, where $P$ is the principal ($1,000), $r$ is the annual interest rate (0.05), and $t$ is the time in years (3).\n\n1.  Calculate the growth factor: $(1 + 0.05)^3 = 1.05^3 = 1.157625$.\n2.  Multiply by the principal: $1,000 \\times 1.157625 = 1,157.625$.\n3.  Round to the nearest cent: $1,157.625$ rounds up to **$1,157.63**.",
+   "correct": true,
+   "seconds": 21.4,
+   "retried": false
+  },
+  "quorum": {
+   "id": "78edf3da0038",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "It is worth $1,157.63.",
+   "final_correct": true
+  }
+ },
+ "round-trip": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "48 km/h\n\n**Explanation:**\nAverage speed is defined as the **total distance** divided by the **total time**. Because you travel the same distance at both speeds, you spend more time driving at the slower speed (40 km/h) than at the faster speed (60 km/h), which pulls the average down.\n\nMathematically, for two equal distances, the average speed is the harmonic mean of the two speeds:\n$$ \\text{Average Speed} = \\frac{2 \\times 60 \\times 40}{60 + 40} = \\frac{4800}{100} = 48 \\text{ km/h} $$",
+   "correct": true,
+   "seconds": 16.9,
+   "retried": false
+  },
+  "quorum": {
+   "id": "2d9a2595f1e6",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "The average speed for the whole trip is 48 km/h.",
+   "final_correct": true
+  }
+ },
+ "zeros": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "24\n\n**Explanation:**\nTrailing zeros are produced by factors of 10, which come from pairs of prime factors 2 and 5 ($2 \\times 5 = 10$). In a factorial, there are always more factors of 2 than 5, so the number of trailing zeros is determined by the count of the prime factor 5.\n\nTo find this, we use Legendre's Formula:\n1.  Divide 100 by 5: $\\lfloor 100/5 \\rfloor = 20$ (counts multiples like 5, 10, 15...)\n2.  Divide 100 by 25 ($5^2$): $\\lfloor 100/25 \\rfloor = 4$ (counts extra factors in numbers like 25, 50, 75, 100)\n3.  Divide 100 by 125 ($5^3$): $\\lfloor 100/125 \\rfloor = 0$\n\nTotal: $20 + 4 = 24$.",
+   "correct": true,
+   "seconds": 17.0,
+   "retried": false
+  },
+  "quorum": {
+   "id": "05a28deda4ee",
+   "seconds": 21.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "100! has 24 trailing zeros.",
+   "final_correct": true
+  }
+ },
+ "y2k-day": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "Saturday\n\n**Explanation:**\nYou can determine this by looking at the following year: January 1, 2001, was a Monday. Since the year 2000 was a leap year (divisible by 400), it contained 366 days. Because 366 days is exactly 52 weeks plus 2 extra days, you count backward two days from Monday to land on Saturday.",
+   "correct": true,
+   "seconds": 29.8,
+   "retried": false
+  },
+  "quorum": {
+   "id": "2657543f9447",
+   "seconds": 3.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "It was Saturday.",
+   "final_correct": true
+  }
+ },
+ "multiples": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "2418\n\nTo find this sum, we use the inclusion-exclusion principle: (sum of multiples of 3) + (sum of multiples of 5) − (sum of multiples of 15).\n\n• Multiples of 3 up to 100: 3, 6, …, 99 (33 terms). Sum = 3 × (33×34)/2 = 1683.\n• Multiples of 5 up to 100: 5, 10, …, 100 (20 terms). Sum = 5 × (20×21)/2 = 1050.\n• Multiples of 15 up to 100: 15, 30, …, 90 (6 terms). Sum = 15 × (6×7)/2 = 315.\n\nTotal = 1683 + 1050 − 315 = 2418.",
+   "correct": true,
+   "seconds": 35.2,
+   "retried": false
+  },
+  "quorum": {
+   "id": "0e0994ee54ee",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "The sum is 2318.",
+   "final_correct": false
+  }
+ },
+ "discount": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "$100\n\n**Explanation:**\nA 20% discount means the customer pays 80% of the original price ($100\\% - 20\\% = 80\\%$). Since the sale price is $80, you can find the original price by dividing the sale price by the remaining percentage (expressed as a decimal):\n$$80 \\div 0.80 = 100$$",
+   "correct": true,
+   "seconds": 35.1,
+   "retried": false
+  },
+  "quorum": {
+   "id": "96c8317cfa91",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "The original price was $100.",
+   "final_correct": true
+  }
+ },
+ "up-down": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "A decrease of 1%\n\n**Explanation:**\nIf you start with a price of $100:\n1.  A 10% rise increases it to **$110**.\n2.  A 10% fall is calculated based on the new amount ($110), which equals $11.\n3.  Subtracting that $11 leaves a final price of **$99**.\n\nSince $99 is $1 less than the original $100, the overall change is a 1% decrease.",
+   "correct": true,
+   "seconds": 13.8,
+   "retried": false
+  },
+  "quorum": {
+   "id": "5baa09122b27",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "The overall change is a decrease of 1%.",
+   "final_correct": true
+  }
+ },
+ "handshakes": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "45\n\nEach of the 10 people would initially seem to shake 9 hands, giving 10 × 9 = 90 counts. However, this double-counts every handshake (once for each participant), so we divide by 2: 90 ÷ 2 = 45 unique handshakes. This is equivalent to the combination formula C(10, 2) = 10×9/2 = 45.",
+   "correct": true,
+   "seconds": 8.0,
+   "retried": false
+  },
+  "quorum": {
+   "id": "c644e04bdf40",
+   "seconds": 12.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "45 handshakes.",
+   "final_correct": true
+  }
+ },
+ "chessboard": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "**204**\n\nTo find the total number of squares on an $8 \\times 8$ chessboard, you must count the squares for every possible size ($k \\times k$) and sum them up. The number of positions available for a square of size $k$ is $(9-k)^2$.\n\n*   **Size $1\\times1$:** $8^2 = 64$\n*   **Size $2\\times2$:** $7^2 = 49$\n*   **Size $3\\times3$:** $6^2 = 36$\n*   **Size $4\\times4$:** $5^2 = 25$\n*   **Size $5\\times5$:** $4^2 = 16$\n*   **Size $6\\times6$:** $3^2 = 9$\n*   **Size $7\\times7$:** $2^2 = 4$\n*   **Size $8\\times8$:** $1^2 = 1$\n\nTotal: $64 + 49 + 36 + 25 + 16 + 9 + 4 + 1 = \\mathbf{204}$.",
+   "correct": true,
+   "seconds": 90.1,
+   "retried": false
+  },
+  "quorum": {
+   "id": "3a9e18dbad63",
+   "seconds": 9.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "204",
+   "final_correct": true
+  }
+ },
+ "clock": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "7.5 degrees\n\n**Explanation:**\n1.  **Minute Hand Position:** At 15 minutes, the minute hand points exactly at the number 3. Relative to the 12 o'clock position, this is $90^\\circ$ ($15 \\text{ minutes} \\times 6^\\circ/\\text{minute}$).\n2.  **Hour Hand Position:** At 3:00, the hour hand points at the 3. However, it moves continuously. In 15 minutes, the hour hand moves $7.5^\\circ$ past the 3 ($15 \\text{ minutes} \\times 0.5^\\circ/\\text{minute}$).\n3.  **Calculation:** The angle between the two hands is the difference between their positions: $97.5^\\circ - 90^\\circ = 7.5^\\circ$.",
+   "correct": true,
+   "seconds": 29.8,
+   "retried": false
+  },
+  "quorum": {
+   "id": "81ca88777737",
+   "seconds": 36.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "75 degrees.",
+   "final_correct": false
+  }
+ },
+ "digits": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "31\n\n**Explanation:**\nTo find the number of digits in a number $N$, you calculate $\\lfloor \\log_{10}(N) \\rfloor + 1$. \n\nFor $2^{100}$:\n1.  Calculate $\\log_{10}(2^{100}) = 100 \\times \\log_{10}(2)$.\n2.  Using the approximation $\\log_{10}(2) \\approx 0.30103$, we get $100 \\times 0.30103 = 30.103$.\n3.  The integer part (floor) of $30.103$ is $30$.\n4.  Adding 1 gives the total number of digits: $30 + 1 = 31$.",
+   "correct": true,
+   "seconds": 25.0,
+   "retried": false
+  },
+  "quorum": {
+   "id": "71d181fcf84d",
+   "seconds": 653.4,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "$2^{100}$ has 31 digits, derived from the floor of $100 \\log_{10}(2)$ plus one.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "2^100 has exactly 31 digits, confirmed via floor(100·log₁₀2)+1 = floor(30.103)+1 = 31.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The decimal representation of \\(2^{100}\\) contains 31 digits.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "2 to the power 100 has 31 digits, calculated using the floor of 100 * log<sub>10</sub>(2) + 1.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "\\(2^{100}\\) has 31 digits.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The number of digits in $2^{100}$ is 31, calculated via $\\lfloor 100 \\cdot \\log_{10}(2) \\rfloor + 1$.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "The answer is 30 decimal digits, but calculating $2^{100}$ via standard floating-point methods introduces precision errors that corrupt the least significant bits of the number.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The number $2^{100}$ has exactly 31 decimal digits.",
+   "draft_round1_correct": true,
+   "final": "The number $2^{100}$ has exactly 31 decimal digits.",
+   "final_correct": true
+  }
+ },
+ "dice-seven": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "1/6\n\nWhen rolling two fair six-sided dice, there are 6 × 6 = 36 equally likely outcomes. The pairs that sum to 7 are (1,6), (2,5), (3,4), (4,3), (5,2), and (6,1), giving 6 favorable outcomes. Thus, the probability is 6/36 = 1/6.",
+   "correct": true,
+   "seconds": 11.6,
+   "retried": false
+  },
+  "quorum": {
+   "id": "52f9faef73f5",
+   "seconds": 9.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "The probability is \\(\\displaystyle \\frac16\\).",
+   "final_correct": true
+  }
+ },
+ "monty": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "2/3\n\nInitially, your chosen door has a 1/3 chance of hiding the car and a 2/3 chance of hiding a goat. Because the host always reveals a goat behind one of the other doors, switching transfers that 2/3 probability to the remaining unopened door. Therefore, switching wins with probability 2/3.",
+   "correct": true,
+   "seconds": 11.4,
+   "retried": false
+  },
+  "quorum": {
+   "id": "8ef37cd355bc",
+   "seconds": 563.0,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "Switching yields a 2/3 probability of winning because it captures the probability mass of the scenarios where your initial 1/3 guess was incorrect.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "Switching wins with probability exactly 2/3, conditional on the host's protocol (always reveals a goat, always offers the switch) being fixed in advance.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability of winning by switching is \\(2/3\\).",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "Switching doors in the Monty Hall problem yields a 2/3 probability of winning, though clear demonstration beyond the numerical value is needed to ensure comprehension.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability of winning if you switch in the Monty Hall game is \\( \\frac{2}{3} \\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "Switching gives a 2/3 chance of winning because the host’s action provides information that shifts probability in favor of the unchosen door.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "Switching yields a winning probability of exactly 2/3 due to the host's constrained action concentrating the prior odds against the unchosen door.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The probability of winning if you switch is 2/3 assuming standard game show rules where the host always reveals a goat door without bias.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The probability of winning by switching is exactly 2/3.",
+   "draft_round1_correct": true,
+   "final": "You should switch doors, as this strategy yields a 2/3 probability of winning compared to just 1/3 for staying.",
+   "final_correct": true
+  }
+ },
+ "two-children": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "1/3\n\n**Explanation:** The possible gender combinations for two children (assuming equal likelihood and independence) are: Boy-Boy (BB), Boy-Girl (BG), Girl-Boy (GB), and Girl-Girl (GG). The condition \"at least one is a boy\" rules out GG, leaving three equally likely scenarios: BB, BG, and GB. Only one of these three outcomes has two boys, so the probability is 1/3.",
+   "correct": true,
+   "seconds": 12.5,
+   "retried": false
+  },
+  "quorum": {
+   "id": "ea012908ff23",
+   "seconds": 545.0,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The answer is mathematically 1/3 under standard conditional probability conventions, but strictly relies on the unverified assumption that the information was not derived from observing a specific child.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "Under the standard \"at least one is a boy\" constraint, the probability is exactly 1/3.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability is 1/3 under the standard assumption of a random family selection, but if a random child is observed to be a boy, the probability becomes 1/2.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The probability that both children are boys, given that at least one is a boy, is approximately 1/3, but we should be mindful of potential biases affecting the underlying probabilities.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability is \\( \\frac{1}{3} \\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The answer assumes equal likelihood of all combinations, but real-world scenarios (like how the information is revealed) could alter the probability.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The probability remains 1/3 because only three gender combinations satisfy the condition of having at least one boy.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The probability is 1/3, assuming standard conditional probability conventions where \"at least one\" filters the family sample space equally.",
+   "draft_round1_correct": true,
+   "final": "The probability is 1/3, as the standard interpretation treats \"at least one boy\" as a family-level filter that excludes the Girl-Girl case, leaving three equally likely combinations (Boy-Boy, Boy-Girl, Girl-Boy) of which only one consists of two boys.",
+   "final_correct": true
+  }
+ },
+ "birthday": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "23\n\nThis is the classic birthday problem. The probability exceeds 50% at 23 people because the number of possible pairs grows quadratically (23 choose 2 = 253 pairs), making a collision far more likely than most expect. At n=23, the exact probability of at least one shared birthday is ≈50.7%.",
+   "correct": true,
+   "seconds": 10.0,
+   "retried": false
+  },
+  "quorum": {
+   "id": "8dc718d5cd8d",
+   "seconds": 3.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "23 people",
+   "final_correct": true
+  }
+ },
+ "three-flips": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "**7/8** (or 0.875)\n\n**Explanation:**\nWhen flipping a coin 3 times, there are $2^3 = 8$ total possible outcomes (HHH, HHT, HTH, HTT, THH, THT, TTH, TTT). The only outcome that does *not* have at least one head is TTT (all tails). Therefore, there are 7 favorable outcomes out of 8.\n\nAlternatively, using the complement rule:\n$P(\\text{at least one head}) = 1 - P(\\text{no heads})$\n$P(\\text{no heads}) = (1/2) \\times (1/2) \\times (1/2) = 1/8$\n$1 - 1/8 = 7/8$",
+   "correct": true,
+   "seconds": 14.2,
+   "retried": false
+  },
+  "quorum": {
+   "id": "320b16472caf",
+   "seconds": 578.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The exact probability is 7/8 based on 7 favorable outcomes out of 8 total equally likely sequences.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The probability of at least one head in 3 fair coin flips is 7/8, found most cleanly as 1 − P(all tails) = 1 − 1/8.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability of at least one head in three independent fair coin flips is \\(7/8\\).",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The probability of at least one head in three coin flips is 7/8, best understood by considering the complement (all tails).",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability of at least one head in three flips of a fair coin is \\(\\frac{7}{8}\\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The probability of at least one head in three fair coin flips is 7/8.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "The probability is 7/8 based on counting non-all-tail outcomes in the sample space.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The probability is exactly 7/8 (or 0.875), calculated by subtracting the single binary case of all zeros from the total $2^3$ outcomes.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The probability of at least one head in three fair coin flips is 7/8.",
+   "draft_round1_correct": true,
+   "final": "The probability of getting at least one head when flipping a fair coin 3 times is exactly 7/8 (or 0.875).",
+   "final_correct": true
+  }
+ },
+ "socks": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "3\n\n**Explanation:** There are only two colors of socks (black and white). In the worst-case scenario, you pick one black sock and one white sock first. The third sock you pick must be either black or white, which guarantees a match with one of the previous socks.",
+   "correct": true,
+   "seconds": 12.7,
+   "retried": false
+  },
+  "quorum": {
+   "id": "1fb24fed000f",
+   "seconds": 3.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "You need 3 socks.",
+   "final_correct": true
+  }
+ },
+ "log": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "15 minutes\n\n**Explanation:**\nTo cut a log into 3 pieces, you must make 2 cuts (intervals). Since those 2 cuts take 6 minutes, each individual cut takes 3 minutes ($6 \\div 2$). To cut the log into 6 pieces, you need to make 5 cuts ($6 - 1$). Therefore, $5 \\text{ cuts} \\times 3 \\text{ minutes per cut} = 15 \\text{ minutes}$.",
+   "correct": true,
+   "seconds": 11.8,
+   "retried": false
+  },
+  "quorum": {
+   "id": "59a6c11da40d",
+   "seconds": 18.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "18 minutes",
+   "final_correct": false
+  }
+ },
+ "ages": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "10\n\nLet the son's current age be $x$. Then the father's current age is $4x$. In 20 years, their ages will be $x+20$ and $4x+20$. According to the problem:\n$4x + 20 = 2(x + 20)$\n$4x + 20 = 2x + 40$\n$2x = 20$\n$x = 10$\nThus, the son is currently 10 years old.",
+   "correct": true,
+   "seconds": 23.2,
+   "retried": false
+  },
+  "quorum": {
+   "id": "32d8ab5af597",
+   "seconds": 625.9,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The son is currently 10 years old.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The son is 10 years old, confirmed by substituting back into both original conditions.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The son’s current age is 10 years old.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The son is currently 10 years old.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The son is currently 10 years old.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The son is currently 10 years old.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "The son is 10 years old and the father is 40, which is mathematically correct and biologically feasible despite being an advanced age for parenthood.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The son is currently 10 years old based on straightforward algebraic simplification.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The son is currently 10 years old.",
+   "draft_round1_correct": true,
+   "final": "The son is currently 10 years old.",
+   "final_correct": true
+  }
+ },
+ "sevens": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "20\n\n**Explanation:** \n- The digit 7 appears in the **units place** 10 times: 7, 17, 27, 37, 47, 57, 67, 77, 87, 97.\n- It appears in the **tens place** 10 times: 70, 71, 72, 73, 74, 75, 76, 77, 78, 79.\n- Since we're counting individual digits (not numbers), the two 7s in \"77\" are counted separately. Adding them together gives 10 + 10 = **20**.",
+   "correct": true,
+   "seconds": 15.2,
+   "retried": false
+  },
+  "quorum": {
+   "id": "ba8e55b5ca72",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "There are 20 occurrences of the digit 7.",
+   "final_correct": true
+  }
+ },
+ "die-six": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "6\n\nThis problem follows a **geometric distribution**, which models the number of trials needed to get the first success. Since a fair die has 6 faces, the probability ($p$) of rolling a 6 on any given roll is $\\frac{1}{6}$. The expected value (average) for a geometric distribution is calculated as $\\frac{1}{p}$. Therefore, $\\frac{1}{1/6} = 6$.",
+   "correct": true,
+   "seconds": 12.0,
+   "retried": false
+  },
+  "quorum": {
+   "id": "1cd21b3e4f49",
+   "seconds": 15.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "6",
+   "final_correct": true
+  }
+ },
+ "bird": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "200 km\n\nThe trains close the 300 km gap at a combined speed of 70 + 80 = 150 km/h, so they meet after 300 / 150 = 2 hours. Since the bird flies continuously at 100 km/h for that exact duration, it covers exactly 100 × 2 = 200 km.",
+   "correct": true,
+   "seconds": 26.0,
+   "retried": false
+  },
+  "quorum": {
+   "id": "5ab1a2167836",
+   "seconds": 566.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The bird flies exactly 200 km under idealized kinematic assumptions, though physical constraints like turnaround time would reduce this in reality.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The bird flies 200 km, found by multiplying the bird's speed (100 km/h) by the time-to-collision (300/150 = 2 h), not by summing any series.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "200 km, because the bird flies 100 km/h for the 2 h it takes the trains to meet.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The bird flies 200 km until the trains meet.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The bird flies a total of 200 km.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The bird flies 200 km, calculated by multiplying its speed (100 km/h) by the time until the trains meet (2 hours).",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "qwen3.5:9b-mlx",
+     "position": "The bird flies 200 km because the problem reduces to how long until the trains collide.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "qwen3.5:9b-q4_K_M",
+     "position": "The group should adopt the direct calculation method (200 km) for its efficiency and lower error potential.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The bird flies a total of 200 km.",
+   "draft_round1_correct": true,
+   "final": "The bird flies exactly 200 km because the total distance depends only on the bird's constant speed and the time it takes for the trains to meet, not on the complexity of its back-and-forth path.",
+   "final_correct": true
+  }
+ },
+ "leap-days": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "29\n\n**Explanation:**\n1.  **Identify the year type:** 2024 is a leap year because it is divisible by 4 and not by 100 (or divisible by 400). Therefore, February 2024 has 29 days.\n2.  **Determine the range:** The period is from 1 February to 1 March.\n3.  **Calculate the days:**\n    *   Total days in February 2024 = 29.\n    *   The question asks for the number of days *from* 1 February *to* 1 March, *not counting* the first day (1 February).\n    *   This means we count from 2 February through 28 February (the last day of February) and then include 1 March? No, typically \"from date A to date B\" implies the duration between them. Let's look at the standard interpretation:\n        *   Days remaining in February after Feb 1: $29 - 1 = 28$ days (Feb 2 to Feb 29).\n        *   Plus the day of March 1? The phrase \"to 1 March\" usually includes the end date if it's a duration count, or excludes it if it's an interval. However, the specific constraint \"not counting the first day\" suggests we are counting the days *between* the two dates or the days elapsed.\n        *   Let's calculate the difference in days: Date(1 March 2024) - Date(1 February 2024).\n        *   Days in Feb after the 1st: 28 days (Feb 2–29).\n        *   Day on March 1: 1 day.\n        *   Total = $28 + 1 = 29$ days? Or is it just the days *between*?\n        *   Standard interpretation of \"days from X to Y\" usually means $Y - X$.\n        *   Feb 1 to Mar 1 is exactly one month. In a leap year, that month has 29 days.\n        *   If we do not count the first day (Feb 1), we are counting Feb 2, Feb 3, ..., Feb 29, and Mar 1? Or just up to but not including Mar 1?\n        *   Usually, \"from [Start Date] to [End Date]\" inclusive of end date is calculated as $(End - Start)$. If we exclude the start date, it is simply the difference in days.\n        *   Difference between March 1 and February 1 is 29 days.\n        *   Let's verify: Feb 1 to Feb 2 is 1 day (not counting Feb 1). Feb 1 to Mar 1 is 29 days.\n\n    Therefore, the number of days is 29.",
+   "correct": true,
+   "seconds": 146.1,
+   "retried": true
+  },
+  "quorum": {
+   "id": "d3b6a2790b1f",
+   "seconds": 6.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "The answer is 28.",
+   "final_correct": false
+  }
+ },
+ "percent-of": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "80\n\nTo find 40% of 25% of 800, first calculate 25% of 800 (0.25 × 800 = 200). Then take 40% of that result (0.40 × 200 = 80). Alternatively, multiply the percentages together (0.40 × 0.25 = 0.10) and find 10% of 800, which also equals 80.",
+   "correct": true,
+   "seconds": 7.4,
+   "retried": false
+  },
+  "quorum": {
+   "id": "79da5aeb1dcd",
+   "seconds": 9.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "80",
+   "final_correct": true
+  }
+ },
+ "ages-sum": {
+  "single": {
+   "model": "qwen3.6:latest",
+   "text": "18\n\n**Explanation:**\nLet $B$ be Ben's current age. We know Anna is currently 24.\n\n1.  **\"When Anna was as old as Ben is now\"**: This refers to a time in the past when Anna was $B$ years old. Since Anna is currently 24, this was $24 - B$ years ago.\n2.  **Ben's age at that time**: Since it was $24 - B$ years ago, Ben was $(24 - B)$ years younger than he is now. So, Ben's past age was $B - (24 - B) = 2B - 24$.\n3.  **\"Anna is twice as old as Ben was [then]\"**: Anna's current age (24) is equal to two times Ben's past age ($2B - 24$).\n\nSetting up the equation:\n$$24 = 2(2B - 24)$$\n$$12 = 2B - 24$$\n$$36 = 2B$$\n$$B = 18$$\n\nBen is 18 years old.",
+   "correct": true,
+   "seconds": 30.8,
+   "retried": false
+  },
+  "quorum": {
+   "id": "088ae81d3c94",
+   "seconds": 48.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "Ben is 12.",
+   "final_correct": false
+  }
+ }
+}

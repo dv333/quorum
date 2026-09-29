@@ -804,3 +804,19 @@ async def test_checked_extras_fit_even_when_the_pages_name_many_options():
     eng._complete, eng.search_fn = complete, lookup
     options = await eng._make_shortlist(1, "Which EV under $45k is best?", 1, "m", None)
     assert "Tesla Model Y" in options and len(options) <= 7
+
+
+def test_named_sources_finds_studies_journals_and_surveys():
+    from backend.engine import named_sources
+
+    text = (
+        "- Cochrane (2019) meta-analyses show an 18% cut.\n"
+        "- A 2024 *Journal of Food Systems* case study agrees.\n"
+        "- Smith et al. found the same.\n"
+        "- According to a recent Gartner survey, 40% of firms agree.\n"
+        "- A 2021 randomized trial of 300 patients too.\n"
+        "- Your 2026 budget of $2,000 covers it. Train staff to confirm by phone."
+    )
+    assert len(named_sources(text)) == 5
+    # a source the user named is theirs to use
+    assert named_sources("As the 2025 BMJ meta-analysis shows", "I read the 2025 BMJ meta-analysis") == []

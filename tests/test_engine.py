@@ -16,6 +16,13 @@ from backend.providers import ChatClient, Chunk
 AGENT_RE = re.compile(r"You are (Otter|Panda|Koala|Penguin|Hedgehog),")
 
 
+UNSOURCED = (
+    "BOTTOM LINE: Send **reminder texts**.\n\n## Key points\n"
+    "- **Reminders work:** Reminders usually help; a rough estimate is a cut of about a fifth.\n"
+    "- **Cheap:** texts cost little."
+)
+
+
 class FakeClient(ChatClient):
     """Scripted model server. turn_fn(handle, round, messages) -> (content, thinking) or raises."""
 
@@ -40,6 +47,7 @@ class FakeClient(ChatClient):
         self.review_gap_reply = '{"missing": []}'
         self.draft_reply = None  # None: the verdict reply
         self.review_add_reply = "BOTTOM LINE: add back"
+        self.unsourced_reply = None  # None: the answer with its named sources taken out
 
     def calls_with(self, marker):
         return [m for _, m, _ in self.calls if marker in m[0]["content"]]
@@ -73,6 +81,8 @@ class FakeClient(ChatClient):
             content, thinking = self.draft_reply, ""
         elif sys.startswith("You check an AI council's code review"):
             content, thinking = self.review_gap_reply, ""
+        elif "doesn't cite sources nobody checked" in sys:
+            content, thinking = self.unsourced_reply or UNSOURCED, ""
         elif sys.startswith("You finish an AI council's code review"):
             content, thinking = self.review_add_reply, ""
         elif "You correct your final answer" in sys:
@@ -1587,3 +1597,76 @@ async def test_a_chair_that_calls_its_own_python_tool_answers_without_checks(fak
     await eng.task
     chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert chair["status"] == "done" and chair["content"] == "VERDICT TEXT"
+
+
+# ---------------------------------------------------------------- sources nobody checked
+
+CITED = (
+    "BOTTOM LINE: Send **reminder texts**.\n\n## Key points\n"
+    "- **Reminders work:** Cochrane (2019) meta-analyses show reminders cut no-shows by 18-23%.\n"
+    "- **Cheap:** texts cost little."
+)
+
+
+async def test_without_research_an_answer_that_names_a_study_is_rewritten_without_it():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = CITED
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How do I cut no-shows at my clinic?")
+    await eng.task
+    rewrite = client.calls_with("doesn't cite sources nobody checked")
+    assert len(rewrite) == 1 and "Cochrane (2019)" in rewrite[0][1]["content"]
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert "Cochrane" not in chair["content"] and "Reminders usually help" in chair["content"]
+    meta = json.loads(chair["meta_json"])["unchecked_sources"]
+    assert meta["revised"] and meta["original"] == CITED and meta["left"] == []
+
+
+async def test_a_rewrite_that_drops_part_of_the_answer_is_not_used():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = CITED
+    client.unsourced_reply = "Reminders help."  # no bottom line, no sections
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How do I cut no-shows at my clinic?")
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["content"] == CITED
+    assert json.loads(chair["meta_json"])["unchecked_sources"]["revised"] is False
+
+
+async def test_agents_and_the_chair_are_told_not_to_cite_when_nothing_can_be_looked_up():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How do I cut no-shows at my clinic?")
+    await eng.task
+    assert all("Don't name studies" in m[0]["content"] for m, _ in client.turn_calls())
+    verdict = client.calls_with("You are the chair of an AI council. You turn")
+    assert "Web research was off" in verdict[0][1]["content"] and "BMJ meta-analysis" not in verdict[0][1]["content"]
+
+
+async def test_with_research_the_answer_keeps_its_checked_studies():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = CITED
+    eng = make_debate(client, max_rounds=1, research=True, search=FakeSearch())
+    await eng.post_user_message("How do I cut no-shows at my clinic?")
+    await eng.task
+    assert not client.calls_with("doesn't cite sources nobody checked")
+    assert not any("Don't name studies" in m[0]["content"] for m, _ in client.turn_calls())
+
+
+async def test_a_question_that_quotes_code_gets_the_usual_roles_not_reviewers():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("What does this print?\n\n```python\nprint(-7 // 2)\n```")
+    await eng.task
+    roles = {s["role"] for s in eng.seats()}
+    assert "Security expert" not in roles and "Skeptic" in roles
+    assert db.query_one("SELECT reason FROM verdicts")["reason"] != "direct"  # still debated
+
+
+async def test_quoted_code_the_user_wants_checked_for_bugs_gets_reviewers():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Any bugs in this?\n\n```python\ndef div(a, b):\n    return a / b\n```")
+    await eng.task
+    assert "Security expert" in {s["role"] for s in eng.seats()}

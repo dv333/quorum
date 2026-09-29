@@ -1,0 +1,458 @@
+{
+ "widgets": {
+  "quorum": {
+   "id": "e971ba69cbad",
+   "seconds": 24.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "5 minutes",
+   "final_correct": true
+  }
+ },
+ "compound": {
+  "quorum": {
+   "id": "2d79286c1f24",
+   "seconds": 12.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "$1,157.63",
+   "final_correct": true
+  }
+ },
+ "round-trip": {
+  "quorum": {
+   "id": "c008b0fbca6a",
+   "seconds": 394.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "48, derived via harmonic mean for equal distances, though real-world factors and misapplied formulas require careful constraint-checking.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The average speed for an equal-distance round trip at 60 and 40 km/h is 48 km/h, found by dividing total distance by total time (harmonic mean), not by averaging the two speeds.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The average speed for the round trip is 48 km/h.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The average speed for the whole trip is 48 km/h, calculated using the harmonic mean due to differing travel times.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The average speed for the whole trip is 48 km/h.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The average speed is 48 km/h because the harmonic mean accounts for unequal time intervals.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The arithmetic mean is not the correct average speed for a round trip with different speeds and equal distances.",
+     "correct": false
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The average speed is simply the harmonic mean of the two speeds, not 48 km/h.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The average speed for the trip is 48 km/h.",
+   "draft_round1_correct": true,
+   "final": "The average speed for the round trip is 48 km/h.",
+   "final_correct": true
+  }
+ },
+ "zeros": {
+  "quorum": {
+   "id": "f425b1d1e6d1",
+   "seconds": 39.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "## 24",
+   "final_correct": true
+  }
+ },
+ "y2k-day": {
+  "quorum": {
+   "id": "1637d44d3fc6",
+   "seconds": 24.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "Saturday",
+   "final_correct": true
+  }
+ },
+ "multiples": {
+  "quorum": {
+   "id": "79a30252f15d",
+   "seconds": 42.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "2418",
+   "final_correct": true
+  }
+ },
+ "discount": {
+  "quorum": {
+   "id": "d7b018463fb2",
+   "seconds": 33.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "$100",
+   "final_correct": true
+  }
+ },
+ "up-down": {
+  "quorum": {
+   "id": "935b93174856",
+   "seconds": 24.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "−1% (a 1% net decrease).",
+   "final_correct": true
+  }
+ },
+ "handshakes": {
+  "quorum": {
+   "id": "d1594d041153",
+   "seconds": 24.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "45",
+   "final_correct": true
+  }
+ },
+ "chessboard": {
+  "quorum": {
+   "id": "a5de9b931a42",
+   "seconds": 640.8,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "204, derived from the axis-aligned combinatorial summation $\\sum_{k=1}^{n} (n-k+1)^2$.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "An 8×8 chessboard contains exactly 204 axis-aligned squares of all sizes, equal to 1²+2²+…+8².",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The correct count of axis‑aligned squares on an 8 × 8 chessboard is 204.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "While the formula derivation is the most efficient method, we should consider a supplementary explanation accessible to users with less mathematical background.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "There are 204 squares of any size on an 8 by 8 chessboard.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The total number of squares on an 8×8 chessboard is 204, calculated by summing squares of all sizes from 1×1 to 8×8.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "There are 204 squares on an 8x8 chessboard.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "There are 204 squares on an 8 by 8 chessboard.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "There are 204 squares on an 8x8 chessboard.",
+   "draft_round1_correct": true,
+   "final": "There are exactly 204 squares of any size on an 8 by 8 chessboard.",
+   "final_correct": true
+  }
+ },
+ "clock": {
+  "quorum": {
+   "id": "a199d5506aad",
+   "seconds": 36.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "7.5°",
+   "final_correct": true
+  }
+ },
+ "dice-seven": {
+  "quorum": {
+   "id": "417d7d4dab64",
+   "seconds": 403.1,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The answer is 1/6 derived from enumerating 6 specific favorable outcomes within a uniform sample space of 36 ordered pairs.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The probability that two fair dice sum to 7 is exactly 1/6, obtained by counting 6 favourable ordered pairs out of 36 equally likely ones.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The probability that two fair dice sum to 7 is 1/6, assuming the dice are independent and uniformly distributed.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "The probability of rolling a sum of 7 with two fair dice is 1/6, assuming isotropic and independent rolls.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The probability that two fair dice sum to 7 is \\( \\frac{1}{6} \\).",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The probability of rolling a sum of 7 with two fair dice is 1/6.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The probability is 1/6.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The probability of rolling a 7 with two fair six-sided dice is unknown due to potential biases in the dice.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "The probability is exactly 1/6, calculated from 6 favorable outcomes out of 36 equally likely ordered pairs for fair, independent dice.",
+   "draft_round1_correct": true,
+   "final": "The probability that two fair dice sum to 7 is 1/6.",
+   "final_correct": true
+  }
+ },
+ "birthday": {
+  "quorum": {
+   "id": "1c2160e3ab3a",
+   "seconds": 505.7,
+   "status": "concluded",
+   "rounds": 2,
+   "agents": [
+    {
+     "agent": "Otter",
+     "model": "qwen3.6:latest",
+     "position": "The smallest number of people required for a >50% probability of shared birthday under equal likelihood assumptions is exactly 23.",
+     "correct": true
+    },
+    {
+     "agent": "Panda",
+     "model": "qwen3.8:latest",
+     "position": "The smallest n is 23, with P(match)≈50.73%, under the stated 365-uniform-birthday model.",
+     "correct": true
+    },
+    {
+     "agent": "Koala",
+     "model": "gpt-oss:20b",
+     "position": "The classic 23‑person threshold holds under idealized assumptions, but real‑world deviations may shift the exact number.",
+     "correct": true
+    },
+    {
+     "agent": "Penguin",
+     "model": "gemma3:12b",
+     "position": "I believe 23 is a reasonable starting point, but we need to consider if a slightly higher number accounts for non-uniform birthday distributions.",
+     "correct": true
+    },
+    {
+     "agent": "Hedgehog",
+     "model": "phi4:14b",
+     "position": "The smallest number of people needed for a greater than 50% chance of shared birthdays is 23.",
+     "correct": true
+    },
+    {
+     "agent": "Bunny",
+     "model": "qwen3:14b",
+     "position": "The smallest number of people required is 23.",
+     "correct": true
+    },
+    {
+     "agent": "Turtle",
+     "model": "deepseek-r1:8b",
+     "position": "The smallest number is 23.",
+     "correct": true
+    },
+    {
+     "agent": "Dolphin",
+     "model": "llama3.1:8b",
+     "position": "The smallest number of people for which the chance that two share a birthday is over 50% is not 23.",
+     "correct": true
+    }
+   ],
+   "draft_round1": "Under the assumption of 365 equally likely birthdays, 23 people are required for the probability of a shared birthday to exceed 50%.",
+   "draft_round1_correct": true,
+   "final": "The smallest number of people required for the probability of at least two sharing a birthday to exceed 50% is exactly 23.",
+   "final_correct": true
+  }
+ },
+ "socks": {
+  "quorum": {
+   "id": "58113d66510b",
+   "seconds": 27.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "3",
+   "final_correct": true
+  }
+ },
+ "log": {
+  "quorum": {
+   "id": "2728f5bda3ca",
+   "seconds": 24.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "15 minutes",
+   "final_correct": true
+  }
+ },
+ "sevens": {
+  "quorum": {
+   "id": "9d96b05eba87",
+   "seconds": 30.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "20",
+   "final_correct": true
+  }
+ },
+ "die-six": {
+  "quorum": {
+   "id": "1514c51ad878",
+   "seconds": 27.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "6.",
+   "final_correct": true
+  }
+ },
+ "leap-days": {
+  "quorum": {
+   "id": "c6f6d8df110a",
+   "seconds": 30.2,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "29 days",
+   "final_correct": true
+  }
+ },
+ "percent-of": {
+  "quorum": {
+   "id": "7d0e70e5294b",
+   "seconds": 27.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "80",
+   "final_correct": true
+  }
+ },
+ "ages-sum": {
+  "quorum": {
+   "id": "c1b16411de72",
+   "seconds": 27.1,
+   "status": "concluded",
+   "rounds": 0,
+   "agents": [],
+   "draft_round1": "",
+   "draft_round1_correct": null,
+   "final": "Ben is 18.",
+   "final_correct": true
+  }
+ }
+}

@@ -6,7 +6,7 @@ import sys
 import pytest
 
 from backend import coder, db
-from backend.engine import ROLE_FOCUS, code_roles, is_code_debate, settle_roles
+from backend.engine import ROLE_FOCUS, code_roles, is_code_debate, is_code_review, settle_roles
 from backend.parsing import parse_coder_requests
 from tests.test_engine import FakeClient, make_debate, reply
 
@@ -148,3 +148,13 @@ def test_the_codex_effort_override_is_for_this_run_only():
     cmd = coder.command("codex", "q", "/repo", effort="high")
     assert cmd[cmd.index("-c") + 1] == 'model_reasoning_effort="high"' and cmd[-1] == "q"
     assert "-c" not in coder.command("codex", "q", "/repo")
+
+
+def test_a_question_that_quotes_code_is_not_a_review():
+    snippet = "```python\nprint(-7 // 2)\n```"
+    assert is_code_debate(f"What does this print?\n\n{snippet}")  # still debated, never answered directly
+    assert not is_code_review(f"What does this print?\n\n{snippet}")
+    assert is_code_review(f"Any bugs in this?\n\n{snippet}")
+    assert is_code_review(f"Is this code safe to ship?\n\n{snippet}")
+    assert is_code_review("Review this change.\n\n```diff\n-a = 1\n+a = 2\n```")
+    assert not is_code_review("Are there bugs in the new iPhone?")  # review words without code
