@@ -48,6 +48,8 @@ class FakeClient(ChatClient):
         self.draft_reply = None  # None: the verdict reply
         self.review_add_reply = "BOTTOM LINE: add back"
         self.unsourced_reply = None  # None: the answer with its named sources taken out
+        self.critique_reply = '{"problems": []}'
+        self.critique_revise_reply = None  # None: the verdict reply, corrected
 
     def calls_with(self, marker):
         return [m for _, m, _ in self.calls if marker in m[0]["content"]]
@@ -81,6 +83,10 @@ class FakeClient(ChatClient):
             content, thinking = self.draft_reply, ""
         elif sys.startswith("You check an AI council's code review"):
             content, thinking = self.review_gap_reply, ""
+        elif sys.startswith("You check an AI council's final answer"):
+            content, thinking = self.critique_reply, ""
+        elif "You correct your final answer before the user sees it" in sys:
+            content, thinking = self.critique_revise_reply or self.verdict_reply.replace("rebuild", "pay off"), ""
         elif "doesn't cite sources nobody checked" in sys:
             content, thinking = self.unsourced_reply or UNSOURCED, ""
         elif sys.startswith("You finish an AI council's code review"):
@@ -294,7 +300,7 @@ async def test_failed_seat_is_skipped_and_debate_continues():
     errors = db.query("SELECT * FROM messages WHERE status = 'error'")
     assert errors and "Koala (model-2) failed: model not found" in errors[0]["content"]
     assert eng.debate()["status"] == "concluded"
-    verdict_prompt = client.calls[-1][1][1]["content"]
+    verdict_prompt = client.calls_with("You turn the council")[-1][1]["content"]
     assert "Otter:" in verdict_prompt and "- Koala:" not in verdict_prompt  # C has no final position
 
 
@@ -402,7 +408,7 @@ async def test_conclude_mid_turn_keeps_earlier_position_of_interrupted_seat():
     await wait_for(lambda: len(client.turn_calls("Panda")) == 2)
     await eng.conclude()
     await eng.task
-    verdict_prompt = client.calls[-1][1][1]["content"]
+    verdict_prompt = client.calls_with("You turn the council")[-1][1]["content"]
     assert "Panda position r1" in verdict_prompt and "Otter position r2" in verdict_prompt
 
 
@@ -1779,3 +1785,81 @@ async def test_an_empty_reply_and_a_stopped_turn_are_traced():
     await eng.stop()
     stopped = db.query_one("SELECT * FROM usage WHERE outcome = 'stopped'")
     assert stopped["actor"] == "Koala" and stopped["error"] is None
+
+
+# ---------------------------------------------------------------- the critic (research off)
+
+SAVINGS = (
+    "BOTTOM LINE: Pay $4,000 toward the card and **rebuild your emergency fund first**.\n\n## Key points\n"
+    "- **Keep a cushion:** hold $4,000 in savings.\n- **Then rebuild savings** at $1,000 a month before paying more."
+)
+FLAG = (
+    '{"problems": [{"check": "fit", "text": "rebuild your emergency fund first", '
+    '"issue": "Saving at ~4% while carrying $8,000 at 24% costs the user money; pay the card first."}]}'
+)
+
+
+async def test_the_critic_flags_advice_that_doesnt_fit_the_numbers_and_the_chair_fixes_it():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS
+    client.critique_reply = FLAG
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
+    await eng.task
+    critic = [
+        (model, m) for model, m, _ in client.calls if m[0]["content"].startswith("You check an AI council's final")
+    ]
+    assert len(critic) == 1 and critic[0][0] != "chair-model"  # a different model checks the chair's answer
+    assert "24%" in critic[0][1][1]["content"] and "rebuild your emergency fund first" in critic[0][1][1]["content"]
+    fix = client.calls_with("You correct your final answer before the user sees it")
+    assert len(fix) == 1 and "Saving at ~4%" in fix[0][1]["content"]
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert "pay off your emergency fund" in chair["content"] and "rebuild" not in chair["content"]
+    meta = json.loads(chair["meta_json"])["critique"]
+    assert meta["revised"] and meta["original"] == SAVINGS
+    checks = {p["check"] for p in meta["problems"]}
+    assert "fit" in checks and "missing" in checks  # the critic's, and code's: the answer skips the user's $12,000
+
+
+async def test_an_answer_the_critic_passes_is_left_alone():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS.replace("rebuild", "pay off")
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have card debt. Pay it off?")
+    await eng.task
+    assert not client.calls_with("You correct your final answer before the user sees it")
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["content"] == SAVINGS.replace("rebuild", "pay off")
+    assert json.loads(chair["meta_json"])["critique"] == {
+        "checked": True,
+        "critic": "Otter",
+        "problems": [],
+        "revised": False,
+    }
+
+
+async def test_a_fix_that_drops_part_of_the_answer_is_not_used():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS
+    client.critique_reply = FLAG
+    client.critique_revise_reply = "Pay the card."
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have card debt. Pay it off?")
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["content"] == SAVINGS and json.loads(chair["meta_json"])["critique"]["revised"] is False
+
+
+async def test_the_critic_runs_only_without_research_and_never_on_a_review():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1, research=True, search=FakeSearch())
+    await eng.post_user_message("How do I cut no-shows at my clinic?")
+    await eng.task
+    assert not client.calls_with("You check an AI council's final answer")
+
+    db.connect(":memory:")
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    assert not client.calls_with("You check an AI council's final answer")

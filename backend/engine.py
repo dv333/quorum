@@ -2882,6 +2882,101 @@ class DebateEngine:
                 log.warning("answer revision failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
 
+    def _code_checks(self, content: str, question: str) -> List[Dict[str, str]]:
+        """Checks that need no model: every requirement and option the question names is covered, the bottom line is
+        short, and written-out arithmetic adds up."""
+        return (
+            [
+                {
+                    "check": "missing",
+                    "text": "",
+                    "issue": f"The question asks about {r.lower()}, but the answer doesn't address it.",
+                }
+                for r in stated_requirements(question)
+                if not requirement_covered(r, content)
+            ]
+            + [
+                {
+                    "check": "missing",
+                    "text": "",
+                    "issue": f"The question is specifically about {x}, but the answer doesn't address that.",
+                }
+                for x in question_specifics(question)
+                if not specific_covered(x, content)
+            ]
+            + [
+                {
+                    "check": "missing",
+                    "text": "",
+                    "issue": f"The question names {o} as an option, but the answer doesn't say where it fits.",
+                }
+                for o in named_options(question)
+                if not option_mentioned(o, content)
+            ]
+            + check_bottom_line(content)
+            + check_arithmetic(content)
+        )
+
+    async def _critique_answer(self, msg_id: int) -> None:
+        """Without research there's no evidence ledger to audit against, so a different model checks the answer for
+        what went wrong in practice: advice that doesn't fit the user's own numbers ("rebuild savings" while carrying
+        24% debt), made-up statistics, contradictions, facts that may be out of date, and the obvious missing point.
+        Code checks run too. The chair fixes what was flagged once; the fix is kept only if the answer stays whole."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not row or row["status"] != "done" or not row["content"]:
+            return
+        d = self.debate()
+        question = self._question(row["topic"])
+        critic, c_ep, c_model = self._auditor(d)
+        self.bus.publish({"type": "debate_updated", "debate": {"phase": f"{critic} is checking the answer…"}})
+        raw: List[Any] = []
+        try:
+            text = await self._complete(
+                critic,
+                "critique",
+                c_ep,
+                c_model,
+                prompts.critique_messages(question, row["content"], list(self._handles().values())),
+                await self._thinking_flag(c_ep, c_model, False),
+            )
+            raw = parse_json_loose(text).get("problems") or []
+        except Exception as e:
+            log.warning("answer critique failed: %s", e)
+        problems = (
+            self._code_checks(row["content"], question)
+            + [
+                {
+                    "check": str(p.get("check") or "").strip()[:20],
+                    "text": str(p.get("text") or "").strip()[:300],
+                    "issue": str(p.get("issue") or "").strip()[:300],
+                }
+                for p in raw
+                if isinstance(p, dict) and str(p.get("issue") or "").strip()
+            ]
+        )[:8]
+        meta = json.loads(row["meta_json"] or "{}")
+        meta["critique"] = {"checked": True, "critic": critic, "problems": problems, "revised": False}
+        content = row["content"]
+        if problems:
+            chair = self._chair_label(d)
+            try:
+                revised = strip_thinking(
+                    await self._complete(
+                        chair,
+                        "revise",
+                        d["chair_endpoint_id"],
+                        d["chair_model"],
+                        prompts.critique_revise_messages(question, row["content"], problems),
+                        await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                    )
+                ).strip()
+                if keeps_structure(row["content"], revised):
+                    content = shorten_bottom_line(plain_answer(revised))
+                    meta["critique"].update(revised=True, original=row["content"])
+            except Exception as e:
+                log.warning("answer revision after critique failed: %s", e)
+        self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
+
     async def _drop_unchecked_sources(self, msg_id: int) -> None:
         """Without research nothing was looked up, so a study, journal or survey the answer names came from a model's
         memory, and models invent them. The chair rewrites those sentences once to say what's generally known."""
@@ -3272,6 +3367,8 @@ class DebateEngine:
                 self.partials.pop(row["id"], None)
             self._set(answer_pending=None)
             await self._audit_answer(row["id"], claims, studies)
+            if not d["research_enabled"] and not is_code_review(question, d["pack"], d.get("repo_path")):
+                await self._critique_answer(row["id"])
             if not d["research_enabled"]:
                 await self._drop_unchecked_sources(row["id"])
             if is_code_review(self._question(topic), d["pack"], d.get("repo_path")):
