@@ -224,6 +224,20 @@ def is_advice(question: str) -> bool:
     return bool(_ADVICE_Q.search(question))
 
 
+_PLAN_Q = re.compile(
+    r"\b(how (should|do|can) (i|we) (train|prepare|study|learn|plan|get ready|build up|start)|plan (for|my|our|a|the)"
+    r"|(training|study|learning|meal|workout|savings|business|marketing|action) plan|schedule|itinerary|roadmap"
+    r"|step[- ]by[- ]step|(next|first|coming) \d+ (days|weeks|months)|in \d+ (days|weeks|months)|\d+[- ]day (trip|plan)"
+    r"|planning (a |an |our |my )?\d+ (days|nights|weeks)|\d+ (days|nights) in)\b",
+    re.I,
+)
+
+
+def is_plan(question: str) -> bool:
+    """A question that asks for a plan: how to train or prepare, a schedule, what to do over the coming weeks."""
+    return bool(_PLAN_Q.search(question))
+
+
 def is_code_review(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
     """A review: a change, a repository, or quoted code the user wants judged (bugs, safety, design). A question that
     only quotes code ("what does this print?") isn't one."""
@@ -2973,25 +2987,66 @@ class DebateEngine:
         meta = json.loads(row["meta_json"] or "{}")
         meta["critique"] = {"checked": True, "critic": critic, "problems": problems, "revised": False}
         content = row["content"]
-        if problems:
-            chair = self._chair_label(d)
-            try:
-                revised = strip_thinking(
-                    await self._complete(
-                        chair,
-                        "revise",
-                        d["chair_endpoint_id"],
-                        d["chair_model"],
-                        prompts.critique_revise_messages(question, row["content"], problems),
-                        await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
-                    )
-                ).strip()
-                if keeps_structure(row["content"], revised):
-                    content = shorten_bottom_line(plain_answer(revised))
-                    meta["critique"].update(revised=True, original=row["content"])
-            except Exception as e:
-                log.warning("answer revision after critique failed: %s", e)
+        fixed = await self._fix_answer(d, question, content, problems) if problems else None
+        if fixed:
+            content = fixed
+            meta["critique"].update(revised=True, original=row["content"])
+            # The fix is checked once: a fix can be partial (a new total the stated rate can't reach) or leave traces
+            # of the edit ("(not week 12)"). What's still wrong gets one more fix
+            left = await self._recheck(critic, c_ep, c_model, question, content, problems)
+            meta["critique"]["rechecked"] = left
+            again = await self._fix_answer(d, question, content, left) if left else None
+            if again:
+                content = again
+                meta["critique"]["refixed"] = True
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
+
+    async def _fix_answer(
+        self, d: Dict[str, Any], question: str, answer: str, problems: List[Dict[str, str]]
+    ) -> Optional[str]:
+        """The chair corrects what was flagged; the result, or None when the fix failed or didn't keep the answer
+        whole (bottom line, every section, most of its length)."""
+        try:
+            revised = strip_thinking(
+                await self._complete(
+                    self._chair_label(d),
+                    "revise",
+                    d["chair_endpoint_id"],
+                    d["chair_model"],
+                    prompts.critique_revise_messages(question, answer, problems),
+                    await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                )
+            ).strip()
+        except Exception as e:
+            log.warning("answer revision after critique failed: %s", e)
+            return None
+        return shorten_bottom_line(plain_answer(revised)) if keeps_structure(answer, revised) else None
+
+    async def _recheck(
+        self, critic: str, ep_id: int, model: str, question: str, answer: str, problems: List[Dict[str, str]]
+    ) -> List[Dict[str, str]]:
+        """What's still wrong after a fix: problems fixed only in part, and traces of the edit."""
+        try:
+            text = await self._complete(
+                critic,
+                "recheck",
+                ep_id,
+                model,
+                prompts.recheck_messages(question, answer, problems),
+                await self._thinking_flag(ep_id, model, True),
+            )
+        except Exception as e:
+            log.warning("recheck failed: %s", e)
+            return []
+        return [
+            {
+                "check": str(p.get("check") or "").strip()[:20],
+                "text": str(p.get("text") or "").strip()[:300],
+                "issue": str(p.get("issue") or "").strip()[:300],
+            }
+            for p in (parse_json_loose(text).get("problems") or [])
+            if isinstance(p, dict) and str(p.get("issue") or "").strip()
+        ][:6]
 
     async def _drop_unchecked_sources(self, msg_id: int) -> None:
         """Without research nothing was looked up, so a study, journal or survey the answer names came from a model's
@@ -3346,6 +3401,7 @@ class DebateEngine:
                 studies=prompts.studies_text(studies),
                 options=self._shortlist.get(topic, []),
                 search_failed=(self._search_down or "") if d["research_enabled"] else "",
+                plan=is_plan(question) and not is_code_review(question, d["pack"], d.get("repo_path")),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:

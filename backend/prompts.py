@@ -337,6 +337,7 @@ def verdict_messages(
     studies: str = "",
     options: Sequence[str] = (),
     search_failed: str = "",
+    plan: bool = False,
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
     why = {
@@ -396,7 +397,7 @@ The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_li
 
 Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
-{answer_format(sourced=bool(research or studies or claims))}""",
+{answer_format(sourced=bool(research or studies or claims), plan=plan)}""",
         },
     ]
 
@@ -413,9 +414,18 @@ SOURCED_POINTS = (
 UNSOURCED_POINTS = "Nothing was looked up, so name no studies or sources and give no statistics from them."
 
 
-def answer_format(sourced: bool = True) -> str:
-    """The answer's structure. Without research, it asks for no named studies: models invent them from memory."""
-    return ANSWER_FORMAT.replace("{points}", SOURCED_POINTS if sourced else UNSOURCED_POINTS)
+PLAN_SECTION = """## Plan
+The schedule itself, since the user asked for a plan: a markdown table or numbered steps by week, phase or day, with the concrete numbers for each (distances, amounts, times, dates) and what to do when. Check that the numbers add up from where the user starts to where they want to be.
+
+"""
+
+
+def answer_format(sourced: bool = True, plan: bool = False) -> str:
+    """The answer's structure. Without research, it asks for no named studies: models invent them from memory. A plan
+    gets a schedule: on "how should I train?" and "what should I do in the next 90 days?" the council's answers were
+    thinner than one model's week-by-week plan."""
+    text = ANSWER_FORMAT.replace("{points}", SOURCED_POINTS if sourced else UNSOURCED_POINTS)
+    return text.replace("{plan}", PLAN_SECTION if plan else "")
 
 
 ANSWER_FORMAT = """Use exactly this structure, with no preamble:
@@ -425,7 +435,7 @@ BOTTOM LINE: <one sentence a busy person could act on, wrapping the key recommen
 ## Key points
 - 3 to 5 bullets. Each starts with a short **bold phrase**, then one plain sentence. {points}
 
-## Diagram
+{plan}## Diagram
 Include this section only if a picture genuinely helps (a decision, a process, a comparison or a timeline). Write one small Mermaid diagram in a ```mermaid code block: a "flowchart TD" or "flowchart LR" with at most 8 nodes and no styling, every node written as an id with a quoted label, like A["Check budget"] --> B["Buy"]. Otherwise leave this section out entirely.
 
 ## Where they differed
@@ -935,7 +945,29 @@ Your answer:
 A check found these problems:
 {issues}
 
-Fix each one with the smallest change that makes the answer right: where advice doesn't fit the user's numbers, correct it (and the bottom line, if it's affected); remove a made-up figure or turn it into a rough estimate labelled as one; resolve contradictions; say a fact that may be out of date should be checked before relying on it; add a missing point where it fits best. Keep everything else word for word, including every section and heading. Write for the user: never mention the check or these instructions. Output only the corrected answer.""",
+Fix each one with the smallest change that makes the answer right: where advice doesn't fit the user's numbers, correct it (and the bottom line, if it's affected), along with every other number that depends on it; remove a made-up figure or turn it into a rough estimate labelled as one; resolve contradictions; say a fact that may be out of date should be checked before relying on it; add a missing point where it fits best. Keep everything else word for word, including every section and heading. Write the corrected answer as if it had always been right: no "(not week 12)", "now", "updated", "corrected" or notes about the change, and never mention the check or these instructions. Output only the corrected answer.""",
+        },
+    ]
+
+
+def recheck_messages(question: str, answer: str, problems: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    listed = "\n".join(f"{i}. {p['issue']}" for i, p in enumerate(problems, 1))
+    return [
+        {"role": "system", "content": CRITIC_SYSTEM},
+        {
+            "role": "user",
+            "content": f"""The user's question:
+{question}
+
+An answer was corrected for these problems:
+{listed}
+
+The corrected answer:
+{answer}
+
+For each problem, is it fully fixed? A fix is partial when a number was changed but others that depend on it weren't (for example a new weekly total that the stated growth rate can't reach). Also flag any trace of the editing left in the text ("(not week 12)", "now aligns", "updated", a note about a change). Don't raise new topics. Quote the answer's words exactly. If everything is fixed, return an empty list.
+
+Reply like: {{"problems": [{{"check": "partial|trace", "text": "<exact words from the answer>", "issue": "<what's still wrong and what would be right>"}}]}}""",
         },
     ]
 
