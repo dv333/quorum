@@ -37,6 +37,7 @@ from .config import (
     TURN_MAX_TOKENS,
     BRIEF_TURN_TOKENS,
     SLOW_TURN_SECONDS,
+    CRITIC_MAX_TOKENS,
     REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
@@ -1525,8 +1526,10 @@ class DebateEngine:
         messages: List[Dict[str, str]],
         think: Optional[bool],
         topic: Optional[int] = None,
+        max_tokens: int = ANSWER_MAX_TOKENS,
     ) -> str:
-        """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded."""
+        """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded. max_tokens caps thinking and
+        reply together."""
         parts, stats = [], {}
         ep = self._endpoint(endpoint_id)
         trace = CallTrace()
@@ -1538,8 +1541,8 @@ class DebateEngine:
                 model,
                 messages,
                 think=think,
-                num_ctx=self._num_ctx(messages, ANSWER_MAX_TOKENS, model),
-                num_predict=ANSWER_MAX_TOKENS,
+                num_ctx=self._num_ctx(messages, max_tokens, model),
+                num_predict=max_tokens,
             ):
                 if chunk.kind in ("content", "thinking"):
                     trace.token(chunk.kind == "content")
@@ -2959,12 +2962,19 @@ class DebateEngine:
         self.bus.publish({"type": "debate_updated", "debate": {"phase": f"{critic} is checking the answer…"}})
         raw: List[Any] = []
         critique = prompts.critique_messages(question, row["content"], list(self._handles().values()))
-        # The critic thinks: without it, it missed contradictions between sections and made-up figures. If it
-        # thinks until the limit and replies with nothing, it tries once more without thinking
+        # The critic thinks: without it, it missed contradictions between sections and made-up figures. Its thinking
+        # is capped (on the largest model, often the slowest, uncapped thinking took 3-5 minutes); if it runs out
+        # before it replies, it tries once more without thinking
         for wanted in (True, False):
             try:
                 text = await self._complete(
-                    critic, "critique", c_ep, c_model, critique, await self._thinking_flag(c_ep, c_model, wanted)
+                    critic,
+                    "critique",
+                    c_ep,
+                    c_model,
+                    critique,
+                    await self._thinking_flag(c_ep, c_model, wanted),
+                    max_tokens=CRITIC_MAX_TOKENS if wanted else ANSWER_MAX_TOKENS,
                 )
             except Exception as e:
                 log.warning("answer critique failed: %s", e)
@@ -3033,7 +3043,8 @@ class DebateEngine:
                 ep_id,
                 model,
                 prompts.recheck_messages(question, answer, problems),
-                await self._thinking_flag(ep_id, model, True),
+                # A narrower task than the critique (is each flagged problem fixed?): no thinking, which saves a minute
+                await self._thinking_flag(ep_id, model, False),
             )
         except Exception as e:
             log.warning("recheck failed: %s", e)
