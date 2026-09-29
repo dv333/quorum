@@ -812,6 +812,37 @@ def quote_in_source(quote: str, text: str) -> bool:
 CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
 
 
+class CallTrace:
+    """When a model call was asked for, when it got its turn on the model server, and when its first token came: a
+    stall shows as a long wait for the turn, or a turn with no first token."""
+
+    def __init__(self) -> None:
+        self.started_at = db.now()
+        self.asked = time.monotonic()
+        self.turn_at: Optional[float] = None
+        self.first: Optional[float] = None
+        self.wrote = False  # any reply text, not just thinking
+
+    def turn(self) -> None:
+        self.turn_at = time.monotonic()
+
+    def token(self, content: bool = True) -> None:
+        if self.first is None:
+            self.first = time.monotonic()
+        self.wrote = self.wrote or content
+
+    def run_ms(self) -> int:
+        """Time since the call got its turn (or since it was asked for, if it never did)."""
+        return int((time.monotonic() - (self.turn_at or self.asked)) * 1000)
+
+    def fields(self) -> Dict[str, Any]:
+        return {
+            "started_at": self.started_at,
+            "queued_ms": int(((self.turn_at or time.monotonic()) - self.asked) * 1000),
+            "first_token_ms": int((self.first - self.turn_at) * 1000) if self.first and self.turn_at else None,
+        }
+
+
 def _add_stats(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     """Two calls that wrote one message, counted as one."""
     out = {**a, **b}
@@ -1417,12 +1448,15 @@ class DebateEngine:
         ep = self._endpoint(endpoint_id)
         splitter = ThinkSplitter()  # defensive: route any inline <think> text to the thinking channel
         saved = time.monotonic()
+        trace = CallTrace()
 
         def emit(content: str, thinking: str) -> None:
             nonlocal saved
             if time.monotonic() - saved >= CHECKPOINT_SECONDS:  # a restart keeps what was written so far
                 saved = time.monotonic()
                 db.update("messages", msg_id, content=partial["content"], thinking=partial["thinking"])
+            if content or thinking:
+                trace.token(bool(content))
             if thinking:
                 partial["thinking"] += thinking
                 self.bus.publish({"type": "message_delta", "id": msg_id, "thinking": thinking})
@@ -1449,18 +1483,23 @@ class DebateEngine:
                     stats = chunk.stats
 
         cut = False
-        async with self._model_turn(ep, actor, model):
-            started = time.monotonic()  # the limit starts once it's this call's turn, not while it waits
-            if keep_alive == 0 and QUEUE.wanted_next(server_key(ep), model):
-                keep_alive = "5m"  # another debate wants this model next: don't unload it
-            try:
-                await asyncio.wait_for(consume(), max_seconds)
-            except asyncio.TimeoutError:
-                cut = True
-                log.warning("%s (%s) hit the %ss limit", actor, model, int(max_seconds))
+        try:
+            async with self._model_turn(ep, actor, model):
+                trace.turn()  # the limit starts once it's this call's turn, not while it waits
+                if keep_alive == 0 and QUEUE.wanted_next(server_key(ep), model):
+                    keep_alive = "5m"  # another debate wants this model next: don't unload it
+                try:
+                    await asyncio.wait_for(consume(), max_seconds)
+                except asyncio.TimeoutError:
+                    cut = True
+                    log.warning("%s (%s) hit the %ss limit", actor, model, int(max_seconds))
+        except BaseException as e:  # a failed or stopped call is traced too: that's when the timings matter
+            self._record_failed(actor, model, kind, messages, trace, e)
+            raise
         emit(*splitter.flush())
-        stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000), "cut": cut}
-        stats["prompt_tokens"] = self._record(actor, model, kind, stats, messages)
+        stats = {**stats, "duration_ms": trace.run_ms(), "cut": cut}
+        outcome = "cut" if cut else "ok" if trace.wrote else "empty"  # empty: nothing written, or only thinking
+        stats["prompt_tokens"] = self._record(actor, model, kind, stats, messages, trace=trace, outcome=outcome)
         return stats
 
     async def _complete(
@@ -1476,6 +1515,7 @@ class DebateEngine:
         """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded."""
         parts, stats = [], {}
         ep = self._endpoint(endpoint_id)
+        trace = CallTrace()
 
         async def consume() -> None:
             nonlocal stats
@@ -1487,22 +1527,35 @@ class DebateEngine:
                 num_ctx=self._num_ctx(messages, ANSWER_MAX_TOKENS, model),
                 num_predict=ANSWER_MAX_TOKENS,
             ):
+                if chunk.kind in ("content", "thinking"):
+                    trace.token(chunk.kind == "content")
                 if chunk.kind == "content":
                     parts.append(chunk.text)
                 elif chunk.kind == "done":
                     stats = chunk.stats
 
-        async with self._model_turn(ep, actor, model):
-            started = time.monotonic()
-            try:
-                await asyncio.wait_for(consume(), ANSWER_MAX_SECONDS)
-            except asyncio.TimeoutError:
-                self._record(actor, model, f"{kind}-timeout", {"duration_ms": int((time.monotonic() - started) * 1000)})
-                raise RuntimeError(
-                    f"{actor} ({model}) took longer than {int(ANSWER_MAX_SECONDS // 60)} minutes"
-                ) from None
-        stats = {**stats, "duration_ms": int((time.monotonic() - started) * 1000)}
-        self._record(actor, model, kind, stats, messages, topic=topic)
+        timed_out = False
+        try:
+            async with self._model_turn(ep, actor, model):
+                trace.turn()
+                try:
+                    await asyncio.wait_for(consume(), ANSWER_MAX_SECONDS)
+                except asyncio.TimeoutError:
+                    timed_out = True
+                    self._record(
+                        actor, model, f"{kind}-timeout", {"duration_ms": trace.run_ms()}, messages,
+                        topic=topic, trace=trace, outcome="timeout",
+                    )  # fmt: skip
+                    raise RuntimeError(
+                        f"{actor} ({model}) took longer than {int(ANSWER_MAX_SECONDS // 60)} minutes"
+                    ) from None
+        except BaseException as e:
+            if not timed_out:  # a timeout is already traced, under its own kind
+                self._record_failed(actor, model, kind, messages, trace, e, topic=topic)
+            raise
+        stats = {**stats, "duration_ms": trace.run_ms()}
+        outcome = "ok" if parts else "empty"
+        self._record(actor, model, kind, stats, messages, topic=topic, trace=trace, outcome=outcome)
         return "".join(parts)
 
     @asynccontextmanager
@@ -1537,15 +1590,21 @@ class DebateEngine:
         searches: int = 0,
         pages: int = 0,
         topic: Optional[int] = None,
+        trace: Optional[CallTrace] = None,
+        outcome: Optional[str] = None,
+        error: Optional[str] = None,
     ) -> int:
-        """Log one model call or search batch. Prompt tokens are estimated when the server doesn't report them."""
+        """Log one model call or search batch, with its trace when it has one. Prompt tokens are estimated when the
+        server doesn't report them."""
         topic = self.debate()["topic"] if topic is None else topic
         prompt_tokens = stats.get("prompt_tokens")
         if prompt_tokens is None and messages:
             prompt_tokens = estimate_tokens("".join(m["content"] for m in messages))
+        t = trace.fields() if trace else {}
         db.execute(
             "INSERT INTO usage (debate_id, topic, actor, model, kind, prompt_tokens, output_tokens, duration_ms, "
-            "searches, pages, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "searches, pages, created_at, started_at, queued_ms, first_token_ms, outcome, error) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 self.id,
                 topic,
@@ -1558,10 +1617,34 @@ class DebateEngine:
                 searches,
                 pages,
                 db.now(),
+                t.get("started_at"),
+                t.get("queued_ms"),
+                t.get("first_token_ms"),
+                outcome,
+                (error or "")[:300] or None,
             ],
         )
         self.bus.publish({"type": "metrics_updated", "topic": topic, "metrics": self.metrics(topic)})
         return prompt_tokens or 0
+
+    def _record_failed(
+        self,
+        actor: str,
+        model: str,
+        kind: str,
+        messages: Optional[List[Dict[str, str]]],
+        trace: CallTrace,
+        e: BaseException,
+        topic: Optional[int] = None,
+    ) -> None:
+        stopped = isinstance(e, asyncio.CancelledError)
+        try:
+            self._record(
+                actor, model, kind, {"duration_ms": trace.run_ms()}, messages, topic=topic, trace=trace,
+                outcome="stopped" if stopped else "error", error=None if stopped else str(e) or type(e).__name__,
+            )  # fmt: skip
+        except Exception as err:  # the call's own error matters more than its trace
+            log.warning("couldn't trace a failed call: %s", err)
 
     def metrics(self, topic: int) -> Dict[str, Any]:
         rows = db.query("SELECT * FROM usage WHERE debate_id = ? AND topic = ? ORDER BY id", [self.id, topic])

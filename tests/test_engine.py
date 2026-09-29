@@ -1726,3 +1726,56 @@ def test_advice_questions_are_told_apart_from_simple_ones():
     assert is_advice("Is it worth learning Rust?")
     assert not is_advice("What is the capital of France?")
     assert not is_advice("Hi there!")
+
+
+# ---------------------------------------------------------------- tracing
+
+
+async def test_every_model_call_is_traced_with_its_timings_and_outcome():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    rows = db.query("SELECT * FROM usage WHERE debate_id = 'd1' ORDER BY id")
+    turns = [r for r in rows if r["kind"] == "turn"]
+    assert len(turns) == 3 and all(r["outcome"] == "ok" for r in turns)
+    assert all(r["started_at"] and r["queued_ms"] >= 0 and r["first_token_ms"] is not None for r in turns)
+    assert any(r["kind"] == "answer" and r["outcome"] == "ok" for r in rows)
+
+
+async def test_a_failed_call_is_traced_with_its_error():
+    class FailingChair(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if model == "chair-model" and "chair of an AI council" in messages[0]["content"]:
+                raise ProviderError("the model server stopped mid-reply")
+                yield  # pragma: no cover
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = FailingChair(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    failed = db.query("SELECT * FROM usage WHERE outcome = 'error'")
+    assert len(failed) == 2 and all(r["model"] == "chair-model" and r["kind"] == "answer" for r in failed)
+    assert failed[0]["error"] == "the model server stopped mid-reply" and failed[0]["first_token_ms"] is None
+
+
+async def test_an_empty_reply_and_a_stopped_turn_are_traced():
+    client = EmptyChair(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    answers = db.query("SELECT * FROM usage WHERE kind = 'answer' ORDER BY id")
+    assert [r["outcome"] for r in answers] == ["empty"] * 3  # it only thought: the chair twice, then the backup
+    assert all(r["first_token_ms"] is not None for r in answers)
+    db.connect(":memory:")
+
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.gates["Koala"] = asyncio.Event()
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+    await eng.stop()
+    stopped = db.query_one("SELECT * FROM usage WHERE outcome = 'stopped'")
+    assert stopped["actor"] == "Koala" and stopped["error"] is None

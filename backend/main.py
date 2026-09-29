@@ -542,6 +542,18 @@ async def export_debate(debate_id: str, level: str = "standard", debate: bool = 
     return PlainTextResponse(text, media_type="text/markdown; charset=utf-8", headers=headers)
 
 
+@app.get("/api/debates/{debate_id}/trace")
+async def trace_debate(debate_id: str):
+    """Every model call of the conundrum in order: who, which model, what for, when it was asked for, how long it
+    waited for the model server, how long until its first token, how long it ran, and how it ended."""
+    _require_debate(debate_id)
+    return db.query(
+        "SELECT topic, actor, model, kind, started_at, queued_ms, first_token_ms, duration_ms, prompt_tokens, "
+        "output_tokens, searches, pages, outcome, error, created_at FROM usage WHERE debate_id = ? ORDER BY id",
+        [debate_id],
+    )
+
+
 @app.get("/api/debates/{debate_id}")
 async def get_debate(debate_id: str):
     _require_debate(debate_id)

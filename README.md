@@ -354,6 +354,7 @@ uv run quorum show <id> --debate > debate.md
 uv run quorum packs
 uv run quorum doctor             # health report from your recent conundrums
 uv run quorum doctor --ask       # ...and the council's diagnosis
+uv run quorum trace <id>         # every model call of a conundrum: wait, first token, time, how it ended
 ```
 
 Progress goes to stderr and the answer to stdout, as Markdown (or JSON with `--json`). The chair's clarifying
