@@ -6,6 +6,7 @@
     quorum show <id> --debate > debate.md
     quorum packs
     quorum list
+    quorum trace <id>
     quorum doctor [--ask]
     quorum mcp [install --client claude|codex]
 
@@ -20,6 +21,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 API_URL = os.getenv("QUORUM_URL", "http://127.0.0.1:8002").rstrip("/")
@@ -325,6 +327,46 @@ def cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _secs(ms: Optional[int]) -> str:
+    return "" if ms is None else f"{ms / 1000:.1f}s"
+
+
+def _local_time(iso: str) -> str:
+    """HH:MM:SS on this computer's clock (the database stores UTC)."""
+    try:
+        return datetime.fromisoformat(iso).astimezone().strftime("%H:%M:%S")
+    except ValueError:
+        return iso[11:19]
+
+
+def trace_lines(rows: List[Dict[str, Any]]) -> List[str]:
+    """One line per model call: the time it was asked for, how long it waited for the model server, the time to its
+    first token, how long it ran, tokens in and out, and how it ended."""
+    lines = [
+        f"{'time':<8}  {'who':<10} {'model':<16} {'for':<12} {'wait':>6} {'first':>6} {'ran':>7} {'in':>6} {'out':>5}  end"
+    ]
+    for r in rows:
+        when = _local_time(r.get("started_at") or r.get("created_at") or "")
+        end = r.get("outcome") or ""
+        if r.get("error"):
+            end = f"{end}: {r['error']}"
+        lines.append(
+            f"{when:<8}  {r['actor'][:10]:<10} {r['model'][:16]:<16} {r['kind'][:12]:<12} "
+            f"{_secs(r.get('queued_ms')):>6} {_secs(r.get('first_token_ms')):>6} {_secs(r.get('duration_ms')):>7} "
+            f"{r.get('prompt_tokens') or 0:>6} {r.get('output_tokens') or 0:>5}  {end}"
+        )
+    return lines
+
+
+def cmd_trace(args: argparse.Namespace) -> int:
+    rows = get(f"/debates/{args.id}/trace")
+    if args.json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return 0
+    print("\n".join(trace_lines(rows)))
+    return 0
+
+
 def cmd_mcp(args: argparse.Namespace) -> int:
     from . import mcp_server  # the MCP SDK is only needed here
 
@@ -387,6 +429,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     ls.add_argument("-n", type=int, default=15, help="how many (default 15)")
     ls.add_argument("--json", action="store_true")
     ls.set_defaults(func=cmd_list)
+
+    trace = sub.add_parser("trace", help="every model call of a conundrum, with its timings (for slow or failed runs)")
+    trace.add_argument("id")
+    trace.add_argument("--json", action="store_true")
+    trace.set_defaults(func=cmd_trace)
 
     args = parser.parse_args(argv)
     try:

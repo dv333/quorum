@@ -10,7 +10,7 @@ from backend import inventory, pyrun
 from backend.config import HANDLES, SEAT_COLORS
 from backend.engine import DebateEngine
 from backend.model_queue import Caller, ModelQueue, server_key
-from backend.providers import ChatClient, Chunk
+from backend.providers import ChatClient, Chunk, ProviderError
 
 
 AGENT_RE = re.compile(r"You are (Otter|Panda|Koala|Penguin|Hedgehog),")
@@ -589,30 +589,66 @@ async def test_the_next_conundrum_remembers_that_search_is_down():
     assert len(search.queries) == 1  # not tried again: out of credits until the settings change
 
 
-async def test_empty_chair_answer_is_retried_then_reported():
-    class EmptyChair(FakeClient):
-        async def stream(self, endpoint, model, messages, **kw):
-            if "chair of an AI council" in messages[0]["content"]:
-                self.calls.append((model, messages, kw))
-                yield Chunk("thinking", "drafting...")
-                yield Chunk("done", stats={})
-                return
-            async for c in super().stream(endpoint, model, messages, **kw):
-                yield c
+class EmptyChair(FakeClient):
+    """Every call that writes the final answer comes back empty, whichever model makes it."""
 
+    async def stream(self, endpoint, model, messages, **kw):
+        if "chair of an AI council" in messages[0]["content"]:
+            self.calls.append((model, messages, kw))
+            yield Chunk("thinking", "drafting...")
+            yield Chunk("done", stats={})
+            return
+        async for c in super().stream(endpoint, model, messages, **kw):
+            yield c
+
+
+async def test_an_answer_nobody_can_write_is_reported_as_no_answer():
     client = EmptyChair(lambda h, r, m: reply("AGREE"))
-    eng = make_debate(client)
+    eng = make_debate(client, max_rounds=1)  # one round: no draft to fall back on
     await eng.post_user_message("Q")
     await eng.task
     chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
-    assert chair["status"] == "error" and "empty answer twice" in chair["content"]
-    assert len(client.calls_with("chair of an AI council")) == 2
-    assert client.calls_with("chair of an AI council")[0] and client.calls[-1][2]["think"] is False
+    assert chair["status"] == "error" and "empty answer" in chair["content"]
+    writers = [model for model, m, _ in client.calls if "chair of an AI council" in m[0]["content"]]
+    assert writers == ["chair-model", "chair-model", "model-0"]  # the chair twice, then the largest other model
+    assert all(kw["think"] is False for _, m, kw in client.calls if "chair of an AI council" in m[0]["content"])
     # No answer is reported as a failure, not as an answered debate
     assert eng.debate()["status"] == "failed"
     assert not db.query("SELECT * FROM verdicts")
     note = db.query("SELECT content FROM messages WHERE author_kind = 'system' ORDER BY id DESC")[0]["content"]
-    assert note.startswith("No answer:") and "empty answer twice" in note and "Resume" in note
+    assert note.startswith("No answer:") and "empty answer" in note and "Resume" in note
+
+
+async def test_when_no_model_can_write_the_answer_the_latest_draft_stands_in():
+    client = EmptyChair(lambda h, r, m: reply("REFINE"))
+    client.draft_reply = "BOTTOM LINE: Use Go.\n- It compiles fast.\nCHANGED: First draft."
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Q")
+    await eng.task
+    assert eng.debate()["status"] == "concluded"
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["status"] == "done" and chair["content"].startswith("BOTTOM LINE: Use Go.")
+    assert "CHANGED" not in chair["content"] and "the chair's draft after round 1" in chair["content"]
+
+
+async def test_a_chair_whose_server_fails_hands_the_answer_to_another_model():
+    class FailingChair(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if model == "chair-model" and "chair of an AI council" in messages[0]["content"]:
+                self.calls.append((model, messages, kw))
+                raise ProviderError("the model server stopped mid-reply")
+                yield  # pragma: no cover
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = FailingChair(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
+    assert chair["status"] == "done" and chair["content"] == "VERDICT TEXT"
+    assert "writes it instead" in chair["thinking"] and "stopped mid-reply" in chair["thinking"]
+    assert eng.debate()["status"] == "concluded"
 
 
 async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_round():
@@ -620,7 +656,7 @@ async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_r
         failed = 0
 
         async def stream(self, endpoint, model, messages, **kw):
-            if "chair of an AI council" in messages[0]["content"] and self.failed < 2:
+            if "chair of an AI council" in messages[0]["content"] and self.failed < 3:
                 self.failed += 1
                 self.calls.append((model, messages, kw))
                 yield Chunk("done", stats={})
@@ -629,7 +665,7 @@ async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_r
                 yield c
 
     client = FlakyChair(lambda h, r, m: reply("AGREE"))
-    eng = make_debate(client, max_rounds=2)
+    eng = make_debate(client, max_rounds=1)
     await eng.post_user_message("Q")
     await eng.task
     assert eng.debate()["status"] == "failed"
@@ -1670,3 +1706,76 @@ async def test_quoted_code_the_user_wants_checked_for_bugs_gets_reviewers():
     await eng.post_user_message("Any bugs in this?\n\n```python\ndef div(a, b):\n    return a / b\n```")
     await eng.task
     assert "Security expert" in {s["role"] for s in eng.seats()}
+
+
+async def test_advice_always_gets_the_council_even_when_the_chair_would_answer_directly():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How should I teach my 8-year-old to handle money?")
+    await eng.task
+    assert client.turn_calls()  # the council spoke
+    assert db.query_one("SELECT reason FROM verdicts")["reason"] != "direct"
+
+
+def test_advice_questions_are_told_apart_from_simple_ones():
+    from backend.engine import is_advice
+
+    assert is_advice("Should I repair my car or buy another?")
+    assert is_advice("We're planning 7 days in Japan with two kids")
+    assert is_advice("Is it worth learning Rust?")
+    assert not is_advice("What is the capital of France?")
+    assert not is_advice("Hi there!")
+
+
+# ---------------------------------------------------------------- tracing
+
+
+async def test_every_model_call_is_traced_with_its_timings_and_outcome():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    rows = db.query("SELECT * FROM usage WHERE debate_id = 'd1' ORDER BY id")
+    turns = [r for r in rows if r["kind"] == "turn"]
+    assert len(turns) == 3 and all(r["outcome"] == "ok" for r in turns)
+    assert all(r["started_at"] and r["queued_ms"] >= 0 and r["first_token_ms"] is not None for r in turns)
+    assert any(r["kind"] == "answer" and r["outcome"] == "ok" for r in rows)
+
+
+async def test_a_failed_call_is_traced_with_its_error():
+    class FailingChair(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if model == "chair-model" and "chair of an AI council" in messages[0]["content"]:
+                raise ProviderError("the model server stopped mid-reply")
+                yield  # pragma: no cover
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = FailingChair(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    failed = db.query("SELECT * FROM usage WHERE outcome = 'error'")
+    assert len(failed) == 2 and all(r["model"] == "chair-model" and r["kind"] == "answer" for r in failed)
+    assert failed[0]["error"] == "the model server stopped mid-reply" and failed[0]["first_token_ms"] is None
+
+
+async def test_an_empty_reply_and_a_stopped_turn_are_traced():
+    client = EmptyChair(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await eng.task
+    answers = db.query("SELECT * FROM usage WHERE kind = 'answer' ORDER BY id")
+    assert [r["outcome"] for r in answers] == ["empty"] * 3  # it only thought: the chair twice, then the backup
+    assert all(r["first_token_ms"] is not None for r in answers)
+    db.connect(":memory:")
+
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.gates["Koala"] = asyncio.Event()
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Q")
+    await wait_for(lambda: len(client.turn_calls("Koala")) == 1)
+    await eng.stop()
+    stopped = db.query_one("SELECT * FROM usage WHERE outcome = 'stopped'")
+    assert stopped["actor"] == "Koala" and stopped["error"] is None

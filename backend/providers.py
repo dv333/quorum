@@ -155,6 +155,9 @@ class ChatClient:
                             },
                         )
                         return
+        # The server closed the stream without its final message: it stopped mid-reply (Ollama can stall and drop a
+        # request), which is an error, not an empty answer
+        raise ProviderError("the model server stopped mid-reply")
 
     async def _stream_openai(self, ep, model, messages) -> AsyncIterator[Chunk]:
         payload = {"model": model, "messages": messages, "stream": True}

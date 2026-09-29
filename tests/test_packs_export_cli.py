@@ -308,3 +308,23 @@ async def test_why_traces_a_passage_and_drops_made_up_agents_and_sources():
     assert len(client.calls) == calls
     with pytest.raises(KeyError):
         await eng.why(999, "Use Go.")
+
+
+def test_trace_lines_show_each_calls_wait_first_token_and_end():
+    from datetime import datetime
+
+    from backend.cli import trace_lines
+
+    rows = [
+        {"actor": "Otter", "model": "qwen3.6:latest", "kind": "answer", "started_at": "2026-09-28T23:08:07+00:00",
+         "queued_ms": 598000, "first_token_ms": None, "duration_ms": 9100, "prompt_tokens": 8884, "output_tokens": 0,
+         "outcome": "error", "error": "the model server stopped mid-reply"},
+        {"actor": "Panda", "model": "qwen3.8:latest", "kind": "turn", "created_at": "2026-09-28T23:01:00+00:00",
+         "queued_ms": 0, "first_token_ms": 1200, "duration_ms": 73000, "prompt_tokens": 3000, "output_tokens": 400,
+         "outcome": "ok", "error": None},
+    ]  # fmt: skip
+    head, stalled, fine = trace_lines(rows)
+    assert "wait" in head and "first" in head
+    local = datetime.fromisoformat("2026-09-28T23:08:07+00:00").astimezone().strftime("%H:%M:%S")
+    assert local in stalled and "598.0s" in stalled and "error: the model server stopped mid-reply" in stalled
+    assert "1.2s" in fine and fine.endswith("ok")

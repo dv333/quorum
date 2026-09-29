@@ -183,6 +183,13 @@ MIGRATIONS = [
     ("debates", "pack_json", "TEXT"),
     ("seats", "role", "TEXT"),
     ("seats", "role_focus", "TEXT"),
+    # A trace of each model call: when it was asked for, how long it waited for its turn on the model server, how
+    # long until its first token, and how it ended (ok, empty, cut, timeout, error, stopped)
+    ("usage", "started_at", "TEXT"),
+    ("usage", "queued_ms", "INTEGER"),
+    ("usage", "first_token_ms", "INTEGER"),
+    ("usage", "outcome", "TEXT"),
+    ("usage", "error", "TEXT"),
 ]
 
 _lock = threading.RLock()
