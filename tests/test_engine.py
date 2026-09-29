@@ -50,6 +50,7 @@ class FakeClient(ChatClient):
         self.unsourced_reply = None  # None: the answer with its named sources taken out
         self.critique_reply = '{"problems": []}'
         self.critique_revise_reply = None  # None: the verdict reply, corrected
+        self.recheck_reply = '{"problems": []}'
 
     def calls_with(self, marker):
         return [m for _, m, _ in self.calls if marker in m[0]["content"]]
@@ -83,6 +84,11 @@ class FakeClient(ChatClient):
             content, thinking = self.draft_reply, ""
         elif sys.startswith("You check an AI council's code review"):
             content, thinking = self.review_gap_reply, ""
+        elif (
+            sys.startswith("You check an AI council's final answer")
+            and "An answer was corrected" in messages[1]["content"]
+        ):
+            content, thinking = self.recheck_reply, ""
         elif sys.startswith("You check an AI council's final answer"):
             content, thinking = self.critique_reply, ""
         elif "You correct your final answer before the user sees it" in sys:
@@ -1789,6 +1795,17 @@ async def test_an_empty_reply_and_a_stopped_turn_are_traced():
 
 # ---------------------------------------------------------------- the critic (research off)
 
+
+def critique_calls(client):
+    """The critic's first look at an answer (not its re-check of a fix)."""
+    return [
+        (model, m, kw)
+        for model, m, kw in client.calls
+        if m[0]["content"].startswith("You check an AI council's final")
+        and "An answer was corrected" not in m[1]["content"]
+    ]
+
+
 SAVINGS = (
     "BOTTOM LINE: Pay $4,000 toward the card and **rebuild your emergency fund first**.\n\n## Key points\n"
     "- **Keep a cushion:** hold $4,000 in savings.\n- **Then rebuild savings** at $1,000 a month before paying more."
@@ -1806,9 +1823,7 @@ async def test_the_critic_flags_advice_that_doesnt_fit_the_numbers_and_the_chair
     eng = make_debate(client, max_rounds=1)
     await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
     await eng.task
-    critic = [
-        (model, m) for model, m, _ in client.calls if m[0]["content"].startswith("You check an AI council's final")
-    ]
+    critic = [(model, m) for model, m, _ in critique_calls(client)]
     assert len(critic) == 1 and critic[0][0] != "chair-model"  # a different model checks the chair's answer
     assert "24%" in critic[0][1][1]["content"] and "rebuild your emergency fund first" in critic[0][1][1]["content"]
     fix = client.calls_with("You correct your final answer before the user sees it")
@@ -1876,7 +1891,7 @@ async def test_the_critic_is_the_largest_other_model_by_its_real_size():
     eng.meta_lookup = meta
     await eng.post_user_message("I have card debt. Pay it off?")
     await eng.task
-    critic = [model for model, m, _ in client.calls if m[0]["content"].startswith("You check an AI council's final")]
+    critic = [model for model, _, _ in critique_calls(client)]
     assert critic == ["big:latest"]  # judged by name, "big:latest" would count as 0 and lose to gpt-oss:20b
 
 
@@ -1897,7 +1912,60 @@ async def test_the_critic_thinks_and_retries_without_thinking_when_it_only_thoug
     eng = make_debate(client, max_rounds=1)
     await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
     await eng.task
-    thinks = [kw["think"] for _, m, kw in client.calls if m[0]["content"].startswith("You check an AI council's final")]
+    thinks = [kw["think"] for _, _, kw in critique_calls(client)]
     assert thinks == [True, False]
     chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert json.loads(chair["meta_json"])["critique"]["revised"]  # the second try's flag was acted on
+
+
+async def test_a_fix_is_rechecked_and_what_is_still_wrong_is_fixed_once_more():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS
+    client.critique_reply = FLAG
+    client.recheck_reply = '{"problems": [{"check": "trace", "text": "pay off your emergency fund", "issue": "Reads oddly; say pay the card first."}]}'
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
+    await eng.task
+    recheck = [m for _, m, _ in client.calls if "An answer was corrected" in m[1]["content"]]
+    assert len(recheck) == 1 and "Saving at ~4%" in recheck[0][1]["content"]  # it checks the flagged problems
+    assert len(client.calls_with("You correct your final answer before the user sees it")) == 2
+    meta = json.loads(db.query_one("SELECT meta_json FROM messages WHERE author_kind = 'chair'")["meta_json"])
+    assert meta["critique"]["refixed"] and meta["critique"]["rechecked"][0]["check"] == "trace"
+
+
+async def test_a_fix_that_holds_is_not_fixed_again():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS
+    client.critique_reply = FLAG
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
+    await eng.task
+    assert len(client.calls_with("You correct your final answer before the user sees it")) == 1
+    meta = json.loads(db.query_one("SELECT meta_json FROM messages WHERE author_kind = 'chair'")["meta_json"])
+    assert meta["critique"]["rechecked"] == [] and "refixed" not in meta["critique"]
+
+
+async def test_a_plan_question_asks_for_a_schedule_in_the_answer():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I want to run my first half marathon in 16 weeks. How should I train?")
+    await eng.task
+    verdict = client.calls_with("You turn the council")[-1][1]["content"]
+    assert "## Plan" in verdict and "add up" in verdict
+
+    db.connect(":memory:")
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Should I replace my gas furnace with a heat pump?")
+    await eng.task
+    assert "## Plan" not in client.calls_with("You turn the council")[-1][1]["content"]
+
+
+def test_plan_questions_are_told_apart():
+    from backend.engine import is_plan
+
+    assert is_plan("How should I train for a half marathon?")
+    assert is_plan("What should I do in the next 90 days?")
+    assert is_plan("We're planning 7 days in Japan in April")
+    assert not is_plan("Is it worth learning Rust?")
+    assert not is_plan("How should I teach my 8-year-old to handle money?")
