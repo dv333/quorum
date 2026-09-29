@@ -1652,3 +1652,21 @@ async def test_with_research_the_answer_keeps_its_checked_studies():
     await eng.task
     assert not client.calls_with("doesn't cite sources nobody checked")
     assert not any("Don't name studies" in m[0]["content"] for m, _ in client.turn_calls())
+
+
+async def test_a_question_that_quotes_code_gets_the_usual_roles_not_reviewers():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("What does this print?\n\n```python\nprint(-7 // 2)\n```")
+    await eng.task
+    roles = {s["role"] for s in eng.seats()}
+    assert "Security expert" not in roles and "Skeptic" in roles
+    assert db.query_one("SELECT reason FROM verdicts")["reason"] != "direct"  # still debated
+
+
+async def test_quoted_code_the_user_wants_checked_for_bugs_gets_reviewers():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Any bugs in this?\n\n```python\ndef div(a, b):\n    return a / b\n```")
+    await eng.task
+    assert "Security expert" in {s["role"] for s in eng.seats()}

@@ -196,6 +196,10 @@ _CODE_Q = re.compile(r"```|diff --git|^[-+]{3} [ab]/|\bcode review\b|\breview (t
 # A review of a change, as opposed to a question that only quotes some code ("what does this print?")
 _REVIEW_Q = re.compile(r"```diff|diff --git|^[-+]{3} [ab]/|^@@ |\bcode review\b|\breview (this|the) (code|change|diff|pr)\b",
                        re.I | re.M)  # fmt: skip
+# Quoted code the user wants judged: bugs, safety, design
+_REVIEW_ASK = re.compile(r"\b(review|bugs?|buggy|vulnerab\w*|secure|security|refactor\w*|code smells?|edge cases?"
+                         r"|race conditions?|what'?s wrong|is (this|it|my)( code| function| query)? (correct|safe|right|ok|okay|good)"
+                         r"|improve (this|it|my code)|production.ready)\b", re.I)  # fmt: skip
 
 
 ROLE_FOCUS = {**dict(DEFAULT_ROLES), **{name: focus for name, focus, _ in CODE_ROLES}}
@@ -208,8 +212,14 @@ def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_pa
 
 
 def is_code_review(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
-    """A review of a change or a repository, where the code can't run on its own."""
-    return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_REVIEW_Q.search(question))
+    """A review: a change, a repository, or quoted code the user wants judged (bugs, safety, design). A question that
+    only quotes code ("what does this print?") isn't one."""
+    return (
+        bool(repo_path)
+        or (pack or {}).get("id") == "code-review"
+        or bool(_REVIEW_Q.search(question))
+        or ("```" in question and bool(_REVIEW_ASK.search(question)))
+    )
 
 
 def code_roles(question: str, n: int) -> List[str]:
@@ -1659,7 +1669,8 @@ class DebateEngine:
         if not seats:
             return
         question = self._question(d["topic"])
-        code = is_code_debate(question, d["pack"], d.get("repo_path"))
+        # Reviewers (Security, PSR, Test engineer) only for a review, not for a question that quotes code
+        code = is_code_review(question, d["pack"], d.get("repo_path"))
         required = code_roles(question, len(seats)) if code else required_roles(len(seats))
         members, _ = await self._describe_members(seats)
         proposed: Dict[str, Dict[str, str]] = {}
@@ -3141,7 +3152,7 @@ class DebateEngine:
             await self._audit_answer(row["id"], claims, studies)
             if not d["research_enabled"]:
                 await self._drop_unchecked_sources(row["id"])
-            if is_code_debate(self._question(topic), d["pack"], d.get("repo_path")):
+            if is_code_review(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
             done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])
             if studies and done and done["status"] == "done" and done["content"]:
