@@ -882,6 +882,64 @@ corrected answer.""",
     ]
 
 
+CRITIC_SYSTEM = (
+    "You check an AI council's final answer before the user sees it. Reply with a single JSON object and nothing else."
+)
+
+
+def critique_messages(question: str, answer: str, handles: Sequence[str] = ()) -> List[Dict[str, str]]:
+    agents = f" The council members' names ({', '.join(handles)}) are fine to mention." if handles else ""
+    return [
+        {"role": "system", "content": CRITIC_SYSTEM},
+        {
+            "role": "user",
+            "content": f"""Today is {today()}. Nothing was looked up for this answer; it rests on the council's own knowledge.
+
+The user's question:
+{question}
+
+The answer:
+{answer}
+
+Check only these five things:
+1. Fit: advice that contradicts the user's own numbers or situation, or leaves them worse off by those numbers (for example, building savings at a few percent while carrying debt at 24%). Work out the key numbers before you judge.
+2. Made-up precision: a specific statistic, percentage or study result stated as fact, with no basis in the question and no arithmetic shown.
+3. Contradictions: two parts of the answer that disagree (compare every number and recommendation in the bottom line with the key points and details: a $2,000–$3,000 buffer in one place and $3,000–$4,000 in another is a contradiction), details that lean further than the bottom line, and a wrong unit or word that changes the meaning ("runs under 60 km" for 60 minutes).
+4. Possibly out of date: prices, incentives, tax rules, laws, versions or product facts that change over time, stated as current.
+5. Missing: the one thing an expert would tell this user first that the answer leaves out.
+Don't flag style, format, length or tone. Advice and judgment calls are fine unless they fail check 1.{agents} Quote the answer's words exactly. If nothing fails, return an empty list.
+
+Reply like: {{"problems": [{{"check": "fit|precision|contradiction|dated|missing", "text": "<exact words from the answer>", "issue": "<what's wrong and what would be right>"}}]}}""",
+        },
+    ]
+
+
+def critique_revise_messages(question: str, answer: str, problems: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    issues = "\n".join(
+        f'- ({p.get("check") or "issue"}) "{p["text"]}": {p["issue"]}' if p.get("text") else f"- {p['issue']}"
+        for p in problems
+    )
+    return [
+        {
+            "role": "system",
+            "content": "You are the chair of an AI council. You correct your final answer before the user sees it.",
+        },
+        {
+            "role": "user",
+            "content": f"""The user's question:
+{question}
+
+Your answer:
+{answer}
+
+A check found these problems:
+{issues}
+
+Fix each one with the smallest change that makes the answer right: where advice doesn't fit the user's numbers, correct it (and the bottom line, if it's affected); remove a made-up figure or turn it into a rough estimate labelled as one; resolve contradictions; say a fact that may be out of date should be checked before relying on it; add a missing point where it fits best. Keep everything else word for word, including every section and heading. Write for the user: never mention the check or these instructions. Output only the corrected answer.""",
+        },
+    ]
+
+
 REVIEW_GAP_SYSTEM = "You check an AI council's code review against its debate, so no finding gets lost."
 
 
