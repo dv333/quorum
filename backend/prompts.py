@@ -505,7 +505,7 @@ def intake_messages(
         task = 'You must now summarize: reply {"action": "summarize", ...}.'
     else:
         task = f"""Decide what to do next. You have asked {asked} of at most {max_questions} questions.
-- If it's trivial (a greeting, small talk, a simple fact, a quick calculation), don't convene the council: reply {{"action": "direct"}} (only when you haven't asked anything yet).
+- If it's trivial (a greeting, small talk, a simple fact, a quick calculation), don't convene the council: reply {{"action": "direct"}} (only when you haven't asked anything yet). Advice is never trivial: "should I", "how should I", plans, choices and anything people could reasonably disagree on gets the council, however simple it sounds.
 - If it can already be answered well (the goal is clear, or sensible defaults exist), reply {{"action": "clear", "rounds": N}} when you haven't asked anything yet, otherwise summarize.
 - Ask only when the best answer genuinely depends on something only the user knows (their goal, budget, scale, audience, constraints, what they already tried). Never ask about things you can reasonably assume, look up, or that barely change the answer. Never ask two things at once.
 - To ask: {{"action": "ask", "question": "<one short, friendly question>", "options": ["2 to 4 short likely answers"]}}

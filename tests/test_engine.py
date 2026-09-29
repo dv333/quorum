@@ -1706,3 +1706,23 @@ async def test_quoted_code_the_user_wants_checked_for_bugs_gets_reviewers():
     await eng.post_user_message("Any bugs in this?\n\n```python\ndef div(a, b):\n    return a / b\n```")
     await eng.task
     assert "Security expert" in {s["role"] for s in eng.seats()}
+
+
+async def test_advice_always_gets_the_council_even_when_the_chair_would_answer_directly():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.intake_replies = ['{"action": "direct"}']
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How should I teach my 8-year-old to handle money?")
+    await eng.task
+    assert client.turn_calls()  # the council spoke
+    assert db.query_one("SELECT reason FROM verdicts")["reason"] != "direct"
+
+
+def test_advice_questions_are_told_apart_from_simple_ones():
+    from backend.engine import is_advice
+
+    assert is_advice("Should I repair my car or buy another?")
+    assert is_advice("We're planning 7 days in Japan with two kids")
+    assert is_advice("Is it worth learning Rust?")
+    assert not is_advice("What is the capital of France?")
+    assert not is_advice("Hi there!")

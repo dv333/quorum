@@ -211,6 +211,19 @@ def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_pa
     return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_CODE_Q.search(question))
 
 
+_ADVICE_Q = re.compile(
+    r"\b(should (i|we)|how (should|do|can|could) (i|we)|what should (i|we)|is it worth|worth it|help me (decide|choose|plan)"
+    r"|(which|what) (one )?(is|would be) (better|best)|best way to|recommend|advice|plan (for|my|our|a|the)|pros and cons"
+    r"|(i'?m|i am|we'?re|we are) (planning|deciding|thinking about|trying to decide)|(i|we) (want|need) to (decide|choose))\b",
+    re.I,
+)
+
+
+def is_advice(question: str) -> bool:
+    """A question asking what to do: a choice, a plan or a how-to, where the council's range of views helps."""
+    return bool(_ADVICE_Q.search(question))
+
+
 def is_code_review(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
     """A review: a change, a repository, or quoted code the user wants judged (bugs, safety, design). A question that
     only quotes code ("what does this print?") isn't one."""
@@ -1114,6 +1127,9 @@ class DebateEngine:
             pass
         if action == "direct" and is_code_debate(question, d["pack"], d.get("repo_path")):
             # A review always gets the council: a model once answered a diff "directly" with "Ready to get started?"
+            action = "clear"
+        if action == "direct" and is_advice(question):
+            # Advice always gets the council: "How should I teach my 8-year-old to handle money?" once got 75 words
             action = "clear"
         if action == "direct" and not asked and not summarized:
             await self._answer_directly()
