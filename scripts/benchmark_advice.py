@@ -176,6 +176,17 @@ def write_blind(results: Dict[str, Any], questions: List[Dict[str, str]], out: P
     (out / "key.json").write_text(json.dumps(key, indent=1))
 
 
+def position_note(judged: List[Any]) -> str:
+    """A judge that picks whichever answer comes first isn't judging: phi4 did that on every pair it saw."""
+    split = sum(1 for _, r in judged if len(set(r["judge"].get("votes", []))) > 1)
+    if judged and split > len(judged) / 2:
+        return (
+            f"**Caution:** on {split} of {len(judged)} pairs the judge's two votes disagreed once the order was "
+            "swapped, so it mostly judged by position. Judge blind.md by hand instead."
+        )
+    return ""
+
+
 def report(results: Dict[str, Any], questions: List[Dict[str, str]]) -> str:
     judged = [(q, results[q["id"]]) for q in questions if "judge" in results.get(q["id"], {})]
     counts = {v: sum(r["judge"]["verdict"] == v for _, r in judged) for v in ("quorum", "single", "tie")}
@@ -194,6 +205,8 @@ def report(results: Dict[str, Any], questions: List[Dict[str, str]]) -> str:
         f"| **Quorum's share of decided pairs** | **{round(100 * counts['quorum'] / decided) if decided else 0}%** |",
         "",
         f"Median time per question: Quorum {minutes[len(minutes) // 2]:.1f} min." if minutes else "",
+        "",
+        position_note(judged),
         "",
         "| Question | Verdict | Why (Quorum first / alone first) |",
         "|---|---|---|",

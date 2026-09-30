@@ -43,3 +43,10 @@ def test_a_pair_is_a_win_only_when_both_orders_agree(monkeypatch):
 def test_the_advice_set_has_twenty_distinct_questions():
     qs = json.loads(Path("benchmarks/advice/questions.json").read_text())["questions"]
     assert len(qs) == 20 and len({q["id"] for q in qs}) == 20
+
+
+def test_the_report_warns_when_the_judge_picks_by_position():
+    judged = [({"id": i}, {"judge": {"verdict": "tie", "votes": ["quorum", "single"]}}) for i in range(3)]
+    assert "judged by position" in bench.position_note(judged) or "by position" in bench.position_note(judged)
+    fair = [({"id": 1}, {"judge": {"verdict": "quorum", "votes": ["quorum", "quorum"]}})]
+    assert bench.position_note(fair) == ""
