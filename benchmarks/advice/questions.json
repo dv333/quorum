@@ -1,0 +1,85 @@
+{
+ "note": "Everyday advice. No computed answers: pairs are judged blind (see scripts/benchmark_advice.py).",
+ "questions": [
+  {
+   "id": "card-debt",
+   "question": "I earn $85,000 a year in California, have $12,000 of credit card debt at 24% APR and $8,000 in savings. Should I use my savings to pay off the card?"
+  },
+  {
+   "id": "civic-repair",
+   "question": "My 2015 Honda Civic has 140,000 miles and needs a $2,800 transmission repair. Should I repair it or buy a used car?"
+  },
+  {
+   "id": "half-marathon",
+   "question": "I'm 34 and want to run my first half marathon in 16 weeks. Right now I run about 10 km a week. How should I train?"
+  },
+  {
+   "id": "heat-pump",
+   "question": "Should I replace my old gas furnace with a heat pump? It's an 1,800 sq ft house near Chicago."
+  },
+  {
+   "id": "job-offers",
+   "question": "I have two job offers: $140k at a big company with a 30-minute commute, or $120k plus 0.3% equity at a 40-person startup, fully remote. How should I decide?"
+  },
+  {
+   "id": "kid-money",
+   "question": "How should I teach my 8-year-old to handle money?"
+  },
+  {
+   "id": "3am-waking",
+   "question": "I keep waking up at 3 am and can't get back to sleep. What should I try?"
+  },
+  {
+   "id": "japan-trip",
+   "question": "We're planning 7 days in Japan in April with two kids aged 6 and 10, on $6,000 excluding flights. How should we plan it?"
+  },
+  {
+   "id": "learn-rust",
+   "question": "Is it worth learning Rust in 2026 as a Python backend developer?"
+  },
+  {
+   "id": "bakery-90-days",
+   "question": "My small bakery's revenue is flat at $30k a month and costs keep rising. What should I do in the next 90 days?"
+  },
+  {
+   "id": "401k-catch-up",
+   "question": "I'm 45 with $150,000 in a 401(k) and no other retirement savings. I earn $110,000. How should I catch up?"
+  },
+  {
+   "id": "deposit-kept",
+   "question": "My landlord kept my whole $2,000 deposit for 'cleaning' after I moved out of my California apartment. What should I do?"
+  },
+  {
+   "id": "tesla-or-corolla",
+   "question": "Should I buy a used Tesla Model 3 or a new Toyota Corolla Hybrid for a 40-mile daily commute?"
+  },
+  {
+   "id": "teen-phone",
+   "question": "My 15-year-old spends 6 hours a day on their phone. How should I handle it?"
+  },
+  {
+   "id": "lose-10kg",
+   "question": "I want to lose 10 kg in 6 months. I'm 38, 92 kg, 178 cm and sit at a desk all day. What plan should I follow?"
+  },
+  {
+   "id": "interview-prep",
+   "question": "How should I prepare for a senior backend engineer interview in 4 weeks?"
+  },
+  {
+   "id": "late-sprints",
+   "question": "Our team of 6 engineers keeps missing sprint deadlines. What should I change as their new manager?"
+  },
+  {
+   "id": "refinance",
+   "question": "Should I refinance my $400,000 mortgage from 7.1% to 6.2% if closing costs are $6,000 and I might move in 4 years?"
+  },
+  {
+   "id": "spanish-year",
+   "question": "What's the best way to learn Spanish to a conversational level in a year with 30 minutes a day?"
+  },
+  {
+   "id": "dying-plants",
+   "question": "My houseplants keep dying: the leaves turn yellow, then drop. I water them every 3 days. What am I doing wrong?"
+  }
+ ]
+}
