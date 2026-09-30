@@ -2178,3 +2178,11 @@ async def test_follow_up_questions_are_suggested_from_what_the_council_left_open
     assert "Keep $4k instead." in suggest[1]["content"]
     meta = json.loads(db.query_one("SELECT meta_json FROM messages WHERE author_kind = 'chair'")["meta_json"])
     assert meta["suggestions"] == ["What if I only have $4k saved?", "Should I use a balance transfer?"]
+
+
+def test_a_visible_self_correction_is_a_trace():
+    from backend.engine import process_traces
+
+    assert process_traces(
+        "*Correction*: The previous saving logic was flawed; let's re-calculate. Two adults: ¥53,200."
+    )

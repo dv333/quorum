@@ -90,3 +90,10 @@ def test_parse_json_loose_strict_and_broken():
     assert got["action"] == "summarize" and got["brief"] == "Rent or buy in Austin"
     assert got["assumptions"] == ["Stays 7+ years", "Has $80k saved"]
     assert parse_json_loose("no json here") == {}
+
+
+def test_citation_marks_are_tidied_and_agent_marks_dropped():
+    from backend.parsing import tidy_citations
+
+    text = "Keep phones out at night【5†L4-L7】 and model it【Otter】【Panda】. See [2]."
+    assert tidy_citations(text) == "Keep phones out at night[5] and model it. See [2]."

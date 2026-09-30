@@ -44,6 +44,7 @@ from .config import (
     RESEARCHER_NAME,
 )
 from .parsing import (
+    tidy_citations,
     CODER_MENTION_RE,
     MENTION_RE,
     ThinkSplitter,
@@ -763,7 +764,8 @@ _TRACE = re.compile(
     r"(initial|original|earlier) (stance|estimate|position|answer|draft|suggestion)|was corrected|were corrected|"
     r"(un)?confirmed by the (available )?(sources|evidence|research)|contradicted by the sources|"
     r"evidence (contradicts|does not (confirm|support|show))|is unconfirmed|remains unconfirmed|"
-    r"python (execution|check|program|simulation)|as verified by)",
+    r"python (execution|check|program|simulation)|as verified by|\*?correction\*?:|let'?s re-?calculate|"
+    r"(previous|earlier) (logic|calculation|figure) was (flawed|wrong|incorrect))",
     re.I,
 )
 
@@ -1354,7 +1356,7 @@ class DebateEngine:
                 stats = _add_stats(stats, more)
             self._finish_message(
                 row["id"],
-                content=strip_thinking(partial["content"]).strip() or "…",
+                content=tidy_citations(strip_thinking(partial["content"]).strip()) or "…",
                 thinking=partial["thinking"],
                 tokens=stats.get("tokens"),
                 tok_per_s=stats.get("tok_per_s"),
@@ -1504,7 +1506,7 @@ class DebateEngine:
             partial = self.partials[row["id"]]
             self._finish_message(
                 row["id"],
-                content=strip_thinking(partial["content"]).strip() or "…",
+                content=tidy_citations(strip_thinking(partial["content"]).strip()) or "…",
                 thinking=partial["thinking"],
                 tokens=stats.get("tokens"),
                 tok_per_s=stats.get("tok_per_s"),
@@ -3687,7 +3689,7 @@ class DebateEngine:
                     continue
                 content = strip_thinking(partial["content"]).strip()
                 if content:
-                    return content, stats, ""
+                    return tidy_citations(content), stats, ""
                 errors.append("returned an empty answer")
                 self._log(msg_id, "(empty answer)")
             if i + 1 < len(writers):
