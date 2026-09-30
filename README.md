@@ -253,6 +253,11 @@ MacBook Pro. Click any image to see it full size.
 </tr>
 </table>
 
+**Attach a file.** Drop, paste or pick an image, PDF, Word document or text file (up to 5, 20 MB each), then ask about
+it, or send it on its own for a review. Images are described word for word by a model that can see (qwen3.6, gemma3 and
+others; the chair when it can), and long documents are summarized by the chair. Tap a file on your message to see
+exactly what the council read. PDFs need `pdftotext` (`brew install poppler`) or `pypdf`.
+
 ### 2. Clarify and debate
 
 <table>

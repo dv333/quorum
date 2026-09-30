@@ -1296,3 +1296,56 @@ Sources found:
 Output only the final brief: no drafts, revisions, or notes about these instructions. The source list is added automatically.""",
         },
     ]
+
+
+# ---------------------------------------------------------------- attached files
+
+
+def read_image_messages(name: str, question: str, image_b64: str) -> List[Dict[str, Any]]:
+    """A model that can see describes an attached image for a council that can't."""
+    return [
+        {
+            "role": "system",
+            "content": "You describe images for a council of AI models that can't see them. They rely on your "
+            "description alone, so be exact and complete, and don't judge whether what the image says is true.",
+        },
+        {
+            "role": "user",
+            "content": f"""The user attached this image ({name}) and asked: {question}
+
+Describe it:
+- Every piece of text in it, word for word: names and handles, dates, captions, headlines, numbers, labels, prices, small print.
+- What it shows: people, objects, a screenshot of what app or site, a chart (its axes, values and trend), a document.
+- What it claims, argues or sells, in a sentence or two, as the image puts it.
+Say plainly what you can't read or aren't sure of. Plain text, no preamble.""",
+            "images": [image_b64],
+        },
+    ]
+
+
+DIGEST_INPUT_CHARS = 48000  # what the chair reads of a long file to summarize it (about 12,000 tokens)
+
+
+def digest_file_messages(name: str, question: str, text: str) -> List[Dict[str, str]]:
+    """A file too long for the question, summarized for the council without losing what it will need."""
+    part = ""
+    if len(text) > DIGEST_INPUT_CHARS:
+        cut = text[:DIGEST_INPUT_CHARS]
+        part = f" (only the first {round(100 * len(cut) / len(text))}% of the file fits here; say so at the start)"
+        text = cut
+    return [
+        {
+            "role": "system",
+            "content": "You summarize a document for a council of AI models that will debate the user's question "
+            "about it. They see only your summary, so keep what they'll need and don't judge it.",
+        },
+        {
+            "role": "user",
+            "content": f"""The user asked: {question}
+
+The attached file, {name}{part}:
+{text}
+
+Summarize it in at most 900 words: what it is and who wrote it; every claim, number, date, name, price, commitment and condition that bears on the question, with the page ([page n]) when the text shows it; the author's own words for the central claims, in quotes. Don't evaluate it. Plain text, no preamble.""",
+        },
+    ]

@@ -27,6 +27,13 @@ PORT = _env_int("LLC_PORT", 8002)
 # SQLite database file
 DB_PATH = os.getenv("LLC_DB_PATH", "data/council.db")
 
+# Attached files: where uploads are kept, the largest file accepted, and how much of the files' text goes into the
+# question (a longer document is summarized by the chair first)
+UPLOADS_DIR = os.getenv("QUORUM_UPLOADS_DIR", os.path.join(os.path.dirname(DB_PATH) or ".", "uploads"))
+ATTACHMENT_MAX_BYTES = 20_000_000
+ATTACHMENT_CHARS = 8000
+ATTACHMENT_PREVIEW_CHARS = 4000  # what the app shows of what the council read
+
 # Topic packs: the ones that ship with Quorum, and your own (JSON files; the same id overrides a built-in one)
 BUILTIN_PACKS_DIR = os.path.join(os.path.dirname(__file__), "packs")
 USER_PACKS_DIR = os.getenv("QUORUM_PACKS_DIR", "data/packs")

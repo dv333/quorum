@@ -45,7 +45,15 @@ export const api = {
   createDebate: (body) => request('/debates', { method: 'POST', body }),
   deleteDebate: (id) => request(`/debates/${id}`, { method: 'DELETE' }),
   updateDebate: (id, body) => request(`/debates/${id}`, { method: 'PATCH', body }),
-  postMessage: (id, content) => request(`/debates/${id}/messages`, { method: 'POST', body: { content } }),
+  postMessage: (id, content, attachments = []) => request(`/debates/${id}/messages`, { method: 'POST', body: { content, attachments } }),
+  upload: async (file, name) => {
+    const form = new FormData()
+    form.append('file', file, name || file.name)
+    const res = await fetch('/api/uploads', { method: 'POST', body: form })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `${res.status} ${res.statusText}`)
+    return data
+  },
   why: (id, verdictId, passage) => request(`/debates/${id}/verdicts/${verdictId}/why`, { method: 'POST', body: { passage } }),
   rewriteLevel: (id, verdictId, level) => request(`/debates/${id}/verdicts/${verdictId}/level`, { method: 'POST', body: { level } }),
   confirmIntake: (id) => request(`/debates/${id}/intake/confirm`, { method: 'POST' }),
@@ -91,6 +99,10 @@ export const api = {
 }
 
 // Markdown export of a conundrum: the answer at a reading level, optionally with the whole debate
+export function attachmentUrl(id) {
+  return `/api/attachments/${id}/file`
+}
+
 export function exportUrl(id, { level = 'standard', debate = false, download = false } = {}) {
   return `/api/debates/${id}/export?level=${level}&debate=${debate}&download=${download}`
 }

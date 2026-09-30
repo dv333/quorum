@@ -5,6 +5,7 @@ import { RESEARCHER, modelShort } from '../agents'
 import Customize from './Customize'
 import { useAutoGrow } from './DebateView'
 import { Orb } from './Message'
+import { AttachButton, AttachChips, dropProps, useAttachments } from './Attach'
 
 const PACKS_SHOWN = 4 // the rest sit behind "More"
 
@@ -28,6 +29,8 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar, int
   const [custom, setCustom] = useState(null) // null = fully automatic
   const [editing, setEditing] = useState(null)
   const [busy, setBusy] = useState(false)
+  const files = useAttachments()
+  const [over, setOver] = useState(false)
   const [error, setError] = useState(null)
   const [packs, setPacks] = useState([])
   const [packId, setPackId] = useState(null)
@@ -86,16 +89,17 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar, int
 
   const start = async () => {
     const q = question.trim()
-    if (!q || busy) return
+    if ((!q && !files.ids.length) || busy || files.uploading) return
     setBusy(true)
     setError(null)
     requestNotifications() // ask once, during a click, so the chair can reach you later
     try {
-      let body = { question: q, pack: packId }
+      let body = { question: q, pack: packId, attachments: files.ids }
       if (custom) {
         const seatRef = (h) => { const s = custom.seats[handles.indexOf(h)]; return s && { endpoint_id: s.endpoint_id, model: s.model } }
         body = {
           question: q,
+          attachments: files.ids,
           seats: custom.seats,
           chair: custom.chair === 'auto' ? null : seatRef(custom.chair),
           researcher: custom.researcher === 'auto' ? null : seatRef(custom.researcher),
@@ -146,13 +150,18 @@ export default function Home({ config, onCreated, onOpenSettings, mobileBar, int
           <div className="mark big alive"><span /><span /><span /></div>
           <h1>{config.app_name}</h1>
           <div className="tagline">Many minds. One answer.</div>
-          <div className="ask">
-            <textarea ref={ref} rows={1} autoFocus value={question} placeholder="What's your conundrum?" aria-label="Your question"
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); start() } }} />
-            <button className="send" disabled={!question.trim() || busy || !setup} onClick={start} aria-label="Ask">
-              {busy ? '…' : '↑'}
-            </button>
+          <div className={`ask ${over ? 'drop' : ''} ${files.files.length ? 'has-files' : ''}`} {...dropProps(files.add, setOver)}>
+            <AttachChips files={files.files} onRemove={files.remove} />
+            <div className="ask-row">
+              <AttachButton onFiles={files.add} disabled={busy} />
+              <textarea ref={ref} rows={1} autoFocus value={question} aria-label="Your question"
+                placeholder={files.files.length ? 'Ask about it, or send it as is for a review' : "What's your conundrum?"}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); start() } }} />
+              <button className="send" disabled={(!question.trim() && !files.ids.length) || files.uploading || busy || !setup} onClick={start} aria-label="Ask">
+                {busy ? '…' : '↑'}
+              </button>
+            </div>
           </div>
           <div className="council-row">
             {seatsShown.map((s, i) => (

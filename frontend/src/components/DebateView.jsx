@@ -7,10 +7,17 @@ import { useDebate } from '../useDebate'
 import AnswerCard from './AnswerCard'
 import LivingAnswer from './Living'
 import RoundTable, { LINE_H } from './RoundTable'
+import { AttachButton, AttachChips, dropProps, useAttachments } from './Attach'
 import { AgentMessage, BeagleCard, CoderCard, ModeratorMessage, Orb, SystemRow, UserMessage } from './Message'
 
 const INTAKE = ['intake', 'clarifying', 'confirming']
 const focusComposer = () => window.dispatchEvent(new Event('quorum:focus-composer'))
+
+// A message's files: what the council read from each once the server has it, else what was sent
+export function filesOf(attachments, msg) {
+  const read = (attachments || []).filter((a) => a.message_id === msg.id)
+  return read.length ? read : msg.meta?.attachments || []
+}
 
 function latestStances(messages, topic, seats) {
   return seats.map((seat) => {
@@ -56,7 +63,7 @@ function RoundDivider({ round, turns, seatsCount, collapsed, onToggle, anchor })
   )
 }
 
-function Thread({ items, seatsById, debate, onIntake }) {
+function Thread({ items, seatsById, debate, onIntake, files = [] }) {
   const [collapsed, setCollapsed] = useState(() => new Set())
   const toggleRound = (r) => setCollapsed((prev) => {
     const next = new Set(prev)
@@ -97,7 +104,7 @@ function Thread({ items, seatsById, debate, onIntake }) {
     }
     // A folded round hides its turns and the lookups made during it
     if (lastRound !== null && collapsed.has(lastRound) && m.round === lastRound && ['seat', 'researcher'].includes(m.author_kind)) continue
-    if (m.author_kind === 'user') out.push(<UserMessage key={m.id} msg={m} />)
+    if (m.author_kind === 'user') out.push(<UserMessage key={m.id} msg={m} files={filesOf(files, m)} />)
     else if (m.author_kind === 'researcher' && ['code', 'codebrief'].includes(m.research_kind)) out.push(<CoderCard key={m.id} msg={m} />)
     else if (m.author_kind === 'researcher') out.push(<BeagleCard key={m.id} msg={m} model={debate.researcher_model} />)
     else if (m.author_kind === 'system') out.push(<SystemRow key={m.id} msg={m} />)
@@ -285,6 +292,8 @@ function Composer({ debate, seats, onError, state }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [picker, setPicker] = useState(null) // { query, start, index }
+  const files = useAttachments()
+  const [over, setOver] = useState(false)
   const ref = useRef(null)
   useAutoGrow(ref, text)
   const id = debate.id
@@ -298,9 +307,9 @@ function Composer({ debate, seats, onError, state }) {
     try { await fn() } catch (e) { onError(e.message) }
   }
   const send = async () => {
-    if (!text.trim() || busy) return
+    if ((!text.trim() && !files.ids.length) || busy || files.uploading) return
     setBusy(true)
-    await act(async () => { await api.postMessage(id, text.trim()); setText('') })
+    await act(async () => { await api.postMessage(id, text.trim(), files.ids); setText(''); files.clear() })
     setBusy(false)
     ref.current?.focus()
   }
@@ -356,10 +365,14 @@ function Composer({ debate, seats, onError, state }) {
           ))}
         </div>
       )}
-      <div className="composer">
-        <textarea ref={ref} rows={1} value={text} placeholder={placeholder} aria-label="Message"
-          onChange={onChange} onKeyDown={onKeyDown} onBlur={() => setTimeout(() => setPicker(null), 150)} />
-        <button className="send" style={{ width: 34, height: 34, fontSize: 16 }} disabled={!text.trim() || busy} onClick={send} aria-label="Send">↑</button>
+      <div className={`composer ${over ? 'drop' : ''} ${files.files.length ? 'has-files' : ''}`} {...dropProps(files.add, setOver)}>
+        <AttachChips files={files.files} onRemove={files.remove} />
+        <div className="ask-row">
+          <AttachButton onFiles={files.add} disabled={busy} />
+          <textarea ref={ref} rows={1} value={text} placeholder={placeholder} aria-label="Message"
+            onChange={onChange} onKeyDown={onKeyDown} onBlur={() => setTimeout(() => setPicker(null), 150)} />
+          <button className="send" style={{ width: 34, height: 34, fontSize: 16 }} disabled={(!text.trim() && !files.ids.length) || files.uploading || busy} onClick={send} aria-label="Send">↑</button>
+        </div>
       </div>
       <div className="composer-meta">
         {state && <LiveStatus state={state} />}
@@ -386,7 +399,8 @@ function IntakeTyping({ debate }) {
       <div className="bubble moderator">
         <div className="status-line">
           <span className="typing"><i /><i /><i /></span>
-          {chair ? `${chair} is reading your conundrum…` : 'Choosing a chair…'}
+          {/^(Reading|Summarizing) /.test(debate.phase || '') ? debate.phase
+            : chair ? `${chair} is reading your conundrum…` : 'Choosing a chair…'}
         </div>
       </div>
     </div>
@@ -431,7 +445,7 @@ function TopicBlock({ topic, state, seatsById, current, answerRef, onIntake }) {
   return (
     <>
       {topic > 1 && <div className="divider">Follow-up</div>}
-      {question && <UserMessage msg={question} />}
+      {question && <UserMessage msg={question} files={filesOf(state.attachments, question)} />}
       {answered && (verdict.reason === 'direct' || verdict.reason === 'followup') ? answer : answered ? (
         <>
           {answer}
@@ -442,13 +456,13 @@ function TopicBlock({ topic, state, seatsById, current, answerRef, onIntake }) {
           </button>
           {open && (
             <div className="history-block" ref={historyRef}>
-              <Thread items={items} seatsById={seatsById} debate={debate} />
+              <Thread items={items} seatsById={seatsById} debate={debate} files={state.attachments} />
             </div>
           )}
         </>
       ) : (
         <>
-          <Thread items={items} seatsById={seatsById} debate={debate} onIntake={current ? onIntake : null} />
+          <Thread items={items} seatsById={seatsById} debate={debate} onIntake={current ? onIntake : null} files={state.attachments} />
           {current && debate.status === 'intake' && <IntakeTyping debate={debate} />}
           {answer}
         </>
