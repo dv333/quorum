@@ -361,7 +361,19 @@ Reply with JSON only:
     ]
 
 
-ANSWER_RULES = "Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them."
+ANSWER_RULES = (
+    "Address every requirement the user stated in the question, even briefly, and say what the evidence shows for "
+    "each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds "
+    "of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who "
+    "should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac "
+    "means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, "
+    "quote price and specifications for the same version (trim, configuration or plan) and name it, compare "
+    "realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as"
+    " well as the premium one, and say who each suits. For questions about hardware, costs, sizes, speeds or other "
+    "quantities, work out the key numbers for each option and show the arithmetic where the sources don't give "
+    "them. Don't assume facts about the user they didn't give (where they live, their income, family or health); "
+    "when the answer depends on one, say how."
+)
 MAINSTREAM = (
     "Where your recommendation departs from mainstream expert guidance (what professional bodies or standard practice "
     "advise), say so plainly and why; don't take an unusual position only because the council converged on it or "
@@ -863,7 +875,8 @@ EVIDENCE_RULES = """Rules for factual claims (they override the debate):
 - Never state a CONTRADICTED claim; state the correct fact from the ledger instead.
 - A PARTLY SUPPORTED claim must carry its caveat.
 - An UNVERIFIED claim (the check couldn't confirm it) may be stated only when the research findings above back it,
-  citing them; otherwise present it as uncertain, and never as a deciding reason.
+  citing them. Otherwise leave it out, or, if the answer needs it, state it once as a general judgment in plain words
+  ("usually", "may"), never as a deciding reason. Don't write about claims the answer doesn't make.
 - Don't present a comparative advantage (cheaper, faster to implement, better integrated, no middleware) as established unless a SUPPORTED claim says exactly that.
 - If the evidence can't establish a single winner, give a conditional recommendation instead ("choose A if …, B
   if …") naming what decides it; don't stop at "no clear winner". Agreement among agents is not evidence.
@@ -875,8 +888,9 @@ EVIDENCE_RULES = """Rules for factual claims (they override the debate):
   named with their year and key numbers, even if the checked claims are narrower.
 - Laws, regulations, bans and rebate programs need an official source (a government or program page); a blog or
   news mention alone isn't enough to state them as fact.
-- Write for the user in plain words ("Oracle's documentation confirms…", "not confirmed by the sources"). Never mention
-  the ledger, these rules, statuses in capitals or item numbers, and don't explain how claims were checked."""
+- Write for the user about their question, in plain words ("Oracle's documentation says…"). Never write about the
+  checking: no "confirmed" or "unconfirmed by the sources", "the evidence contradicts", "the claim that…", "verified";
+  never mention the ledger, these rules, statuses in capitals or item numbers."""
 
 
 def answer_check_messages(
@@ -1034,6 +1048,30 @@ The corrected answer:
 For each problem, is it fully fixed? A fix is partial when a number was changed but others that depend on it weren't (for example a new weekly total that the stated growth rate can't reach). Also flag any trace of the editing left in the text ("(not week 12)", "now aligns", "updated", a note about a change). Don't raise new topics. Quote the answer's words exactly. If everything is fixed, return an empty list.
 
 Reply like: {{"problems": [{{"check": "partial|trace", "text": "<exact words from the answer>", "issue": "<what's still wrong and what would be right>"}}]}}""",
+        },
+    ]
+
+
+def traces_fix_messages(answer: str, passages: List[str]) -> List[Dict[str, str]]:
+    listed = "\n".join(f"- {p}" for p in passages)
+    return [
+        {
+            "role": "system",
+            "content": "You are the chair of an AI council. You polish your final answer so it speaks only to the user's question.",
+        },
+        {
+            "role": "user",
+            "content": f"""Your answer:
+{answer}
+
+These sentences talk about how the answer was made instead of about the user's question (the council or its agents,
+earlier positions or corrections, program runs, whether sources confirmed something):
+{listed}
+
+Rewrite each so it speaks directly to the user about their situation: state the fact or advice itself (with "usually"
+or "may" where it's uncertain), and drop a sentence that only discusses whether something was confirmed. Keep
+everything else word for word, including every section and heading; the "Where they differed" section may name the
+agents. Output only the corrected answer.""",
         },
     ]
 

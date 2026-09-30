@@ -321,8 +321,8 @@ async def test_when_search_is_down_the_ledger_still_binds_the_answer():
 
 def test_the_answer_is_written_for_the_user_not_about_the_ledger():
     rules = " ".join(prompts.EVIDENCE_RULES.split())
-    assert "Never mention the ledger" in rules and "item numbers" in rules
-    assert "don't explain how claims were checked" in rules and "never invent study details" in rules
+    assert "never mention the ledger" in rules and "item numbers" in rules and "never invent study details" in rules
+    assert "Never write about the checking" in rules and '"unconfirmed by the sources"' in rules  # the leaked phrase
 
 
 def test_excerpts_keep_the_passages_about_the_claim():

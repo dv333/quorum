@@ -756,6 +756,29 @@ def named_sources(text: str, question: str = "", limit: int = 8) -> List[str]:
     return out[:limit]
 
 
+_TRACE = re.compile(
+    r"\b(the council|council'?s|(council|group) consensus|the consensus (view|position|was|moved|shifted)|"
+    r"the agents?\b|other agents|"
+    r"(initial|original|earlier) (stance|estimate|position|answer|draft|suggestion)|was corrected|were corrected|"
+    r"(un)?confirmed by the (available )?(sources|evidence|research)|contradicted by the sources|"
+    r"evidence (contradicts|does not (confirm|support|show))|is unconfirmed|remains unconfirmed|"
+    r"python (execution|check|program|simulation)|as verified by)",
+    re.I,
+)
+
+
+def process_traces(text: str, limit: int = 8) -> List[str]:
+    """Sentences of an answer that talk about how it was made (the council, corrections, program runs, whether
+    sources confirmed a claim) instead of the user's question. "Where they differed" may name the agents."""
+    body = re.sub(r"(?ims)^##\s*Where they differed.*?(?=^##\s|\Z)", "", text or "")
+    out: List[str] = []
+    for sentence in re.split(r"(?<!\bal\.)(?<!\be\.g\.)(?<=[.!?])\s+|\n+", body):
+        sentence = sentence.strip()
+        if sentence and _TRACE.search(sentence) and sentence not in out:
+            out.append(sentence)
+    return out[:limit]
+
+
 def keeps_structure(original: str, revised: str) -> bool:
     """A rewrite keeps the answer whole: its bottom line, every section, and most of its length."""
     sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
@@ -3120,6 +3143,40 @@ class DebateEngine:
             if isinstance(p, dict) and str(p.get("issue") or "").strip()
         ][:6]
 
+    async def _remove_traces(self, msg_id: int) -> None:
+        """The answer speaks to the user's question, not about how it was made. In the advice benchmark, answers said
+        "the council consensus corrected the initial protein estimate" and "is unconfirmed by the available sources"
+        in their key points; the chair rewrites those sentences once."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not row or row["status"] != "done" or not row["content"]:
+            return
+        passages = process_traces(row["content"])
+        if not passages:
+            return
+        d = self.debate()
+        chair = self._chair_label(d)
+        self._set_phase(f"{chair} is polishing the answer…")
+        meta = json.loads(row["meta_json"] or "{}")
+        meta["traces"] = {"passages": passages, "revised": False}
+        content = row["content"]
+        try:
+            revised = strip_thinking(
+                await self._complete(
+                    chair,
+                    "polish",
+                    d["chair_endpoint_id"],
+                    d["chair_model"],
+                    prompts.traces_fix_messages(row["content"], passages),
+                    await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                )
+            ).strip()
+            if keeps_structure(row["content"], revised):
+                content = shorten_bottom_line(plain_answer(revised))
+                meta["traces"].update(revised=True, left=process_traces(content), original=row["content"])
+        except Exception as e:
+            log.warning("removing traces failed: %s", e)
+        self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
+
     async def _drop_unchecked_sources(self, msg_id: int) -> None:
         """Without research nothing was looked up, so a study, journal or survey the answer names came from a model's
         memory, and models invent them. The chair rewrites those sentences once to say what's generally known."""
@@ -3516,6 +3573,8 @@ class DebateEngine:
                 await self._critique_answer(row["id"])
             if not d["research_enabled"]:
                 await self._drop_unchecked_sources(row["id"])
+            if not is_code_review(question, d["pack"], d.get("repo_path")):
+                await self._remove_traces(row["id"])
             if is_code_review(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
             done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])

@@ -2040,3 +2040,54 @@ async def test_a_code_review_gets_no_first_answer():
     await eng.post_user_message(DIFF_Q)
     await eng.task
     assert not client.calls_with("you write your own best answer")
+
+
+# ---------------------------------------------------------------- traces of how the answer was made
+
+TRACED = (
+    "BOTTOM LINE: Eat **1,850 kcal** a day.\n\n## Key points\n"
+    "- **Protein:** The council consensus corrected the initial low protein estimate to 170 g.\n"
+    "- **Steps:** Walk 8,000 steps a day.\n\n## Where they differed\nOtter wanted 150 g; the council settled on 170 g."
+)
+
+
+def test_process_traces_finds_sentences_about_how_the_answer_was_made():
+    from backend.engine import process_traces
+
+    assert process_traces(TRACED) == [
+        "- **Protein:** The council consensus corrected the initial low protein estimate to 170 g."
+    ]
+    assert process_traces("The 2026 limit is unconfirmed by the available sources.")
+    assert process_traces("We checked this with a Python simulation.")  # how it was made, not the user's question
+    assert process_traces("Slow increases match sports medicine consensus. Study consensus protocols like Raft.") == []
+
+
+async def test_an_answer_that_talks_about_how_it_was_made_is_polished():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = TRACED
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How should I lose 10 kg in 6 months?")
+    await eng.task
+    polish = client.calls_with("You polish your final answer")
+    assert len(polish) == 1 and "The council consensus corrected" in polish[0][1]["content"]
+    meta = json.loads(db.query_one("SELECT meta_json FROM messages WHERE author_kind = 'chair'")["meta_json"])
+    assert meta["traces"]["passages"] == [
+        "- **Protein:** The council consensus corrected the initial low protein estimate to 170 g."
+    ]
+
+
+async def test_where_they_differed_may_name_the_agents_and_a_review_is_not_polished():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = "BOTTOM LINE: Go.\n\n## Where they differed\nOtter and the council disagreed."
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("How should I lose 10 kg in 6 months?")
+    await eng.task
+    assert not client.calls_with("You polish your final answer")
+
+    db.connect(":memory:")
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = TRACED
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    assert not client.calls_with("You polish your final answer")
