@@ -15,7 +15,7 @@ const LEVELS = [['simple', 'Simple'], ['standard', 'Standard'], ['expert', 'Expe
 // Splits the chair's structured answer (BOTTOM LINE + ## sections) into display parts.
 // Falls back to plain markdown when the model ignored the format.
 export function parseAnswer(text) {
-  const out = { bottom: null, sections: [], diagrams: [], dissent: null }
+  const out = { bottom: null, sections: [], diagrams: [], dissent: null, evidence: [] }
   if (!text) return out
   // Some models write footnote-style citations ([^1]); show them like the rest ([1])
   let rest = text.replace(/\[\^(\d+)\]/g, '[$1]')
@@ -34,6 +34,11 @@ export function parseAnswer(text) {
     const title = parts[i].trim()
     const content = (parts[i + 1] || '').trim()
     if (/diagram/i.test(title)) continue
+    // The evidence behind a reader's answer is folded away: people scan, and read the top most
+    if (/^(evidence|key studies)$/i.test(title)) {
+      if (content) out.evidence.push({ title, content })
+      continue
+    }
     if (/differ|dissent|disagree/i.test(title)) {
       if (content && !/^(none|nothing significant)\b/i.test(content)) out.dissent = content
       continue
@@ -44,6 +49,14 @@ export function parseAnswer(text) {
 }
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+// About how long the part that's shown takes to read (the folded evidence isn't counted), at ~220 words a minute
+export function readTime(a) {
+  const shown = [a.bottom || '', ...a.sections.map((s) => `${s.title || ''} ${s.content}`)].join(' ')
+  const words = (shown.match(/[A-Za-z0-9$%']+/g) || []).length
+  const minutes = Math.round(words / 220)
+  return minutes < 1 ? 'Under a minute to read' : `${minutes} min read`
+}
 
 function headline(verdict, finalStances, seatsCount, factChecked, chairName) {
   const agreeN = finalStances.filter((s) => s === 'AGREE').length
@@ -440,6 +453,7 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
         <div className="t">{verdict ? headline(verdict, finalStances, seats.length, factChecked, chairName) : <span>{chairName} is writing the answer…</span>}</div>
         {verdict && <CopyButton text={text} label="Copy answer" />}
         {!replay && verdict && msg?.status === 'done' && <ExportMenu debateId={debateId} level={versions[level] || level === 'standard' ? level : 'standard'} onPrint={print} />}
+        {verdict && text && !streaming && <span className="read-time">{readTime(a)}</span>}
         {verdict && verdict.reason !== 'direct' && (
           <div className="seg" role="group" aria-label="Reading level">
             {LEVELS.map(([k, label]) => (
@@ -478,6 +492,18 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
             </div>
           ))}
           {a.sections.length === 0 && diagram}
+          {a.evidence.length > 0 && (
+            <details className="a-evidence">
+              <summary>Show the evidence</summary>
+              {a.evidence.map((ev) => (
+                <div key={ev.title} className="a-body">
+                  {/^key studies$/i.test(ev.title) && parseStudies(ev.content)
+                    ? <KeyStudies studies={parseStudies(ev.content)} />
+                    : <Markdown>{citeLinks(/^key studies$/i.test(ev.title) ? `### ${ev.title}\n\n${ev.content}` : ev.content)}</Markdown>}
+                </div>
+              ))}
+            </details>
+          )}
           {a.dissent && <div className="dissent"><b>Where they differed: </b><Markdown className="inline">{citeLinks(a.dissent)}</Markdown></div>}
         </div>
         </CiteContext.Provider>

@@ -504,7 +504,11 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .bottom-line strong { background: linear-gradient(90deg, var(--panda), var(--otter)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .bottom-line p { margin: 0; }
 .a-body { padding: 8px 26px 6px; font-size: 15.5px; line-height: 1.62; transition: opacity 0.3s; }
-.a-body h3 { font: 600 13px var(--font); color: var(--text-2); margin: 16px 0 6px; }
+.a-body h3 { font: 600 16px/1.35 var(--font); color: var(--text); margin: 16px 0 4px; }
+.a-evidence { margin: 10px 26px 14px; border-radius: 14px; background: var(--fill); padding: 10px 14px; }
+.a-evidence summary { cursor: pointer; font: 600 14px var(--font); color: var(--text); }
+.a-evidence .a-body { padding: 4px 0 0; font-size: 14.5px; }
+.read-time { font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
 .a-body ul { padding-left: 20px; margin: 6px 0; }
 .a-body li { margin: 5px 0; }
 .a-body li::marker { color: var(--text-3); }
