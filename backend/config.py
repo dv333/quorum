@@ -49,6 +49,9 @@ MAX_ROUNDS_LIMIT = 10
 DEFAULT_AUTOPILOT = True
 AUTO_COUNCIL_MAX = 8  # every installed model joins, up to one per agent name
 AUTO_COUNCIL_MIN = 3  # repeat models if fewer distinct ones fit
+# Advice gets the strongest few: on everyday advice, 4-8B seats diluted the debate and pulled it toward odd positions
+ADVICE_SEATS = 4
+ADVICE_MIN_PARAMS_B = 10.0
 INTAKE_MAX_QUESTIONS = 3  # the chair asks at most this many clarifying questions
 MIN_ROUNDS_FOR_CONSENSUS = _env_int("LLC_MIN_ROUNDS", 2)
 MAX_SEATS = 8

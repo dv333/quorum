@@ -72,3 +72,31 @@ async def test_a_stream_that_ends_without_its_final_message_is_an_error(monkeypa
     with pytest.raises(ProviderError, match="stopped mid-reply"):
         async for _ in ChatClient().stream(ep, "m", [{"role": "user", "content": "hi"}]):
             pass
+
+
+def _m(model, gb, params):
+    return {"model": model, "est_bytes": int(gb * GB), "fit": "fits", "chat": True, "local": True, "params": params}
+
+
+def test_advice_gets_the_four_largest_models_of_at_least_10b():
+    from backend.inventory import billions, strongest_council
+
+    models = [
+        _m("qwen3.6", 24, "35.1B"), _m("qwen3.8", 20, "27.8B"), _m("gpt-oss", 14, "20.9B"), _m("qwen3:14b", 10, "14.8B"),
+        _m("phi4", 10, "14.7B"), _m("gemma3:12b", 9, "12.2B"), _m("llama3.1", 6, "8.0B"), _m("gemma3:4b", 4, "4.3B"),
+    ]  # fmt: skip
+    assert [s["model"] for s in strongest_council(models, int(48 * GB))] == [
+        "qwen3.6",
+        "qwen3.8",
+        "gpt-oss",
+        "qwen3:14b",
+    ]
+    # fewer than three large models: the usual council, every model
+    small = [
+        _m("qwen3:8b", 6, "8.2B"),
+        _m("llama3.1", 6, "8.0B"),
+        _m("gemma3:4b", 4, "4.3B"),
+        _m("qwen3:14b", 10, "14.8B"),
+    ]
+    assert len(strongest_council(small, int(48 * GB))) == 4
+    assert billions("900M") == 0.9 and billions(None) == 0.0
