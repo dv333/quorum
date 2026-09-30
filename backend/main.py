@@ -8,13 +8,14 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import coder, db, diagnostics, export, firecrawl, inventory, monitor, packs, setup
+from . import attachments, coder, db, diagnostics, export, firecrawl, inventory, monitor, packs, setup
 from .config import (
+    ATTACHMENT_MAX_BYTES,
     APP_NAME,
     DEFAULT_AUTOPILOT,
     DEFAULT_CRITERIA,
@@ -30,7 +31,7 @@ from .config import (
     SEAT_COLORS,
 )
 from .hardware import estimate_model_bytes, fit_label
-from .engine import APP_BUS, drop_engine, get_engine, is_advice, is_code_review, recover_after_restart
+from .engine import APP_BUS, FILE_QUESTION, drop_engine, get_engine, is_advice, is_code_review, recover_after_restart
 from .providers import ProviderError, delete_model, lookup_model, pull_model
 
 
@@ -70,7 +71,8 @@ class ModelRef(BaseModel):
 class CreateDebate(BaseModel):
     """Only the question is required; everything else is picked automatically."""
 
-    question: str = Field(min_length=1)
+    question: str = ""  # may be empty when files are attached: the council then reviews the files
+    attachments: List[str] = []  # ids from POST /api/uploads
     seats: Optional[List[SeatIn]] = None  # None: auto council
     chair: Optional[ModelRef] = None  # None: the largest member picks the chair
     title: Optional[str] = None
@@ -93,7 +95,8 @@ class UpdateDebate(BaseModel):
 
 
 class PostMessage(BaseModel):
-    content: str = Field(min_length=1)
+    content: str = ""
+    attachments: List[str] = []
 
 
 class PlanIn(BaseModel):
@@ -167,6 +170,8 @@ async def config():
         "min_rounds_for_consensus": MIN_ROUNDS_FOR_CONSENSUS,
         "handles": HANDLES,
         "researcher_name": RESEARCHER_NAME,
+        "attachment_types": attachments.ACCEPT,
+        "attachment_max_bytes": ATTACHMENT_MAX_BYTES,
     }
 
 
@@ -449,6 +454,8 @@ async def count_debates(
 
 @app.post("/api/debates")
 async def create_debate(body: CreateDebate):
+    if not body.question.strip() and not body.attachments:
+        raise HTTPException(400, "Ask a question or attach a file")
     pack = None
     if body.pack:
         pack = packs.get(body.pack)
@@ -457,7 +464,8 @@ async def create_debate(body: CreateDebate):
     seats = body.seats
     researcher = body.researcher
     if seats is None:
-        advice = is_advice(body.question) and not is_code_review(body.question, pack, body.repo_path)
+        asked = body.question.strip() or FILE_QUESTION
+        advice = is_advice(asked) and not is_code_review(asked, pack, body.repo_path)
         auto = await inventory.auto_council(body.num_ctx, pack=pack, advice=advice)
         seats = [SeatIn(endpoint_id=m["endpoint_id"], model=m["model"], thinking=True) for m in auto["seats"]]
         if researcher is None and auto["researcher"]:
@@ -514,8 +522,27 @@ async def create_debate(body: CreateDebate):
             [debate_id, HANDLES[i], seat.endpoint_id, seat.model, SEAT_COLORS[i], int(seat.thinking), i],
         )
 
-    await get_engine(debate_id).post_user_message(body.question)
+    await get_engine(debate_id).post_user_message(body.question, body.attachments)
     return get_engine(debate_id).snapshot()
+
+
+@app.get("/api/attachments/{att_id}/file")
+async def attachment_file(att_id: str):
+    """An attached file, for the app's thumbnails and to open it again."""
+    row = attachments.get(att_id)
+    if not row or not os.path.exists(row["path"]):
+        raise HTTPException(404, "No such file")
+    return FileResponse(row["path"], filename=row["name"])
+
+
+@app.post("/api/uploads")
+async def upload(file: UploadFile = File(...)):
+    """A file to attach to the next question: read now when it's a document, when the debate starts when an image."""
+    data = await file.read(ATTACHMENT_MAX_BYTES + 1)
+    try:
+        return attachments.save(file.filename or "file", data)
+    except attachments.AttachmentError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/diagnostics")
@@ -580,6 +607,7 @@ async def patch_debate(debate_id: str, body: UpdateDebate):
 async def delete_debate(debate_id: str):
     _require_debate(debate_id)
     await drop_engine(debate_id)
+    attachments.remove(debate_id)
     db.execute("DELETE FROM debates WHERE id = ?", [debate_id])
     return {"ok": True}
 
@@ -587,7 +615,9 @@ async def delete_debate(debate_id: str):
 @app.post("/api/debates/{debate_id}/messages")
 async def post_message(debate_id: str, body: PostMessage):
     _require_debate(debate_id)
-    await get_engine(debate_id).post_user_message(body.content)
+    if not body.content.strip() and not body.attachments:
+        raise HTTPException(400, "Write a message or attach a file")
+    await get_engine(debate_id).post_user_message(body.content, body.attachments)
     return {"ok": True}
 
 

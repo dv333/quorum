@@ -140,6 +140,23 @@ CREATE TABLE IF NOT EXISTS claims (
     source_title TEXT,
     created_at TEXT NOT NULL
 );
+-- Files attached to a question: uploaded first (no debate yet), then linked to the message they were sent with
+CREATE TABLE IF NOT EXISTS attachments (
+    id TEXT PRIMARY KEY,
+    debate_id TEXT REFERENCES debates(id) ON DELETE CASCADE,
+    topic INTEGER,
+    message_id INTEGER,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    path TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    text TEXT,
+    digest TEXT,
+    pages INTEGER,
+    read_by TEXT,
+    error TEXT,
+    created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -155,6 +172,7 @@ CREATE INDEX IF NOT EXISTS idx_usage_debate ON usage(debate_id, topic);
 CREATE INDEX IF NOT EXISTS idx_drafts_debate ON drafts(debate_id, topic);
 CREATE INDEX IF NOT EXISTS idx_summaries_debate ON summaries(debate_id, topic);
 CREATE INDEX IF NOT EXISTS idx_claims_debate ON claims(debate_id, topic);
+CREATE INDEX IF NOT EXISTS idx_attachments_debate ON attachments(debate_id, topic);
 """
 
 # Columns added after v1; applied to existing databases on connect

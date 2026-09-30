@@ -6,17 +6,23 @@ text of in-flight streams in memory so late subscribers can catch up.
 """
 
 import asyncio
+import base64
 import json
 import logging
 import re
 import time
 from contextlib import asynccontextmanager
 from datetime import date
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
 from . import coder, db, firecrawl, inventory, prompts, pyrun
+from . import attachments
+from .attachments import strip_block
 from .config import (
+    ATTACHMENT_CHARS,
+    ATTACHMENT_PREVIEW_CHARS,
     MAX_NUM_CTX,
     FOLLOWUP_ROUNDS,
     MAX_ROUNDS_LIMIT,
@@ -68,6 +74,8 @@ PRIOR_TOPICS_IN_CONTEXT = 3
 ACTIVE_STATUSES = ("running", "concluding", "researching", "intake")
 # Waiting on the user during the chair's clarifying interview
 INTAKE_WAITING = ("clarifying", "confirming")
+# The question when the user sends only a file
+FILE_QUESTION = "What should I make of the attached file? Is it accurate, what's missing or misleading, and what should I take from it?"
 STOPPED = ("paused", "cancelled", "failed")  # stopped before an answer; any of them can be resumed
 
 
@@ -210,7 +218,7 @@ ROLE_FOCUS = {**dict(DEFAULT_ROLES), **{name: focus for name, focus, _ in CODE_R
 def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
     """A debate about code: a repository is attached, the code-review pack is used, or the question holds a diff or
     code."""
-    return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_CODE_Q.search(question))
+    return bool(repo_path) or (pack or {}).get("id") == "code-review" or bool(_CODE_Q.search(strip_block(question)))
 
 
 _ADVICE_Q = re.compile(
@@ -223,7 +231,7 @@ _ADVICE_Q = re.compile(
 
 def is_advice(question: str) -> bool:
     """A question asking what to do: a choice, a plan or a how-to, where the council's range of views helps."""
-    return bool(_ADVICE_Q.search(question))
+    return bool(_ADVICE_Q.search(strip_block(question)))
 
 
 _PLAN_Q = re.compile(
@@ -237,12 +245,13 @@ _PLAN_Q = re.compile(
 
 def is_plan(question: str) -> bool:
     """A question that asks for a plan: how to train or prepare, a schedule, what to do over the coming weeks."""
-    return bool(_PLAN_Q.search(question))
+    return bool(_PLAN_Q.search(strip_block(question)))
 
 
 def is_code_review(question: str, pack: Optional[Dict[str, Any]] = None, repo_path: Optional[str] = None) -> bool:
     """A review: a change, a repository, or quoted code the user wants judged (bugs, safety, design). A question that
     only quotes code ("what does this print?") isn't one."""
+    question = strip_block(question)
     return (
         bool(repo_path)
         or (pack or {}).get("id") == "code-review"
@@ -849,6 +858,7 @@ def check_arithmetic(text: str) -> List[Dict[str, str]]:
 
 def evidence_queries(question: str) -> List[str]:
     """Extra searches for evidence questions: the newest meta-analysis and any Cochrane review on the topic."""
+    question = strip_block(question)
     if not _EVIDENCE_Q.search(question):
         return []
     topic = _topic(question)
@@ -1049,8 +1059,11 @@ class DebateEngine:
 
     # --------------------------------------------------------------- commands
 
-    async def post_user_message(self, content: str) -> None:
+    async def post_user_message(self, content: str, attachments: Optional[List[str]] = None) -> None:
         content = content.strip()
+        files = [a for a in (attachments or []) if a]
+        if not content and files:
+            content = FILE_QUESTION
         if not content:
             return
         requests = parse_research_requests(content, limit=1)
@@ -1079,19 +1092,19 @@ class DebateEngine:
                     return
                 topic = d["topic"] + 1
                 self._set(topic=topic, round=0, status="intake", answer_pending=None, interrupted=0)
-                self._insert_message(topic=topic, round_no=0, author_kind="user", content=content)
+                self._user_message(topic, 0, content, files)
                 self._start(self._intake())
                 return
 
             if status in INTAKE_WAITING or status == "intake":
                 # An answer to the chair's question, or extra details for its summary
-                self._insert_message(topic=d["topic"], round_no=0, author_kind="user", content=content)
+                self._user_message(d["topic"], 0, content, files)
                 if status in INTAKE_WAITING:
                     self._set(status="intake")
                     self._start(self._intake())
                 return
 
-            self._insert_message(topic=d["topic"], round_no=d["round"], author_kind="user", content=content)
+            self._user_message(d["topic"], d["round"], content, files)
             if requests:
                 self._queue_research(requests[0], "You", "request")
             if coder_requests:
@@ -1101,6 +1114,119 @@ class DebateEngine:
                 self._start(self._run_rounds())
             # running / concluding / researching: the interjection and any request are
             # picked up before the next speaker
+
+    def _user_message(self, topic: int, round_no: int, content: str, files: List[str]) -> None:
+        """The user's message, with the files sent with it (the app shows them on the message)."""
+        row = self._insert_message(topic=topic, round_no=round_no, author_kind="user", content=content)
+        linked = attachments.link(files, self.id, topic, row["id"]) if files else []
+        if linked:
+            db.update("messages", row["id"], meta_json=json.dumps({"attachments": linked}))
+            row = db.query_one("SELECT * FROM messages WHERE id = ?", [row["id"]])
+            self.bus.publish({"type": "message_updated", "message": serialize_message(row)})
+
+    async def _read_attachments(self, topic: int) -> None:
+        """Before the council sees the question: images described by a model that can see, and documents too long for
+        the question summarized by the chair. Each is done once; what failed says why on the file."""
+        worked = False
+        for row in attachments.for_topic(self.id, topic):
+            if row["error"]:
+                continue
+            if row["kind"] == "image" and row["text"] is None:
+                await self._read_image(row, topic)
+                worked = True
+            elif row["kind"] != "image" and len(row["text"] or "") > ATTACHMENT_CHARS and not row["digest"]:
+                await self._digest_file(row, topic)
+                worked = True
+        if worked:
+            self._set_phase("")
+
+    async def _vision_model(self) -> Optional[Dict[str, Any]]:
+        """The chair when it can see images, otherwise the largest model here that can and fits in memory."""
+        d = self.debate()
+        try:
+            chair = await self.meta_lookup(d["chair_endpoint_id"], d["chair_model"], d["num_ctx"])
+            if chair and chair.get("vision"):
+                return {**chair, "endpoint_id": d["chair_endpoint_id"], "model": d["chair_model"]}
+            models = (await inventory.inventory(d["num_ctx"]))["models"]
+        except Exception as e:
+            log.warning("couldn't list models that read images: %s", e)
+            return None
+        able = [m for m in models if m.get("vision") and m.get("chat")]
+        fits = [m for m in able if m.get("fit") != "too_big"] or able
+        return max(fits, key=lambda m: inventory.billions(m.get("params")), default=None)
+
+    async def _read_image(self, row: Dict[str, Any], topic: int) -> None:
+        model = await self._vision_model()
+        if not model:
+            error = "No model here can read images. Install one that can (for example: ollama pull gemma3:4b)."
+            db.update("attachments", row["id"], error=error)
+            self._system_message(f"Couldn't read {row['name']}: {error}")
+            self._publish_attachments(topic)
+            return
+        self._set_phase(f"Reading {row['name']}…")
+        question = self._intake_messages(topic)[0]["content"] if self._intake_messages(topic) else ""
+        try:
+            data = base64.b64encode(Path(row["path"]).read_bytes()).decode()
+            text = strip_thinking(
+                await self._complete(
+                    model["model"],
+                    "read-file",
+                    model["endpoint_id"],
+                    model["model"],
+                    prompts.read_image_messages(row["name"], strip_block(question), data),
+                    think=await self._thinking_flag(model["endpoint_id"], model["model"], False),
+                    topic=topic,
+                )
+            ).strip()
+            if not text:
+                raise RuntimeError("the model sent an empty description")
+            db.update("attachments", row["id"], text=text, read_by=model["model"])
+        except Exception as e:
+            log.warning("couldn't read image %s: %s", row["name"], e)
+            db.update("attachments", row["id"], error=f"{model['model']} couldn't read it: {e}")
+            self._system_message(f"Couldn't read {row['name']}; the council goes on without it.")
+        self._publish_attachments(topic)
+
+    async def _digest_file(self, row: Dict[str, Any], topic: int) -> None:
+        d = self.debate()
+        self._set_phase(f"Summarizing {row['name']} for the council…")
+        question = self._intake_messages(topic)[0]["content"] if self._intake_messages(topic) else ""
+        try:
+            text = strip_thinking(
+                await self._complete(
+                    self._chair_label(d),
+                    "digest-file",
+                    d["chair_endpoint_id"],
+                    d["chair_model"],
+                    prompts.digest_file_messages(row["name"], strip_block(question), row["text"]),
+                    think=await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                    topic=topic,
+                )
+            ).strip()
+            if text:
+                db.update("attachments", row["id"], digest=text, read_by=d["chair_model"])
+        except Exception as e:  # the question then carries the start of the file, and says so
+            log.warning("couldn't summarize %s: %s", row["name"], e)
+        self._publish_attachments(topic)
+
+    def _publish_attachments(self, topic: int) -> None:
+        self.bus.publish({"type": "attachments_updated", "topic": topic, "attachments": self._attachments(topic)})
+
+    def _attachments(self, topic: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Every file of the debate (or one question), with what the council read from it, for the app."""
+        rows = db.query("SELECT * FROM attachments WHERE debate_id = ? ORDER BY created_at", [self.id])
+        return [
+            {
+                **attachments.public(r),
+                "topic": r["topic"],
+                "message_id": r["message_id"],
+                "read_by": r["read_by"],
+                "read": (r["digest"] or r["text"] or "")[:ATTACHMENT_PREVIEW_CHARS],
+                "summarized": bool(r["digest"]),
+            }
+            for r in rows
+            if topic is None or r["topic"] == topic
+        ]
 
     async def confirm_intake(self) -> None:
         """The user accepted the chair's summary (or skipped the interview): start the debate."""
@@ -1193,15 +1319,18 @@ class DebateEngine:
 
     async def _intake(self) -> None:
         """The chair decides whether to ask a clarifying question, summarize its assumptions, or just start."""
+        await self._read_attachments(self.debate()["topic"])
         d = self.debate()
         if d["chair_mode"] == "auto" and not d["chair_handle"]:
             await self._pick_roles()
             d = self.debate()
         msgs = self._intake_messages(d["topic"])
-        question = msgs[0]["content"] if msgs else ""
+        files = self._files_block(d["topic"])
+        question = (msgs[0]["content"] if msgs else "") + files
         # A follow-up after an answer: a question about that answer is answered from its debate in seconds; new facts
         # get a short debate; only a new question gets the full treatment
-        prev = self._previous_answer(d["topic"]) if len(msgs) == 1 else None
+        # (a follow-up that brings a file is a new question about it)
+        prev = self._previous_answer(d["topic"]) if len(msgs) == 1 and not files else None
         if prev:
             kind = await self._route_followup(prev, question)
             if kind == "clarify":
@@ -1242,7 +1371,7 @@ class DebateEngine:
         try:
             rounds = int(choice.get("rounds"))
             # Questions about what the evidence says need at least one round of rebuttal
-            floor = 2 if _EVIDENCE_Q.search(self._question(d["topic"])) else 1
+            floor = 2 if _EVIDENCE_Q.search(strip_block(self._question(d["topic"]))) else 1
             if not d.get("rounds_fixed"):  # a number of rounds the caller asked for (quick, deep) stands
                 cap = FOLLOWUP_ROUNDS if self._update_topic == d["topic"] else MAX_ROUNDS_LIMIT
                 self._set(max_rounds=min(cap, max(floor, min(MAX_ROUNDS_LIMIT, rounds))))
@@ -1613,6 +1742,7 @@ class DebateEngine:
         try:
             while True:
                 d = self.debate()
+                await self._read_attachments(d["topic"])  # files sent mid-debate
                 await self._drain_research(d["round"])  # opening brief, or requests made while paused
                 round_no = d["round"]
                 if round_no == 0:
@@ -2614,12 +2744,15 @@ class DebateEngine:
 
     # ---------------------------------------------------------------- context
 
+    def _files_block(self, topic: int) -> str:
+        return attachments.block(attachments.for_topic(self.id, topic), ATTACHMENT_CHARS)
+
     def _question(self, topic: int) -> str:
         """The user's conundrum, plus anything the chair's clarifying interview established."""
         msgs = self._intake_messages(topic)
         if not msgs:
             return ""
-        question = msgs[0]["content"]
+        question = msgs[0]["content"] + self._files_block(topic)
         summary = next((m for m in reversed(msgs) if (m["meta"] or {}).get("kind") == "summary"), None)
         if summary:
             points = "\n".join(f"- {a}" for a in summary["meta"].get("assumptions", []))
@@ -3872,6 +4005,7 @@ class DebateEngine:
             "summaries": db.query("SELECT * FROM summaries WHERE debate_id = ? ORDER BY id", [self.id]),
             "drafts": db.query("SELECT * FROM drafts WHERE debate_id = ? ORDER BY id", [self.id]),
             "claims": self._claims(),
+            "attachments": self._attachments(),
             "verdicts": db.query(
                 "SELECT id, debate_id, topic, reason, rounds, message_id, created_at "
                 "FROM verdicts WHERE debate_id = ? ORDER BY id",

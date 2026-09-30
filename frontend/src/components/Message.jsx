@@ -7,6 +7,7 @@ const GFM = [[remarkGfm, { singleTilde: false }]]
 import { createContext, memo, useContext, useDeferredValue, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CODER, RESEARCHER, agentFor, formatTime, linkMentions, modelShort } from '../agents'
+import { MessageFiles } from './Attach'
 
 // Inside an answer, [n] citations render through this (see citeLinks); elsewhere they stay plain text
 export const CiteContext = createContext(null)
@@ -206,10 +207,11 @@ export const AgentMessage = memo(function AgentMessage({ msg, seat, isChair, tot
   )
 })
 
-export const UserMessage = memo(function UserMessage({ msg }) {
+export const UserMessage = memo(function UserMessage({ msg, files }) {
   return (
     <div className="msg me">
       <div className="bubble">
+        <MessageFiles files={files} />
         <Markdown>{msg.content}</Markdown>
         <div className="me-ts">{formatTime(msg.created_at)}<CopyButton text={msg.content} /></div>
       </div>

@@ -3,7 +3,7 @@ import { ReplayContext, play } from './replay'
 
 // Live debate state: a snapshot on connect, then incremental SSE events.
 
-const empty = { loaded: false, debate: null, seats: [], messages: [], summaries: [], drafts: [], claims: [], verdicts: [], mode: null, metrics: {} }
+const empty = { loaded: false, debate: null, seats: [], messages: [], summaries: [], drafts: [], claims: [], attachments: [], verdicts: [], mode: null, metrics: {} }
 
 function upsert(list, item) {
   const i = list.findIndex((x) => x.id === item.id)
@@ -33,7 +33,7 @@ export function reducer(state, event) {
     case 'reset':
       return empty
     case 'snapshot':
-      return { drafts: [], claims: [], ...event.state, loaded: true }
+      return { drafts: [], claims: [], attachments: [], ...event.state, loaded: true }
     case 'debate_updated':
       return { ...state, debate: { ...state.debate, ...event.debate } }
     case 'message_created':
@@ -53,6 +53,8 @@ export function reducer(state, event) {
       return { ...state, summaries: [...state.summaries, event.summary] }
     case 'metrics_updated':
       return { ...state, metrics: { ...state.metrics, [event.topic]: event.metrics } }
+    case 'attachments_updated':
+      return { ...state, attachments: [...(state.attachments || []).filter((a) => a.topic !== event.topic), ...event.attachments] }
     case 'verdict_created':
       return { ...state, verdicts: [...state.verdicts, event.verdict] }
     default:

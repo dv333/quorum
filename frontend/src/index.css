@@ -340,7 +340,7 @@ textarea.input { resize: vertical; }
 .home h1 { font: 700 48px/1.05 var(--display); letter-spacing: -0.03em; margin: 18px 0 0; }
 .tagline { font: 400 20px var(--display); color: var(--text-2); margin: 8px 0 34px; letter-spacing: -0.01em; }
 .ask {
-  width: 100%; display: flex; align-items: flex-end; gap: 10px; padding: 8px 8px 8px 20px; border-radius: 24px;
+  width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 8px 8px 8px 20px; border-radius: 24px;
   background: var(--glass-strong); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
   box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline); transition: box-shadow 0.3s;
 }
@@ -350,6 +350,33 @@ textarea.input { resize: vertical; }
   padding: 10px 0; max-height: 220px; min-height: 45px;
 }
 .ask textarea::placeholder { color: var(--text-3); }
+/* Attached files: the paperclip, the chips above the text, and a glow while files are dragged over */
+.ask-row { display: flex; align-items: flex-end; gap: 8px; width: 100%; }
+.ask.drop, .composer.drop { box-shadow: var(--shadow-lg), 0 0 0 2px var(--blue); }
+.attach { flex: none; width: 34px; height: 34px; margin-bottom: 5px; border: 0; border-radius: 50%; display: grid; place-items: center;
+  background: transparent; color: var(--text-2); cursor: pointer; transition: background 0.2s, color 0.2s; }
+.ask .attach { margin-left: -12px; margin-bottom: 6px; }
+.composer .attach { margin-left: -10px; margin-bottom: 2px; }
+.attach:hover:not(:disabled) { background: var(--fill, color-mix(in srgb, var(--text) 8%, transparent)); color: var(--text); }
+.attach-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0 2px; }
+.ask .attach-chips { margin-left: -10px; }
+.attach-chip { display: flex; align-items: center; gap: 8px; max-width: 280px; padding: 5px 6px 5px 5px; border-radius: 12px; border: 0;
+  background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline); font: 500 12.5px var(--font); color: var(--text); text-align: left; }
+.attach-chip img, .attach-chip .file-ext { flex: none; width: 34px; height: 34px; border-radius: 8px; object-fit: cover; }
+.attach-chip .file-ext { display: grid; place-items: center; font: 700 9.5px var(--font); letter-spacing: 0.04em; color: #fff; background: var(--blue); }
+.attach-chip .attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.attach-chip .attach-note { flex: none; color: var(--text-3); font-weight: 400; }
+.attach-chip button { flex: none; width: 20px; height: 20px; border: 0; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer; font-size: 15px; line-height: 1; }
+.attach-chip button:hover { background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); }
+.attach-chip.uploading { opacity: 0.7; }
+.attach-chip.error .attach-note { color: var(--red, #ff3b30); }
+.attach-chip.sent { cursor: pointer; }
+.attach-chip.sent.on { box-shadow: 0 0 0 1.5px var(--blue); }
+.msg-files { margin-bottom: 6px; }
+.file-read { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--hairline); text-align: left; }
+.file-read-by { font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
+.file-read pre { margin: 0; max-height: 280px; overflow: auto; white-space: pre-wrap; font: 400 13px/1.5 var(--font); color: var(--text); }
+@media (max-width: 600px) { .attach-chip { max-width: 100%; } }
 .council-row { display: flex; align-items: center; justify-content: center; gap: 8px 16px; flex-wrap: wrap; margin-top: 22px; min-height: 26px; }
 .member { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); animation: rise 0.5s var(--ease) both; }
 .member b { color: var(--text); font-weight: 600; }
@@ -477,7 +504,7 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 
 .composer-wrap { padding: 0 32px 18px; max-width: 1360px; position: relative; width: 100%; margin: 0 auto; position: relative; z-index: 2; }
 .composer {
-  display: flex; align-items: flex-end; gap: 8px; padding: 6px 6px 6px 16px; border-radius: 22px;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px 6px 6px 16px; border-radius: 22px;
   background: var(--glass-strong); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
   box-shadow: var(--shadow), 0 0 0 0.5px var(--hairline);
 }

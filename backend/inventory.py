@@ -119,6 +119,7 @@ async def inventory(num_ctx: int = DEFAULT_NUM_CTX, force: bool = False) -> Dict
                     "quant": details.get("quantization_level"),
                     "context_length": _context_length(m["model_info"]),
                     "thinking": "thinking" in (m["capabilities"] or []),
+                    "vision": "vision" in (m["capabilities"] or []),
                     # Embedding-only models can't chat
                     "chat": ("completion" in m["capabilities"] if m["capabilities"] else True)
                     and "embed" not in m["model"].lower(),

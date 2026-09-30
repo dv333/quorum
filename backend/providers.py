@@ -67,6 +67,15 @@ class ProviderError(Exception):
     pass
 
 
+def _openai_message(m: Dict[str, Any]) -> Dict[str, Any]:
+    """Ollama takes images as a list beside the text; OpenAI-style servers want them as parts of the content."""
+    if not m.get("images"):
+        return m
+    parts: List[Dict[str, Any]] = [{"type": "text", "text": m["content"]}]
+    parts += [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b}"}} for b in m["images"]]
+    return {"role": m["role"], "content": parts}
+
+
 class ChatClient:
     """Streams chat completions from any registered endpoint."""
 
@@ -160,7 +169,7 @@ class ChatClient:
         raise ProviderError("the model server stopped mid-reply")
 
     async def _stream_openai(self, ep, model, messages) -> AsyncIterator[Chunk]:
-        payload = {"model": model, "messages": messages, "stream": True}
+        payload = {"model": model, "messages": [_openai_message(m) for m in messages], "stream": True}
         splitter = ThinkSplitter()
         started = time.monotonic()
         first_token_at: Optional[float] = None
