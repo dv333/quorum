@@ -17,8 +17,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-from . import coder, db, firecrawl, inventory, prompts, pyrun
-from . import attachments
+from . import attachments, coder, db, firecrawl, inventory, links, prompts, pyrun
 from .attachments import strip_block
 from .config import (
     ATTACHMENT_CHARS,
@@ -224,7 +223,10 @@ def is_code_debate(question: str, pack: Optional[Dict[str, Any]] = None, repo_pa
 _ADVICE_Q = re.compile(
     r"\b(should (i|we)|how (should|do|can|could) (i|we)|what should (i|we)|is it worth|worth it|help me (decide|choose|plan)"
     r"|(which|what) (one )?(is|would be) (better|best)|best way to|recommend|advice|plan (for|my|our|a|the)|pros and cons"
-    r"|(i'?m|i am|we'?re|we are) (planning|deciding|thinking about|trying to decide)|(i|we) (want|need) to (decide|choose))\b",
+    r"|(i'?m|i am|we'?re|we are) (planning|deciding|thinking about|trying to decide)|(i|we) (want|need) to (decide|choose)"
+    # strategy: how to grow, improve or promote something, and requests for ideas or a strategy
+    r"|strateg(y|ies)|come up with|ideas? (for|to)|ways to|how (to|can i|can we|do i|do we) (grow|improve|increase|market"
+    r"|promote|get more|attract|scale|monetize)|(grow|improve|market|promote|scale) (my|our|the|this))\b",
     re.I,
 )
 
@@ -954,6 +956,7 @@ class DebateEngine:
         self.id = debate_id
         self.client = client or ChatClient()
         self.meta_lookup = meta_lookup or inventory.model_meta
+        self.read_link = links.read  # replaced in tests
         self.plan_lookup = plan_lookup or inventory.plan
         self.search_fn = search_fn or firecrawl.search
         self.bus = EventBus()
@@ -1118,6 +1121,8 @@ class DebateEngine:
     def _user_message(self, topic: int, round_no: int, content: str, files: List[str]) -> None:
         """The user's message, with the files sent with it (the app shows them on the message)."""
         row = self._insert_message(topic=topic, round_no=round_no, author_kind="user", content=content)
+        # Links in the message are opened before the council answers, like attached files
+        files = files + [attachments.add_link(url)["id"] for url in links.links_in(content)]
         linked = attachments.link(files, self.id, topic, row["id"]) if files else []
         if linked:
             db.update("messages", row["id"], meta_json=json.dumps({"attachments": linked}))
@@ -1131,6 +1136,12 @@ class DebateEngine:
         for row in attachments.for_topic(self.id, topic):
             if row["error"]:
                 continue
+            if row["kind"] == "link" and row["text"] is None:
+                await self._read_link(row, topic)
+                worked = True
+                row = attachments.get(row["id"])
+                if row["error"]:
+                    continue
             if row["kind"] == "image" and row["text"] is None:
                 await self._read_image(row, topic)
                 worked = True
@@ -1139,6 +1150,17 @@ class DebateEngine:
                 worked = True
         if worked:
             self._set_phase("")
+
+    async def _read_link(self, row: Dict[str, Any], topic: int) -> None:
+        self._set_phase(f"Opening {row['name']}…")
+        try:
+            text = await self.read_link(row["path"])
+            db.update("attachments", row["id"], text=text, size=len(text), read_by="web")
+        except Exception as e:
+            log.warning("couldn't open %s: %s", row["path"], e)
+            db.update("attachments", row["id"], error=f"Couldn't open the link: {e}")
+            self._system_message(f"Couldn't open {row['name']} ({e}); the council goes on without it.")
+        self._publish_attachments(topic)
 
     async def _vision_model(self) -> Optional[Dict[str, Any]]:
         """The chair when it can see images, otherwise the largest model here that can and fits in memory."""

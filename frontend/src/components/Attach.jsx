@@ -94,7 +94,7 @@ export function AttachButton({ onFiles, disabled }) {
 function FileIcon({ file }) {
   if (file.preview) return <img src={file.preview} alt="" />
   if (file.kind === 'image' && file.id && !file.error) return <img src={attachmentUrl(file.id)} alt="" />
-  const ext = extension(file.name).slice(1, 5).toUpperCase() || 'FILE'
+  const ext = file.kind === 'link' ? 'LINK' : extension(file.name).slice(1, 5).toUpperCase() || 'FILE'
   return <span className="file-ext">{ext}</span>
 }
 
@@ -130,7 +130,7 @@ export function MessageFiles({ files }) {
             onClick={() => setOpen(open === f.id ? null : f.id)} aria-expanded={open === f.id}>
             <FileIcon file={f} />
             <span className="attach-name">{f.name}</span>
-            <span className="attach-note">{f.error ? 'couldn’t read' : f.read ? 'what the council read' : f.kind === 'image' ? 'reading…' : ''}</span>
+            <span className="attach-note">{f.error ? (f.kind === 'link' ? 'couldn’t open' : 'couldn’t read') : f.read ? 'what the council read' : ['image', 'link'].includes(f.kind) ? 'reading…' : ''}</span>
           </button>
         ))}
       </div>
@@ -139,7 +139,8 @@ export function MessageFiles({ files }) {
           {shown.error ? <p>{shown.error}</p> : (
             <>
               <div className="file-read-by">
-                {shown.kind === 'image' ? `Described by ${shown.read_by ? modelShort(shown.read_by) : 'a model that can see'}; the council reads this, not the image`
+                {shown.kind === 'link' ? `The page at this link, as the council reads it${shown.summarized ? ' (summarized by the chair: it’s too long to include in full)' : ''}`
+                  : shown.kind === 'image' ? `Described by ${shown.read_by ? modelShort(shown.read_by) : 'a model that can see'}; the council reads this, not the image`
                   : shown.summarized ? `Summarized by the chair (${modelShort(shown.read_by)}): the file is too long to include in full`
                   : 'The text the council reads'}
               </div>

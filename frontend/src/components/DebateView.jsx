@@ -399,7 +399,7 @@ function IntakeTyping({ debate }) {
       <div className="bubble moderator">
         <div className="status-line">
           <span className="typing"><i /><i /><i /></span>
-          {/^(Reading|Summarizing) /.test(debate.phase || '') ? debate.phase
+          {/^(Reading|Summarizing|Opening) /.test(debate.phase || '') ? debate.phase
             : chair ? `${chair} is reading your conundrum…` : 'Choosing a chair…'}
         </div>
       </div>
