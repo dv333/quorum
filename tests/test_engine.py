@@ -2134,6 +2134,9 @@ async def test_a_question_about_the_answer_is_answered_from_the_debate_without_a
     (answer,) = client.calls_with("You answer a follow-up question")
     prompt = answer[1]["content"]
     assert "Where each agent ended up" in prompt and "Otter" in prompt and "keep a $2k buffer" in prompt
+    # A live follow-up said "the council's review found" and "the consensus of the council's agents"
+    assert "don't mention the council" in prompt and "say what the council found" not in prompt
+    assert "assumes something that isn't true, correct that first" in prompt
     assert [v["reason"] for v in db.query("SELECT reason FROM verdicts ORDER BY id")] == ["max_rounds", "followup"]
     assert eng.debate()["status"] == "concluded"
 

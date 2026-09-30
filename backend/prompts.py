@@ -1181,9 +1181,11 @@ The parts of the debate most related to the follow-up:
 
 The user's follow-up: {followup}
 
-Answer the follow-up directly, in plain words, in a few sentences (a short list if it helps). Base it on the debate:
-say what the council found and why, and when the answer rests on a checked source or a program's output, say so. If
-the debate didn't cover it, say that plainly and give your best answer, marked as your own view. {PLAIN_WORDS}""",
+Answer the follow-up directly, in plain words, in a few sentences (a short list if it helps), from what the debate
+established. If the follow-up assumes something that isn't true, correct that first. Write it as your answer to the
+user: don't mention the council, agents, the debate, rounds or a consensus (the app already shows where the answer came
+from). Keep a source's [n] when the answer rests on it. If the debate didn't cover it, say so in one short clause and
+give your best answer. {PLAIN_WORDS}""",
         },
     ]
 
