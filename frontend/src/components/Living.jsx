@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
-// The living answer: the chair's draft after each round, pinned in the stage while the council debates.
+// The living answer: the chair's first answer (before the debate), then its draft after each round, pinned in the stage
+// while the council debates.
 // Words that changed since the previous draft are highlighted, and earlier drafts are a click away.
 
 const clean = (line) => line.replace(/\*\*/g, '').replace(/^\s*[-*•]\s+/, '').replace(/^\s*BOTTOM\s*LINE\s*[:：]\s*/i, '').trim()
@@ -54,7 +55,7 @@ export default function LivingAnswer({ drafts, chair }) {
   return (
     <div className={`living ${open ? 'open' : ''}`}>
       <button className="living-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="living-label">Draft answer · round {draft.round}</span>
+        <span className="living-label">{draft.round === 0 ? 'First answer' : `Draft answer · round ${draft.round}`}</span>
         <span className="living-bl"><Marked prev={prev?.bottom} text={cur.bottom} /></span>
         <span className="chev" aria-hidden="true">›</span>
       </button>
@@ -64,7 +65,7 @@ export default function LivingAnswer({ drafts, chair }) {
             <ul>{cur.points.map((p, i) => <li key={i}><Marked prev={prevAll} text={p} /></li>)}</ul>
           )}
           <div className="living-foot">
-            {draft.changed && <span className="living-changed">{idx === 0 ? `${chair || 'The chair'}'s first draft` : draft.changed}</span>}
+            {draft.changed && <span className="living-changed">{idx === 0 ? (draft.round === 0 ? `${chair || 'The chair'}'s answer before the debate` : `${chair || 'The chair'}'s first draft`) : draft.changed}</span>}
             {drafts.length > 1 && (
               <span className="living-nav" role="group" aria-label="Earlier drafts">
                 <button disabled={idx === 0} onClick={() => setPick(idx - 1)} aria-label="Previous draft">‹</button>

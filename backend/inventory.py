@@ -3,12 +3,21 @@
 import asyncio
 import json
 import os
+import re
 import shutil
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import db
-from .config import AUTO_COUNCIL_MAX, AUTO_COUNCIL_MIN, DEFAULT_NUM_CTX, HANDLES, SLOW_TURN_SECONDS
+from .config import (
+    ADVICE_MIN_PARAMS_B,
+    ADVICE_SEATS,
+    AUTO_COUNCIL_MAX,
+    AUTO_COUNCIL_MIN,
+    DEFAULT_NUM_CTX,
+    HANDLES,
+    SLOW_TURN_SECONDS,
+)
 from .hardware import GB, detect_system, estimate_model_bytes, fit_label, plan_council
 from .providers import Endpoint, endpoint_status, list_models, loaded_models
 
@@ -181,6 +190,22 @@ def pick_council(
     return seats
 
 
+def billions(params: Any) -> float:
+    """Parameters in billions from the model server's "27.8B" or "900M" (0 when unknown)."""
+    m = re.match(r"\s*(\d+(?:\.\d+)?)\s*([BM])", str(params or ""), re.I)
+    return float(m.group(1)) / (1000 if m and m.group(2).upper() == "M" else 1) if m else 0.0
+
+
+def strongest_council(models: List[Dict[str, Any]], usable_bytes: int, n: int = ADVICE_SEATS) -> List[Dict[str, Any]]:
+    """The n largest models of at least ADVICE_MIN_PARAMS_B, for advice: small seats dilute the debate. The usual
+    council when fewer than three models are that large."""
+    candidates = pick_council(models, usable_bytes, max_size=len(models), min_size=0)
+    big = [m for m in candidates if billions(m.get("params")) >= ADVICE_MIN_PARAMS_B]
+    if len(big) < AUTO_COUNCIL_MIN:
+        return pick_council(models, usable_bytes)
+    return pick_council(big[:n], usable_bytes, max_size=n)
+
+
 def _suits(model: str, prefer: List[str]) -> bool:
     name = model.lower()
     return any(p in name for p in prefer)
@@ -300,12 +325,18 @@ def pick_researcher(seats: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     return distinct[len(distinct) // 2]
 
 
-async def auto_council(num_ctx: int = DEFAULT_NUM_CTX, pack: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def auto_council(
+    num_ctx: int = DEFAULT_NUM_CTX, pack: Optional[Dict[str, Any]] = None, advice: bool = False
+) -> Dict[str, Any]:
     """The council a new question gets by default, plus who will pick the chair (the largest model).
-    A topic pack with model preferences gets a council built around suitable models (see pick_council_for_pack)."""
+    A topic pack with model preferences gets a council built around suitable models (see pick_council_for_pack);
+    advice gets the strongest few (see strongest_council)."""
     inv = await inventory(num_ctx)
     prefs = (pack or {}).get("models")
-    seats, specialists = pick_council_for_pack(inv["models"], inv["system"]["usable_bytes"], prefs)
+    if advice and not (prefs and prefs.get("prefer")):
+        seats, specialists = strongest_council(inv["models"], inv["system"]["usable_bytes"]), []
+    else:
+        seats, specialists = pick_council_for_pack(inv["models"], inv["system"]["usable_bytes"], prefs)
     members = [
         {
             "handle": HANDLES[i],

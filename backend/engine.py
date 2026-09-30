@@ -37,7 +37,6 @@ from .config import (
     TURN_MAX_TOKENS,
     BRIEF_TURN_TOKENS,
     SLOW_TURN_SECONDS,
-    CRITIC_MAX_TOKENS,
     REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
@@ -757,6 +756,29 @@ def named_sources(text: str, question: str = "", limit: int = 8) -> List[str]:
     return out[:limit]
 
 
+_TRACE = re.compile(
+    r"\b(the council|council'?s|(council|group) consensus|the consensus (view|position|was|moved|shifted)|"
+    r"the agents?\b|other agents|"
+    r"(initial|original|earlier) (stance|estimate|position|answer|draft|suggestion)|was corrected|were corrected|"
+    r"(un)?confirmed by the (available )?(sources|evidence|research)|contradicted by the sources|"
+    r"evidence (contradicts|does not (confirm|support|show))|is unconfirmed|remains unconfirmed|"
+    r"python (execution|check|program|simulation)|as verified by)",
+    re.I,
+)
+
+
+def process_traces(text: str, limit: int = 8) -> List[str]:
+    """Sentences of an answer that talk about how it was made (the council, corrections, program runs, whether
+    sources confirmed a claim) instead of the user's question. "Where they differed" may name the agents."""
+    body = re.sub(r"(?ims)^##\s*Where they differed.*?(?=^##\s|\Z)", "", text or "")
+    out: List[str] = []
+    for sentence in re.split(r"(?<!\bal\.)(?<!\be\.g\.)(?<=[.!?])\s+|\n+", body):
+        sentence = sentence.strip()
+        if sentence and _TRACE.search(sentence) and sentence not in out:
+            out.append(sentence)
+    return out[:limit]
+
+
 def keeps_structure(original: str, revised: str) -> bool:
     """A rewrite keeps the answer whole: its bottom line, every section, and most of its length."""
     sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
@@ -825,6 +847,14 @@ def quote_in_source(quote: str, text: str) -> bool:
 
 
 CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
+
+
+def _one_missing(problems: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """At most one "missing" problem, the critic's own if it gave one: fixing five padded a bakery plan with generic
+    points ("compliance underpins all changes")."""
+    missing = [p for p in problems if p.get("check") == "missing"]
+    keep = next((p for p in reversed(missing) if p.get("text")), missing[-1] if missing else None)
+    return [p for p in problems if p.get("check") != "missing" or p is keep]
 
 
 class CallTrace:
@@ -1353,6 +1383,8 @@ class DebateEngine:
                 d = self.debate()
                 await self._drain_research(d["round"])  # opening brief, or requests made while paused
                 round_no = d["round"]
+                if round_no == 0:
+                    await self._opening_answer()
                 # A reply cut off before it said anything (a restart mid-turn) doesn't count: that agent speaks again
                 spoken = {
                     m["seat_id"]
@@ -1414,6 +1446,65 @@ class DebateEngine:
                 self.bus.publish({"type": "debate_updated", "debate": self.debate()})
             raise
         await self._conclude(reason)
+
+    def _opening(self, topic: int) -> Optional[str]:
+        """The chair's first answer, written before the debate (the round-0 draft)."""
+        row = db.query_one(
+            "SELECT content FROM drafts WHERE debate_id = ? AND topic = ? AND round = 0 ORDER BY id LIMIT 1",
+            [self.id, topic],
+        )
+        return row["content"] if row else None
+
+    async def _opening_answer(self) -> None:
+        """Before the council speaks, the chair writes a full answer of its own, thinking first: what one strong model
+        alone would say. From round 2 the agents say what in it is wrong or missing, and the final answer starts from
+        it. On everyday advice, answers written from the debate alone were no better than one model's: the debate
+        dropped detail a single answer keeps, and could talk itself into odd positions."""
+        d = self.debate()
+        topic = d["topic"]
+        question = self._question(topic)
+        if self._opening(topic) is not None or is_code_review(question, d["pack"], d.get("repo_path")):
+            return
+        label = self._chair_label(d)
+        self._set_phase(f"{label} is writing a first answer…")
+        messages = prompts.opening_answer_messages(
+            chair=label,
+            question=question,
+            prior_topics=self._prior_topics(topic),
+            criteria=d["criteria"],
+            custom_rubric=d["custom_rubric"],
+            guidance=(d["pack"] or {}).get("guidance", ""),
+            research=self._research_digest(topic),
+            plan=is_plan(question),
+        )
+        text = ""
+        for wanted in (True, False):  # thinking first; if it only thinks, once more without
+            try:
+                text = strip_thinking(
+                    await self._complete(
+                        label,
+                        "opening",
+                        d["chair_endpoint_id"],
+                        d["chair_model"],
+                        messages,
+                        await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], wanted),
+                    )
+                ).strip()
+            except Exception as e:
+                log.warning("opening answer failed: %s", e)
+                continue
+            if text:
+                break
+        if not text:
+            return  # the debate goes ahead as before, from the agents' views alone
+        did = db.execute(
+            "INSERT INTO drafts (debate_id, topic, round, content, changed, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [self.id, topic, 0, text, "First answer", db.now()],
+        )
+        self.bus.publish({"type": "draft_created", "draft": db.query_one("SELECT * FROM drafts WHERE id = ?", [did])})
+
+    def _set_phase(self, text: str) -> None:
+        self.bus.publish({"type": "debate_updated", "debate": {"phase": text}})
 
     def _draft_unchanged(self, topic: int, round_no: int) -> bool:
         """The chair's draft after this round says nothing changed."""
@@ -1526,10 +1617,8 @@ class DebateEngine:
         messages: List[Dict[str, str]],
         think: Optional[bool],
         topic: Optional[int] = None,
-        max_tokens: int = ANSWER_MAX_TOKENS,
     ) -> str:
-        """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded. max_tokens caps thinking and
-        reply together."""
+        """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded."""
         parts, stats = [], {}
         ep = self._endpoint(endpoint_id)
         trace = CallTrace()
@@ -1541,8 +1630,8 @@ class DebateEngine:
                 model,
                 messages,
                 think=think,
-                num_ctx=self._num_ctx(messages, max_tokens, model),
-                num_predict=max_tokens,
+                num_ctx=self._num_ctx(messages, ANSWER_MAX_TOKENS, model),
+                num_predict=ANSWER_MAX_TOKENS,
             ):
                 if chunk.kind in ("content", "thinking"):
                     trace.token(chunk.kind == "content")
@@ -2396,6 +2485,7 @@ class DebateEngine:
                 coder=bool(self._coder()),
                 roster=roster,
                 python=self._python_on() and seat["id"] not in self._no_python,
+                opening=self._opening(d["topic"]),
             )
 
         others = [s for s in self.seats() if s["id"] != seat["id"]]
@@ -2962,19 +3052,13 @@ class DebateEngine:
         self.bus.publish({"type": "debate_updated", "debate": {"phase": f"{critic} is checking the answer…"}})
         raw: List[Any] = []
         critique = prompts.critique_messages(question, row["content"], list(self._handles().values()))
-        # The critic thinks: without it, it missed contradictions between sections and made-up figures. Its thinking
-        # is capped (on the largest model, often the slowest, uncapped thinking took 3-5 minutes); if it runs out
-        # before it replies, it tries once more without thinking
-        for wanted in (True, False):
+        # The critic doesn't think. With thinking capped at 2,048 tokens, qwen3.8 used the whole budget without replying
+        # on 6 of 8 questions (0.7-2.2 minutes lost each time), and the answer that followed without thinking found
+        # problems every time; uncapped, thinking took 3-5 minutes. The critic being the largest model is what matters
+        for attempt in range(2):  # one retry when the reply is empty
             try:
                 text = await self._complete(
-                    critic,
-                    "critique",
-                    c_ep,
-                    c_model,
-                    critique,
-                    await self._thinking_flag(c_ep, c_model, wanted),
-                    max_tokens=CRITIC_MAX_TOKENS if wanted else ANSWER_MAX_TOKENS,
+                    critic, "critique", c_ep, c_model, critique, await self._thinking_flag(c_ep, c_model, False)
                 )
             except Exception as e:
                 log.warning("answer critique failed: %s", e)
@@ -2982,7 +3066,7 @@ class DebateEngine:
             if text.strip():
                 raw = parse_json_loose(text).get("problems") or []
                 break
-        problems = (
+        problems = _one_missing(
             self._code_checks(row["content"], question)
             + [
                 {
@@ -3058,6 +3142,40 @@ class DebateEngine:
             for p in (parse_json_loose(text).get("problems") or [])
             if isinstance(p, dict) and str(p.get("issue") or "").strip()
         ][:6]
+
+    async def _remove_traces(self, msg_id: int) -> None:
+        """The answer speaks to the user's question, not about how it was made. In the advice benchmark, answers said
+        "the council consensus corrected the initial protein estimate" and "is unconfirmed by the available sources"
+        in their key points; the chair rewrites those sentences once."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not row or row["status"] != "done" or not row["content"]:
+            return
+        passages = process_traces(row["content"])
+        if not passages:
+            return
+        d = self.debate()
+        chair = self._chair_label(d)
+        self._set_phase(f"{chair} is polishing the answer…")
+        meta = json.loads(row["meta_json"] or "{}")
+        meta["traces"] = {"passages": passages, "revised": False}
+        content = row["content"]
+        try:
+            revised = strip_thinking(
+                await self._complete(
+                    chair,
+                    "polish",
+                    d["chair_endpoint_id"],
+                    d["chair_model"],
+                    prompts.traces_fix_messages(row["content"], passages),
+                    await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+                )
+            ).strip()
+            if keeps_structure(row["content"], revised):
+                content = shorten_bottom_line(plain_answer(revised))
+                meta["traces"].update(revised=True, left=process_traces(content), original=row["content"])
+        except Exception as e:
+            log.warning("removing traces failed: %s", e)
+        self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
 
     async def _drop_unchecked_sources(self, msg_id: int) -> None:
         """Without research nothing was looked up, so a study, journal or survey the answer names came from a model's
@@ -3413,6 +3531,7 @@ class DebateEngine:
                 options=self._shortlist.get(topic, []),
                 search_failed=(self._search_down or "") if d["research_enabled"] else "",
                 plan=is_plan(question) and not is_code_review(question, d["pack"], d.get("repo_path")),
+                opening=self._opening(topic),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:
@@ -3454,6 +3573,8 @@ class DebateEngine:
                 await self._critique_answer(row["id"])
             if not d["research_enabled"]:
                 await self._drop_unchecked_sources(row["id"])
+            if not is_code_review(question, d["pack"], d.get("repo_path")):
+                await self._remove_traces(row["id"])
             if is_code_review(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
             done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])

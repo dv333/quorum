@@ -30,7 +30,7 @@ from .config import (
     SEAT_COLORS,
 )
 from .hardware import estimate_model_bytes, fit_label
-from .engine import APP_BUS, drop_engine, get_engine, recover_after_restart
+from .engine import APP_BUS, drop_engine, get_engine, is_advice, is_code_review, recover_after_restart
 from .providers import ProviderError, delete_model, lookup_model, pull_model
 
 
@@ -457,7 +457,8 @@ async def create_debate(body: CreateDebate):
     seats = body.seats
     researcher = body.researcher
     if seats is None:
-        auto = await inventory.auto_council(body.num_ctx, pack=pack)
+        advice = is_advice(body.question) and not is_code_review(body.question, pack, body.repo_path)
+        auto = await inventory.auto_council(body.num_ctx, pack=pack, advice=advice)
         seats = [SeatIn(endpoint_id=m["endpoint_id"], model=m["model"], thinking=True) for m in auto["seats"]]
         if researcher is None and auto["researcher"]:
             researcher = ModelRef(endpoint_id=auto["researcher"]["endpoint_id"], model=auto["researcher"]["model"])

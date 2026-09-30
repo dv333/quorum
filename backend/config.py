@@ -49,6 +49,9 @@ MAX_ROUNDS_LIMIT = 10
 DEFAULT_AUTOPILOT = True
 AUTO_COUNCIL_MAX = 8  # every installed model joins, up to one per agent name
 AUTO_COUNCIL_MIN = 3  # repeat models if fewer distinct ones fit
+# Advice gets the strongest few: on everyday advice, 4-8B seats diluted the debate and pulled it toward odd positions
+ADVICE_SEATS = 4
+ADVICE_MIN_PARAMS_B = 10.0
 INTAKE_MAX_QUESTIONS = 3  # the chair asks at most this many clarifying questions
 MIN_ROUNDS_FOR_CONSENSUS = _env_int("LLC_MIN_ROUNDS", 2)
 MAX_SEATS = 8
@@ -88,7 +91,6 @@ THINK_AFTER_FIRST_ROUND = _env_int("LLC_THINK_LATER_ROUNDS", 0) == 1
 SLOW_TURN_SECONDS = _env_float("LLC_SLOW_TURN_SECONDS", 120.0)
 # After round 1, such a model keeps its seat with shorter replies: its voice stays, without holding up every round
 BRIEF_TURN_TOKENS = _env_int("LLC_BRIEF_TURN_TOKENS", 1024)
-CRITIC_MAX_TOKENS = _env_int("LLC_CRITIC_MAX_TOKENS", 2048)  # the critic's thinking and reply together
 REVIEW_PART_CHARS = 12000  # debate text per check when a code review's answer is checked for dropped findings
 REVIEW_MAX_ADDED = 8  # findings added back to one review, at most
 CODER_REQUESTS_PER_ROUND = 2  # questions for the Coder (Claude Code or Codex) per round; each costs cloud tokens

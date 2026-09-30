@@ -263,9 +263,9 @@ async def test_chair_drafts_the_answer_after_every_round_but_the_last():
     await eng.post_user_message("Rust or Go?")
     await eng.task
     drafts = eng.snapshot()["drafts"]
-    assert [d["round"] for d in drafts] == [1, 2]
+    assert [d["round"] for d in drafts] == [0, 1, 2]  # the chair's first answer, then after every round but the last
     assert (
-        drafts[0]["content"] == "BOTTOM LINE: draft 1\n- a point" and drafts[1]["changed"] == "Otter's point in round 2"
+        drafts[1]["content"] == "BOTTOM LINE: draft 1\n- a point" and drafts[2]["changed"] == "Otter's point in round 2"
     )
     second_prompt = [m for _, m, _ in client.calls if "keep a short draft" in m[0]["content"]][1][1]["content"]
     assert "Your draft after the previous round:\nBOTTOM LINE: draft 1" in second_prompt
@@ -281,7 +281,7 @@ async def test_a_failed_draft_never_stops_the_debate():
     eng = make_debate(client, max_rounds=2)
     await eng.post_user_message("Rust or Go?")
     await eng.task
-    assert eng.debate()["status"] == "concluded" and eng.snapshot()["drafts"] == []
+    assert eng.debate()["status"] == "concluded" and [d["round"] for d in eng.snapshot()["drafts"]] == [0]
 
 
 async def test_why_traces_a_passage_and_drops_made_up_agents_and_sources():
