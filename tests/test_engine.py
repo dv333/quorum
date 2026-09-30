@@ -621,9 +621,9 @@ async def test_an_answer_nobody_can_write_is_reported_as_no_answer():
     await eng.task
     chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert chair["status"] == "error" and "empty answer" in chair["content"]
-    writers = [model for model, m, _ in client.calls if "chair of an AI council" in m[0]["content"]]
+    writers = [model for model, m, _ in client.calls if "You turn the council" in m[0]["content"]]
     assert writers == ["chair-model", "chair-model", "model-0"]  # the chair twice, then the largest other model
-    assert all(kw["think"] is False for _, m, kw in client.calls if "chair of an AI council" in m[0]["content"])
+    assert all(kw["think"] is False for _, m, kw in client.calls if "You turn the council" in m[0]["content"])
     # No answer is reported as a failure, not as an answered debate
     assert eng.debate()["status"] == "failed"
     assert not db.query("SELECT * FROM verdicts")
@@ -668,7 +668,11 @@ async def test_resume_after_a_failed_answer_tries_the_answer_again_not_another_r
         failed = 0
 
         async def stream(self, endpoint, model, messages, **kw):
-            if "chair of an AI council" in messages[0]["content"] and self.failed < 3:
+            if "you write your own best answer" in messages[0]["content"]:  # no first answer to fall back on either
+                self.calls.append((model, messages, kw))
+                yield Chunk("done", stats={})
+                return
+            if "You turn the council" in messages[0]["content"] and self.failed < 3:
                 self.failed += 1
                 self.calls.append((model, messages, kw))
                 yield Chunk("done", stats={})
@@ -1758,7 +1762,7 @@ async def test_every_model_call_is_traced_with_its_timings_and_outcome():
 async def test_a_failed_call_is_traced_with_its_error():
     class FailingChair(FakeClient):
         async def stream(self, endpoint, model, messages, **kw):
-            if model == "chair-model" and "chair of an AI council" in messages[0]["content"]:
+            if model == "chair-model" and "You turn the council" in messages[0]["content"]:
                 raise ProviderError("the model server stopped mid-reply")
                 yield  # pragma: no cover
             async for c in super().stream(endpoint, model, messages, **kw):
@@ -1984,3 +1988,55 @@ async def test_the_recheck_doesnt_think():
     await eng.task
     recheck = [kw for _, m, kw in client.calls if "An answer was corrected" in m[1]["content"]]
     assert len(recheck) == 1 and recheck[0]["think"] is False
+
+
+# ---------------------------------------------------------------- the chair's first answer
+
+
+async def test_the_chair_writes_a_first_answer_that_the_council_then_improves():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Should I pay off my card with my savings?")
+    await eng.task
+    opening = [(m, kw) for _, m, kw in client.calls if "you write your own best answer" in m[0]["content"]]
+    assert len(opening) == 1 and opening[0][1]["think"] is True  # like a single model: thinking, a full answer
+    assert "Where they differed" not in opening[0][0][1]["content"]
+    first_answer = db.query_one("SELECT * FROM drafts WHERE round = 0")
+    assert first_answer["content"] == "VERDICT TEXT" and first_answer["changed"] == "First answer"
+    # round 1 stays independent; from round 2 the agents work on the first answer
+    rounds = {r: [m for m, _ in client.turn_calls() if f"(round {r} of" in m[1]["content"]] for r in (1, 2)}
+    assert not any("THE CHAIR'S FIRST ANSWER" in m[1]["content"] for m in rounds[1])
+    assert all("THE CHAIR'S FIRST ANSWER" in m[1]["content"] for m in rounds[2])
+    verdict = client.calls_with("You turn the council")[-1][1]["content"]
+    assert "Your first answer, written before the debate:\nVERDICT TEXT" in verdict
+    assert "starting from your first answer" in verdict and "mainstream expert guidance" in verdict
+
+
+async def test_without_a_first_answer_the_debate_goes_ahead_as_before():
+    class Silent(FakeClient):
+        async def stream(self, endpoint, model, messages, **kw):
+            if "you write your own best answer" in messages[0]["content"]:
+                self.calls.append((model, messages, kw))
+                yield Chunk("done", stats={})
+                return
+            async for c in super().stream(endpoint, model, messages, **kw):
+                yield c
+
+    client = Silent(lambda h, r, m: reply("REFINE"))
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("Should I pay off my card with my savings?")
+    await eng.task
+    assert [kw["think"] for _, m, kw in client.calls if "you write your own best answer" in m[0]["content"]] == [
+        True,
+        False,
+    ]
+    assert not db.query("SELECT * FROM drafts WHERE round = 0") and eng.debate()["status"] == "concluded"
+    assert "Combine the strongest arguments" in client.calls_with("You turn the council")[-1][1]["content"]
+
+
+async def test_a_code_review_gets_no_first_answer():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message(DIFF_Q)
+    await eng.task
+    assert not client.calls_with("you write your own best answer")

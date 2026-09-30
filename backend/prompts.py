@@ -188,6 +188,7 @@ def turn_messages(
     roster: Optional[List[str]] = None,
     coder: bool = False,
     python: bool = False,
+    opening: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     user = [history_block(prior_topics), f"THE QUESTION:\n{question}\n"]
     if summary:
@@ -201,6 +202,13 @@ def turn_messages(
         )
     elif transcript:
         user.append(f"\nDISCUSSION SO FAR:\n{transcript}\n")
+    if opening and round_no > 1:
+        # Round 1 stays independent; from round 2 the council works on improving the chair's first answer
+        user.append(
+            "\nTHE CHAIR'S FIRST ANSWER (written before the debate; the final answer will start from it):\n"
+            f"{opening}\n\nAs well as answering the others, say concretely what in this answer is wrong, missing or "
+            "should change, and why, and what should stay as it is.\n"
+        )
     else:
         user.append("\nNobody has spoken yet. Give your initial answer.\n")
     last = " This is the final round, so make your position clear." if round_no >= max_rounds else ""
@@ -216,6 +224,39 @@ def turn_messages(
             ),
         },
         {"role": "user", "content": "".join(user)},
+    ]
+
+
+def opening_answer_messages(
+    *,
+    chair: str,
+    question: str,
+    prior_topics: List[Dict[str, str]],
+    criteria: List[str],
+    custom_rubric: str,
+    guidance: str = "",
+    research: str = "",
+    plan: bool = False,
+) -> List[Dict[str, str]]:
+    """The chair's own answer before the council speaks: what one strong model alone would say. The debate then
+    checks and improves it."""
+    found = f"\nWhat the research found:\n{research}\n" if research else ""
+    return [
+        {
+            "role": "system",
+            "content": f"You are {chair}, the chair of an AI council. Before the council debates, you write your own best answer to the user's question; the council will then check it and improve it.",
+        },
+        {
+            "role": "user",
+            "content": f"""Today is {today()}.
+{history_block(prior_topics)}Question: {question}
+{found}
+The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
+
+Think it through, then write the best complete answer you can: the one a careful expert would give this user, specific to their situation and numbers. {ANSWER_RULES} {MAINSTREAM} Every section must agree with the bottom line.
+
+{answer_format(sourced=bool(research), plan=plan, debate=False)}""",
+        },
     ]
 
 
@@ -320,6 +361,14 @@ Reply with JSON only:
     ]
 
 
+ANSWER_RULES = "Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them."
+MAINSTREAM = (
+    "Where your recommendation departs from mainstream expert guidance (what professional bodies or standard practice "
+    "advise), say so plainly and why; don't take an unusual position only because the council converged on it or "
+    "one agent argued it hard."
+)
+
+
 def verdict_messages(
     *,
     question: str,
@@ -338,14 +387,29 @@ def verdict_messages(
     options: Sequence[str] = (),
     search_failed: str = "",
     plan: bool = False,
+    opening: Optional[str] = None,
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
+    if opening:
+        start = (
+            "Write the final answer in markdown, starting from your first answer: keep everything in it the debate "
+            "didn't show to be wrong or weak, correct what the council showed was wrong, add what it showed was "
+            "missing, and change the bottom line only when the debate gave a good reason. Don't treat how many agents "
+            "agree as evidence."
+        )
+    else:
+        start = (
+            "Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one "
+            "agent's answer, and don't treat how many agents agree as evidence."
+        )
     why = {
         "consensus": "The agents reached consensus.",
         "max_rounds": "The round limit was reached without full consensus.",
         "manual": "The user ended the debate.",
     }.get(reason, "")
     summ = f"\nSummary of earlier rounds:\n{summary}\n" if summary else ""
+    if opening:
+        summ = f"\nYour first answer, written before the debate:\n{opening}\n" + summ
     found = f"\nWhat {RESEARCHER_NAME}'s research found:\n{research}\n" if research else ""
     if studies:
         found += (
@@ -395,7 +459,7 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-Write the final answer in markdown. Combine the strongest arguments from all agents; don't just pick one agent's answer, and don't treat how many agents agree as evidence. Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. Address every requirement the user stated in the question, even briefly, and say what the evidence shows for each. When the question covers a category with distinct forms (types of a diet, versions of a product, kinds of treatment), say how the main forms compare, one by one. For health, diet or treatment questions, say who should be careful or avoid an option. Answer for the options and numbers the question states (a 48 GB Mac means 48 GB, not another size); mention other options only as an aside. For buying or choosing questions, quote price and specifications for the same version (trim, configuration or plan) and name it, compare realistic versions of each option, including the cheapest one that does the job (a base model, a used part) as well as the premium one, and say who each suits. Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. For questions about hardware, costs, sizes, speeds or other quantities, work out the key numbers for each option and show the arithmetic where the sources don't give them. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
+{start} Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. {ANSWER_RULES} Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. {MAINSTREAM} Python checks are programs the agents ran, not council members: don't name them among those who differed. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
 
 {answer_format(sourced=bool(research or studies or claims), plan=plan)}""",
         },
@@ -420,11 +484,13 @@ The schedule itself, since the user asked for a plan: a markdown table or number
 """
 
 
-def answer_format(sourced: bool = True, plan: bool = False) -> str:
+def answer_format(sourced: bool = True, plan: bool = False, debate: bool = True) -> str:
     """The answer's structure. Without research, it asks for no named studies: models invent them from memory. A plan
     gets a schedule: on "how should I train?" and "what should I do in the next 90 days?" the council's answers were
     thinner than one model's week-by-week plan."""
     text = ANSWER_FORMAT.replace("{points}", SOURCED_POINTS if sourced else UNSOURCED_POINTS)
+    if not debate:  # the chair's first answer comes before any debate
+        text = re.sub(r"## Where they differed\n.*?\n\n", "", text, flags=re.S)
     return text.replace("{plan}", PLAN_SECTION if plan else "")
 
 

@@ -826,6 +826,14 @@ def quote_in_source(quote: str, text: str) -> bool:
 CLAIM_STATUSES = ("supported", "partly", "contradicted", "unknown")
 
 
+def _one_missing(problems: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    """At most one "missing" problem, the critic's own if it gave one: fixing five padded a bakery plan with generic
+    points ("compliance underpins all changes")."""
+    missing = [p for p in problems if p.get("check") == "missing"]
+    keep = next((p for p in reversed(missing) if p.get("text")), missing[-1] if missing else None)
+    return [p for p in problems if p.get("check") != "missing" or p is keep]
+
+
 class CallTrace:
     """When a model call was asked for, when it got its turn on the model server, and when its first token came: a
     stall shows as a long wait for the turn, or a turn with no first token."""
@@ -1352,6 +1360,8 @@ class DebateEngine:
                 d = self.debate()
                 await self._drain_research(d["round"])  # opening brief, or requests made while paused
                 round_no = d["round"]
+                if round_no == 0:
+                    await self._opening_answer()
                 # A reply cut off before it said anything (a restart mid-turn) doesn't count: that agent speaks again
                 spoken = {
                     m["seat_id"]
@@ -1413,6 +1423,65 @@ class DebateEngine:
                 self.bus.publish({"type": "debate_updated", "debate": self.debate()})
             raise
         await self._conclude(reason)
+
+    def _opening(self, topic: int) -> Optional[str]:
+        """The chair's first answer, written before the debate (the round-0 draft)."""
+        row = db.query_one(
+            "SELECT content FROM drafts WHERE debate_id = ? AND topic = ? AND round = 0 ORDER BY id LIMIT 1",
+            [self.id, topic],
+        )
+        return row["content"] if row else None
+
+    async def _opening_answer(self) -> None:
+        """Before the council speaks, the chair writes a full answer of its own, thinking first: what one strong model
+        alone would say. From round 2 the agents say what in it is wrong or missing, and the final answer starts from
+        it. On everyday advice, answers written from the debate alone were no better than one model's: the debate
+        dropped detail a single answer keeps, and could talk itself into odd positions."""
+        d = self.debate()
+        topic = d["topic"]
+        question = self._question(topic)
+        if self._opening(topic) is not None or is_code_review(question, d["pack"], d.get("repo_path")):
+            return
+        label = self._chair_label(d)
+        self._set_phase(f"{label} is writing a first answer…")
+        messages = prompts.opening_answer_messages(
+            chair=label,
+            question=question,
+            prior_topics=self._prior_topics(topic),
+            criteria=d["criteria"],
+            custom_rubric=d["custom_rubric"],
+            guidance=(d["pack"] or {}).get("guidance", ""),
+            research=self._research_digest(topic),
+            plan=is_plan(question),
+        )
+        text = ""
+        for wanted in (True, False):  # thinking first; if it only thinks, once more without
+            try:
+                text = strip_thinking(
+                    await self._complete(
+                        label,
+                        "opening",
+                        d["chair_endpoint_id"],
+                        d["chair_model"],
+                        messages,
+                        await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], wanted),
+                    )
+                ).strip()
+            except Exception as e:
+                log.warning("opening answer failed: %s", e)
+                continue
+            if text:
+                break
+        if not text:
+            return  # the debate goes ahead as before, from the agents' views alone
+        did = db.execute(
+            "INSERT INTO drafts (debate_id, topic, round, content, changed, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [self.id, topic, 0, text, "First answer", db.now()],
+        )
+        self.bus.publish({"type": "draft_created", "draft": db.query_one("SELECT * FROM drafts WHERE id = ?", [did])})
+
+    def _set_phase(self, text: str) -> None:
+        self.bus.publish({"type": "debate_updated", "debate": {"phase": text}})
 
     def _draft_unchanged(self, topic: int, round_no: int) -> bool:
         """The chair's draft after this round says nothing changed."""
@@ -2393,6 +2462,7 @@ class DebateEngine:
                 coder=bool(self._coder()),
                 roster=roster,
                 python=self._python_on() and seat["id"] not in self._no_python,
+                opening=self._opening(d["topic"]),
             )
 
         others = [s for s in self.seats() if s["id"] != seat["id"]]
@@ -2973,7 +3043,7 @@ class DebateEngine:
             if text.strip():
                 raw = parse_json_loose(text).get("problems") or []
                 break
-        problems = (
+        problems = _one_missing(
             self._code_checks(row["content"], question)
             + [
                 {
@@ -3404,6 +3474,7 @@ class DebateEngine:
                 options=self._shortlist.get(topic, []),
                 search_failed=(self._search_down or "") if d["research_enabled"] else "",
                 plan=is_plan(question) and not is_code_review(question, d["pack"], d.get("repo_path")),
+                opening=self._opening(topic),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:
