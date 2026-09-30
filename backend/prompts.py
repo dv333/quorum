@@ -1130,6 +1130,91 @@ Output only the corrected answer.""",
     ]
 
 
+FOLLOWUP_ROUTE_SYSTEM = (
+    "You route a user's follow-up message in an AI council's chat. Reply with a single JSON object and nothing else."
+)
+
+
+def followup_route_messages(question: str, answer: str, followup: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": FOLLOWUP_ROUTE_SYSTEM},
+        {
+            "role": "user",
+            "content": f"""The user asked: {question}
+
+The council answered:
+{answer[:3000]}
+
+The user now writes: {followup}
+
+Which is it?
+- "clarify": it asks about the answer or the debate behind it (what something means, why, why not another option, what the council thought of something, where a number came from). The debate already has what's needed.
+- "update": it adds or changes facts about their situation that could change the advice ("actually I have $20k saved").
+- "new": a different question.
+
+Reply like: {{"kind": "clarify" | "update" | "new"}}""",
+        },
+    ]
+
+
+def followup_answer_messages(
+    *, chair: str, question: str, answer: str, followup: str, memory: str, excerpts: str
+) -> List[Dict[str, str]]:
+    return [
+        {
+            "role": "system",
+            "content": f"You are {chair}, the chair of an AI council. You answer a follow-up question about the council's answer from the record of its debate.",
+        },
+        {
+            "role": "user",
+            "content": f"""Today is {today()}.
+The user asked: {question}
+
+The council's answer:
+{answer}
+
+What the debate established:
+{memory}
+
+The parts of the debate most related to the follow-up:
+{excerpts or "(none)"}
+
+The user's follow-up: {followup}
+
+Answer the follow-up directly, in plain words, in a few sentences (a short list if it helps). Base it on the debate:
+say what the council found and why, and when the answer rests on a checked source or a program's output, say so. If
+the debate didn't cover it, say that plainly and give your best answer, marked as your own view. {PLAIN_WORDS}""",
+        },
+    ]
+
+
+SUGGEST_SYSTEM = (
+    "You suggest follow-up questions a user might ask next. Reply with a single JSON object and nothing else."
+)
+
+
+def suggest_followups_messages(question: str, answer: str, open_points: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": SUGGEST_SYSTEM},
+        {
+            "role": "user",
+            "content": f"""The user asked: {question}
+
+The council answered:
+{answer[:3000]}
+
+Where the council disagreed or left things open:
+{open_points or "(nothing recorded)"}
+
+Suggest up to three short follow-up questions this user is likely to want next, in their own words (under 12 words
+each). Prefer questions about the conditions that would change the advice ("What if I only have $4k saved?") and the
+points the council left open; skip anything the answer already says plainly.
+
+Reply like: {{"questions": ["...", "..."]}}""",
+        },
+    ]
+
+
 REVIEW_GAP_SYSTEM = "You check an AI council's code review against its debate, so no finding gets lost."
 
 
