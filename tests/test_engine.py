@@ -51,6 +51,8 @@ class FakeClient(ChatClient):
         self.critique_reply = '{"problems": []}'
         self.critique_revise_reply = None  # None: the verdict reply, corrected
         self.recheck_reply = '{"problems": []}'
+        self.route_reply = '{"kind": "new"}'
+        self.suggest_reply = '{"questions": []}'
 
     def calls_with(self, marker):
         return [m for _, m, _ in self.calls if marker in m[0]["content"]]
@@ -84,6 +86,10 @@ class FakeClient(ChatClient):
             content, thinking = self.draft_reply, ""
         elif sys.startswith("You check an AI council's code review"):
             content, thinking = self.review_gap_reply, ""
+        elif sys.startswith("You route a user's follow-up"):
+            content, thinking = self.route_reply, ""
+        elif sys.startswith("You suggest follow-up questions"):
+            content, thinking = self.suggest_reply, ""
         elif (
             sys.startswith("You check an AI council's final answer")
             and "An answer was corrected" in messages[1]["content"]
@@ -2091,3 +2097,95 @@ async def test_where_they_differed_may_name_the_agents_and_a_review_is_not_polis
     await eng.post_user_message(DIFF_Q)
     await eng.task
     assert not client.calls_with("You polish your final answer")
+
+
+async def test_a_long_or_technical_answer_is_polished_for_readers():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = (
+        "BOTTOM LINE: **No.**\n\n## Is it healthier? Not really.\nA risk difference of 0.37 (95% CI 0.1 to 0.6).\n\n"
+        "## Evidence\n- A 2012 review of 237 studies."
+    )
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Is organic food a scam?")
+    await eng.task
+    polish = client.calls_with("You polish your final answer")
+    assert len(polish) == 1 and "Move technical detail into the Evidence section" in polish[0][1]["content"]
+    verdict = client.calls_with("You turn the council")[-1][1]["content"]
+    assert "## What to do" in verdict and "Where they differed" not in verdict.split("Use exactly this structure")[1]
+
+
+# ---------------------------------------------------------------- follow-ups
+
+
+async def ask_then_follow_up(client, followup, max_rounds=2):
+    eng = make_debate(client, max_rounds=max_rounds)
+    await eng.post_user_message("Should I pay off my card with my savings?")
+    await eng.task
+    await eng.post_user_message(followup)
+    await eng.task
+    return eng
+
+
+async def test_a_question_about_the_answer_is_answered_from_the_debate_without_a_new_one():
+    client = FakeClient(lambda h, r, m: reply("REFINE", f"{h} says keep a $2k buffer.", "Keep $2k."))
+    client.route_reply = '{"kind": "clarify"}'
+    eng = await ask_then_follow_up(client, "Why keep a buffer at all?")
+    assert not [m for m, _ in client.turn_calls() if "Why keep a buffer" in m[1]["content"]]  # no new debate
+    (answer,) = client.calls_with("You answer a follow-up question")
+    prompt = answer[1]["content"]
+    assert "Where each agent ended up" in prompt and "Otter" in prompt and "keep a $2k buffer" in prompt
+    # A live follow-up said "the council's review found" and "the consensus of the council's agents"
+    assert "don't mention the council" in prompt and "say what the council found" not in prompt
+    assert "assumes something that isn't true, correct that first" in prompt
+    assert [v["reason"] for v in db.query("SELECT reason FROM verdicts ORDER BY id")] == ["max_rounds", "followup"]
+    assert eng.debate()["status"] == "concluded"
+
+
+async def test_new_facts_get_a_short_debate_and_a_new_question_a_full_one():
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.route_reply = '{"kind": "update"}'
+    client.intake_replies = ['{"action": "clear", "rounds": 2}', '{"action": "clear", "rounds": 6}']
+    eng = await ask_then_follow_up(client, "Actually I have $20k saved, not $8k.", max_rounds=6)
+    assert eng.debate()["max_rounds"] == 2  # capped for a follow-up with new facts
+
+    db.connect(":memory:")
+    client = FakeClient(lambda h, r, m: reply("REFINE"))
+    client.intake_replies = ['{"action": "clear", "rounds": 2}', '{"action": "clear", "rounds": 4}']
+    eng = await ask_then_follow_up(client, "Separately, should I lease or buy a car?", max_rounds=6)
+    assert eng.debate()["max_rounds"] == 4  # routed "new": the chair's own sizing
+
+
+async def test_the_debate_memory_holds_positions_changes_and_program_output(fake_python):
+    def turn(handle, round_no, messages):
+        if "Now finish your message" in messages[-1]["content"]:
+            return reply("AGREE", "The program says 42.", "42")
+        return (CHECK, "") if handle == "Panda" else reply("DISAGREE", position="Keep cash.")
+
+    client = FakeClient(turn)
+    client.draft_reply = "BOTTOM LINE: Pay it.\n- a point\nCHANGED: Panda's check changed the number."
+    eng = make_debate(client, max_rounds=2)
+    await eng.post_user_message("What is 6 times 7?")
+    await eng.task
+    memory = eng._memory_text(1)
+    assert "Where each agent ended up" in memory and "Keep cash." in memory
+    assert "Panda's check changed the number" in memory and "Python checks printed:\n- 42" in memory
+
+
+async def test_follow_up_questions_are_suggested_from_what_the_council_left_open():
+    client = FakeClient(lambda h, r, m: reply("DISAGREE", position="Keep $4k instead."))
+    client.suggest_reply = '{"questions": ["What if I only have $4k saved?", "Should I use a balance transfer?"]}'
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Should I pay off my card with my savings?")
+    await eng.task
+    (suggest,) = client.calls_with("You suggest follow-up questions")
+    assert "Keep $4k instead." in suggest[1]["content"]
+    meta = json.loads(db.query_one("SELECT meta_json FROM messages WHERE author_kind = 'chair'")["meta_json"])
+    assert meta["suggestions"] == ["What if I only have $4k saved?", "Should I use a balance transfer?"]
+
+
+def test_a_visible_self_correction_is_a_trace():
+    from backend.engine import process_traces
+
+    assert process_traces(
+        "*Correction*: The previous saving logic was flawed; let's re-calculate. Two adults: ¥53,200."
+    )

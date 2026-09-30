@@ -53,6 +53,7 @@ AUTO_COUNCIL_MIN = 3  # repeat models if fewer distinct ones fit
 ADVICE_SEATS = 4
 ADVICE_MIN_PARAMS_B = 10.0
 INTAKE_MAX_QUESTIONS = 3  # the chair asks at most this many clarifying questions
+FOLLOWUP_ROUNDS = 2  # a follow-up that changes the facts gets a short debate that reuses the last one
 MIN_ROUNDS_FOR_CONSENSUS = _env_int("LLC_MIN_ROUNDS", 2)
 MAX_SEATS = 8
 MIN_SEATS = 2

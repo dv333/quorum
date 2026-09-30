@@ -424,14 +424,15 @@ function TopicBlock({ topic, state, seatsById, current, answerRef, onIntake }) {
         chairHandle={debate.chair_handle || null} metrics={metrics[topic]}
         finalStances={latestStances(messages, topic, state.seats)} factChecked={factChecked}
         claims={(state.claims || []).filter((c) => c.topic === topic)}
-        question={question?.content} />
+        question={question?.content}
+        onAsk={current && debate.status === 'concluded' ? onIntake.answer : null} />
     </div>
   )
   return (
     <>
       {topic > 1 && <div className="divider">Follow-up</div>}
       {question && <UserMessage msg={question} />}
-      {answered && verdict.reason === 'direct' ? answer : answered ? (
+      {answered && (verdict.reason === 'direct' || verdict.reason === 'followup') ? answer : answered ? (
         <>
           {answer}
           <button className={`how ${open ? 'open' : ''}`} onClick={toggle} aria-expanded={open}>

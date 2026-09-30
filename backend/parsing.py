@@ -182,6 +182,15 @@ _STATUS_PLAIN = [
 ]
 
 
+_CITE_MARK = re.compile(r"【\s*(\d+)(?:†[^】]*)?】")  # gpt-oss style "【2†L3-L6】"
+_STRAY_MARK = re.compile(r"\s*【[^】]*】")  # anything else in those brackets, like an agent's name
+
+
+def tidy_citations(text: str) -> str:
+    """Citations as the app shows them: "【2†L3-L6】" becomes [2]; marks that cite an agent ("【Otter】") go."""
+    return _STRAY_MARK.sub("", _CITE_MARK.sub(r"[\1]", text or ""))
+
+
 def plain_answer(text: str) -> str:
     """Turn leftover evidence-ledger jargon in an answer into plain words (models sometimes echo the labels)."""
     for pattern, replacement in _STATUS_PLAIN:

@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 from . import coder, db, firecrawl, inventory, prompts, pyrun
 from .config import (
     MAX_NUM_CTX,
+    FOLLOWUP_ROUNDS,
     MAX_ROUNDS_LIMIT,
     REPLY_RESERVE_TOKENS,
     CONTEXT_BUDGET_FRACTION,
@@ -43,6 +44,7 @@ from .config import (
     RESEARCHER_NAME,
 )
 from .parsing import (
+    tidy_citations,
     CODER_MENTION_RE,
     MENTION_RE,
     ThinkSplitter,
@@ -762,7 +764,8 @@ _TRACE = re.compile(
     r"(initial|original|earlier) (stance|estimate|position|answer|draft|suggestion)|was corrected|were corrected|"
     r"(un)?confirmed by the (available )?(sources|evidence|research)|contradicted by the sources|"
     r"evidence (contradicts|does not (confirm|support|show))|is unconfirmed|remains unconfirmed|"
-    r"python (execution|check|program|simulation)|as verified by)",
+    r"python (execution|check|program|simulation)|as verified by|\*?correction\*?:|let'?s re-?calculate|"
+    r"(previous|earlier) (logic|calculation|figure) was (flawed|wrong|incorrect))",
     re.I,
 )
 
@@ -779,14 +782,46 @@ def process_traces(text: str, limit: int = 8) -> List[str]:
     return out[:limit]
 
 
-def keeps_structure(original: str, revised: str) -> bool:
+def keeps_structure(original: str, revised: str, min_share: float = 0.6) -> bool:
     """A rewrite keeps the answer whole: its bottom line, every section, and most of its length."""
     sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
     return bool(
         re.search(r"BOTTOM\s*LINE", revised, re.I)
         and sections(original) <= sections(revised)
-        and len(revised) >= 0.6 * len(original)
+        and len(revised) >= min_share * len(original)
     )
+
+
+READ_WORDS = 300  # what's above "## Evidence" should take about a minute to read
+_FOLDED = re.compile(r"(?ims)^##\s*(Evidence|Plan|Key studies|Diagram|Where they differed)\b.*?(?=^##\s|\Z)")
+_JARGON = re.compile(
+    r"\b(95\s?% CI|confidence interval|p\s?[<=]\s?0?\.\d+|odds ratio|hazard ratio|risk difference|relative risk"
+    r"|\d+ CFR|meta-analys[ie]s|systematic review)\b|\bet al\.",
+    re.I,
+)
+
+
+def readability_issues(text: str) -> List[str]:
+    """What makes the part above the evidence hard to read: too long, long sentences, or technical detail that belongs
+    in the Evidence section. Readability scores only roughly track understanding, so these are guardrails, not
+    goals. Only for answers written for readers (with an Evidence section), not code reviews."""
+    if not re.search(r"(?im)^##\s*Evidence\b", text or ""):
+        return []
+    visible = _FOLDED.sub("", re.sub(r"```.*?```", "", text, flags=re.S))
+    words = len(re.findall(r"[A-Za-z0-9$%']+", visible))
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+|\n+", visible) if len(s.split()) > 3]
+    issues = []
+    if words > READ_WORDS:
+        issues.append(
+            f"Everything above the Evidence section is {words} words; cut it to about 250 by removing repetition and "
+            "moving detail into Evidence."
+        )
+    if sentences and sum(len(s.split()) for s in sentences) / len(sentences) > 24:
+        issues.append("Sentences are long; keep them under about 20 words.")
+    jargon = sorted({m.group(0) for m in _JARGON.finditer(visible)})
+    if jargon:
+        issues.append(f"Move technical detail into the Evidence section: {', '.join(jargon)}.")
+    return issues
 
 
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
@@ -925,6 +960,7 @@ class DebateEngine:
         self._cmd_lock = asyncio.Lock()
         self._benched: Dict[int, str] = {}  # seats sitting out this run after their model failed, and why
         self._no_python: set = set()  # seats whose model trips over Python checks (gpt-oss calls its own Python tool)
+        self._update_topic: Optional[int] = None  # a follow-up with new facts: a short debate that reuses the last one
         self.waiting: Optional[str] = None  # set while a model call waits its turn behind another debate
         # context sizes sent so far: never shrunk, so a loaded model isn't reloaded
         self._ctx_by_model: Dict[str, int] = {}
@@ -1163,6 +1199,16 @@ class DebateEngine:
             d = self.debate()
         msgs = self._intake_messages(d["topic"])
         question = msgs[0]["content"] if msgs else ""
+        # A follow-up after an answer: a question about that answer is answered from its debate in seconds; new facts
+        # get a short debate; only a new question gets the full treatment
+        prev = self._previous_answer(d["topic"]) if len(msgs) == 1 else None
+        if prev:
+            kind = await self._route_followup(prev, question)
+            if kind == "clarify":
+                await self._answer_followup(prev, question)
+                return
+            if kind == "update":
+                self._update_topic = d["topic"]
         history, asked, summarized = [], 0, False
         for m in msgs[1:]:
             if m["author_kind"] == "moderator":
@@ -1198,7 +1244,8 @@ class DebateEngine:
             # Questions about what the evidence says need at least one round of rebuttal
             floor = 2 if _EVIDENCE_Q.search(self._question(d["topic"])) else 1
             if not d.get("rounds_fixed"):  # a number of rounds the caller asked for (quick, deep) stands
-                self._set(max_rounds=max(floor, min(MAX_ROUNDS_LIMIT, rounds)))
+                cap = FOLLOWUP_ROUNDS if self._update_topic == d["topic"] else MAX_ROUNDS_LIMIT
+                self._set(max_rounds=min(cap, max(floor, min(MAX_ROUNDS_LIMIT, rounds))))
         except (TypeError, ValueError):
             pass
         if action == "direct" and is_code_debate(question, d["pack"], d.get("repo_path")):
@@ -1309,7 +1356,7 @@ class DebateEngine:
                 stats = _add_stats(stats, more)
             self._finish_message(
                 row["id"],
-                content=strip_thinking(partial["content"]).strip() or "…",
+                content=tidy_citations(strip_thinking(partial["content"]).strip()) or "…",
                 thinking=partial["thinking"],
                 tokens=stats.get("tokens"),
                 tok_per_s=stats.get("tok_per_s"),
@@ -1329,6 +1376,191 @@ class DebateEngine:
             {"type": "verdict_created", "verdict": db.query_one("SELECT * FROM verdicts WHERE id = ?", [vid])}
         )
         self._set(status="concluded")
+
+    # -------------------------------------------------------------- follow-ups
+
+    def _previous_answer(self, topic: int) -> Optional[Dict[str, Any]]:
+        """The answer just before this topic, when this topic is a follow-up to it."""
+        if topic <= 1:
+            return None
+        row = db.query_one(
+            "SELECT v.topic, v.reason, m.content FROM verdicts v JOIN messages m ON m.id = v.message_id "
+            "WHERE v.debate_id = ? AND v.topic = ? AND m.status = 'done'",
+            [self.id, topic - 1],
+        )
+        if not row or not row["content"]:
+            return None
+        return {
+            "topic": row["topic"],
+            "reason": row["reason"],
+            "question": self._question(row["topic"]),
+            "answer": row["content"],
+        }
+
+    def _memory_text(self, topic: int, limit_chars: int = 6000) -> str:
+        """What a debate established, from what's already stored: the assumptions, where each agent ended up, how the
+        draft changed and why, the rolling summary, checked claims, program outputs and the sources read. The full
+        transcript stays in the database; this is the index a follow-up answer works from."""
+        parts: List[str] = []
+        brief = db.query_one(
+            "SELECT content, meta_json FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'moderator' "
+            "AND meta_json LIKE '%\"summary\"%' ORDER BY id DESC LIMIT 1",
+            [self.id, topic],
+        )
+        if brief:
+            assumptions = (json.loads(brief["meta_json"] or "{}").get("assumptions")) or []
+            parts.append("Assumptions: " + "; ".join(assumptions) if assumptions else f"Brief: {brief['content']}")
+        roles = {s["handle"]: s.get("role") for s in self.seats()}
+        positions = []
+        for p in self._final_positions(topic):
+            role = f" ({roles[p['handle']]})" if roles.get(p["handle"]) else ""
+            positions.append(f"- {p['handle']}{role}: {p['stance']}, {p['position']}")
+        if positions:
+            parts.append("Where each agent ended up:\n" + "\n".join(positions))
+        changes = [
+            f"- After round {r['round']}: {r['changed']}" for r in self._drafts(topic) if r["changed"] and r["round"]
+        ]
+        if changes:
+            parts.append("How the answer changed:\n" + "\n".join(changes))
+        summary = self._latest_summary(topic)
+        if summary:
+            parts.append(f"Summary of the debate:\n{summary['content']}")
+        claims = [
+            f"- [{c['status']}] {c['claim']} ({c.get('source_title') or c.get('source_url') or 'no source'})"
+            for c in self._claims(topic)
+        ]
+        if claims:
+            parts.append("Checked claims:\n" + "\n".join(claims[:10]))
+        outputs = []
+        for m in db.query(
+            "SELECT content FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'seat' AND content LIKE '%printed:%'",
+            [self.id, topic],
+        ):
+            for out in re.findall(r"printed:\s*```\n?(.*?)```", m["content"], re.S):
+                outputs.append("- " + " ".join(out.split())[:200])
+        if outputs:
+            parts.append("Python checks printed:\n" + "\n".join(outputs[:4]))
+        sources = []
+        for m in db.query(
+            "SELECT sources_json FROM messages WHERE debate_id = ? AND topic = ? AND author_kind = 'researcher'",
+            [self.id, topic],
+        ):
+            for src in db.loads(m["sources_json"], []):
+                label = src.get("title") or src.get("url")
+                if label and label not in sources:
+                    sources.append(label)
+        if sources:
+            parts.append("Sources read: " + "; ".join(sources[:8]))
+        return "\n\n".join(parts)[:limit_chars]
+
+    async def _route_followup(self, prev: Dict[str, Any], followup: str) -> str:
+        """clarify, update or new; new when the chair's reply can't be used."""
+        d = self.debate()
+        try:
+            text = await self._complete(
+                self._chair_label(d),
+                "route",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.followup_route_messages(prev["question"], prev["answer"], followup),
+                await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+            )
+            kind = str(parse_json_loose(text).get("kind") or "").strip().lower()
+        except Exception as e:
+            log.warning("follow-up routing failed: %s", e)
+            kind = ""
+        return kind if kind in ("clarify", "update", "new") else "new"
+
+    async def _answer_followup(self, prev: Dict[str, Any], followup: str) -> None:
+        """A question about the last answer, answered by the chair from that debate's record in seconds, instead of a
+        new debate that would have forgotten it."""
+        d = self.debate()
+        label = self._chair_label(d)
+        self._set(status="concluding")
+        debate_msgs = [
+            m
+            for m in self._verbatim(prev["topic"], 0)
+            if m["author_kind"] in ("seat", "researcher") and m["status"] == "done" and m["content"].strip()
+        ]
+        handles, roles = self._handles(), {s["id"]: s.get("role") for s in self.seats()}
+        lines = []
+        for m in _most_related(followup, debate_msgs, 5):
+            who = handles.get(m["seat_id"], "Beagle") if m["author_kind"] == "seat" else "Beagle (research)"
+            role = f" ({roles[m['seat_id']]})" if m["author_kind"] == "seat" and roles.get(m["seat_id"]) else ""
+            lines.append(f"{who}{role}, round {m['round']}: {_clip(strip_thinking(m['content']), 700)}")
+        excerpts = "\n\n".join(lines)
+        messages = prompts.followup_answer_messages(
+            chair=label,
+            question=prev["question"],
+            answer=prev["answer"],
+            followup=followup,
+            memory=self._memory_text(prev["topic"]),
+            excerpts=excerpts,
+        )
+        row = self._insert_message(topic=d["topic"], round_no=0, author_kind="chair", status="streaming")
+        try:
+            think = await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False)
+            stats = await self._stream_into(
+                row["id"], d["chair_endpoint_id"], d["chair_model"], messages, think, None, label, "answer"
+            )
+            partial = self.partials[row["id"]]
+            self._finish_message(
+                row["id"],
+                content=tidy_citations(strip_thinking(partial["content"]).strip()) or "…",
+                thinking=partial["thinking"],
+                tokens=stats.get("tokens"),
+                tok_per_s=stats.get("tok_per_s"),
+                prompt_tokens=stats.get("prompt_tokens"),
+                duration_ms=stats.get("duration_ms"),
+                status="done",
+                meta_json=json.dumps({"followup_of": prev["topic"]}),
+            )
+        except Exception as e:
+            self._finish_message(row["id"], status="error", content=f"The chair ({d['chair_model']}) failed: {e}")
+        finally:
+            self.partials.pop(row["id"], None)
+        vid = db.execute(
+            "INSERT INTO verdicts (debate_id, topic, reason, rounds, message_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [self.id, d["topic"], "followup", 0, row["id"], db.now()],
+        )
+        self.bus.publish(
+            {"type": "verdict_created", "verdict": db.query_one("SELECT * FROM verdicts WHERE id = ?", [vid])}
+        )
+        self._set(status="concluded")
+
+    async def _suggest_followups(self, msg_id: int) -> None:
+        """Up to three follow-up questions from what the council left open, so the next question is one tap away."""
+        row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
+        if not row or row["status"] != "done" or not row["content"]:
+            return
+        d = self.debate()
+        open_points = "\n".join(
+            f"- {p['handle']} ({p['stance']}): {p['position']}"
+            for p in self._final_positions(row["topic"])
+            if p["stance"] in ("DISAGREE", "REFINE")
+        )
+        depends = re.search(r"(?ims)^##\s*It depends\s*$(.*?)(?=^##\s|\Z)", row["content"])
+        if depends:
+            open_points += "\n" + depends.group(1).strip()
+        try:
+            text = await self._complete(
+                self._chair_label(d),
+                "suggest",
+                d["chair_endpoint_id"],
+                d["chair_model"],
+                prompts.suggest_followups_messages(self._question(row["topic"]), row["content"], open_points),
+                await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
+            )
+            questions = [
+                str(q).strip()[:120] for q in (parse_json_loose(text).get("questions") or []) if str(q).strip()
+            ]
+        except Exception as e:
+            log.warning("suggesting follow-ups failed: %s", e)
+            return
+        if questions:
+            meta = json.loads(row["meta_json"] or "{}")
+            meta["suggestions"] = questions[:3]
+            self._finish_message(msg_id, meta_json=json.dumps(meta))
 
     async def _begin_debate(self) -> None:
         d = self.debate()
@@ -3144,20 +3376,22 @@ class DebateEngine:
         ][:6]
 
     async def _remove_traces(self, msg_id: int) -> None:
-        """The answer speaks to the user's question, not about how it was made. In the advice benchmark, answers said
-        "the council consensus corrected the initial protein estimate" and "is unconfirmed by the available sources"
-        in their key points; the chair rewrites those sentences once."""
+        """The answer speaks to the user's question, not about how it was made, and reads easily. In the advice
+        benchmark, answers said "the council consensus corrected the initial protein estimate" and "is unconfirmed by
+        the available sources" in their key points, and research answers ran to 1,000 words; the chair rewrites once
+        what the checks flag."""
         row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
         if not row or row["status"] != "done" or not row["content"]:
             return
         passages = process_traces(row["content"])
-        if not passages:
+        issues = readability_issues(row["content"])
+        if not passages and not issues:
             return
         d = self.debate()
         chair = self._chair_label(d)
         self._set_phase(f"{chair} is polishing the answer…")
         meta = json.loads(row["meta_json"] or "{}")
-        meta["traces"] = {"passages": passages, "revised": False}
+        meta["traces"] = {"passages": passages, "readability": issues, "revised": False}
         content = row["content"]
         try:
             revised = strip_thinking(
@@ -3166,13 +3400,19 @@ class DebateEngine:
                     "polish",
                     d["chair_endpoint_id"],
                     d["chair_model"],
-                    prompts.traces_fix_messages(row["content"], passages),
+                    prompts.traces_fix_messages(row["content"], passages, issues),
                     await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
                 )
             ).strip()
-            if keeps_structure(row["content"], revised):
+            # Cutting a long answer down is the point here, so it may shrink more than other fixes
+            if keeps_structure(row["content"], revised, min_share=0.4 if issues else 0.6):
                 content = shorten_bottom_line(plain_answer(revised))
-                meta["traces"].update(revised=True, left=process_traces(content), original=row["content"])
+                meta["traces"].update(
+                    revised=True,
+                    left=process_traces(content),
+                    readability_left=readability_issues(content),
+                    original=row["content"],
+                )
         except Exception as e:
             log.warning("removing traces failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
@@ -3449,7 +3689,7 @@ class DebateEngine:
                     continue
                 content = strip_thinking(partial["content"]).strip()
                 if content:
-                    return content, stats, ""
+                    return tidy_citations(content), stats, ""
                 errors.append("returned an empty answer")
                 self._log(msg_id, "(empty answer)")
             if i + 1 < len(writers):
@@ -3532,6 +3772,7 @@ class DebateEngine:
                 search_failed=(self._search_down or "") if d["research_enabled"] else "",
                 plan=is_plan(question) and not is_code_review(question, d["pack"], d.get("repo_path")),
                 opening=self._opening(topic),
+                review=is_code_review(question, d["pack"], d.get("repo_path")),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:
@@ -3575,6 +3816,7 @@ class DebateEngine:
                 await self._drop_unchecked_sources(row["id"])
             if not is_code_review(question, d["pack"], d.get("repo_path")):
                 await self._remove_traces(row["id"])
+                await self._suggest_followups(row["id"])
             if is_code_review(self._question(topic), d["pack"], d.get("repo_path")):
                 await self._keep_review_findings(row["id"])
             done = db.query_one("SELECT content, status FROM messages WHERE id = ?", [row["id"]])
