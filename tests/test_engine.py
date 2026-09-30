@@ -2091,3 +2091,18 @@ async def test_where_they_differed_may_name_the_agents_and_a_review_is_not_polis
     await eng.post_user_message(DIFF_Q)
     await eng.task
     assert not client.calls_with("You polish your final answer")
+
+
+async def test_a_long_or_technical_answer_is_polished_for_readers():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = (
+        "BOTTOM LINE: **No.**\n\n## Is it healthier? Not really.\nA risk difference of 0.37 (95% CI 0.1 to 0.6).\n\n"
+        "## Evidence\n- A 2012 review of 237 studies."
+    )
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("Is organic food a scam?")
+    await eng.task
+    polish = client.calls_with("You polish your final answer")
+    assert len(polish) == 1 and "Move technical detail into the Evidence section" in polish[0][1]["content"]
+    verdict = client.calls_with("You turn the council")[-1][1]["content"]
+    assert "## What to do" in verdict and "Where they differed" not in verdict.split("Use exactly this structure")[1]

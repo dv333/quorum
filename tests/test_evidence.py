@@ -820,3 +820,28 @@ def test_named_sources_finds_studies_journals_and_surveys():
     assert len(named_sources(text)) == 5
     # a source the user named is theirs to use
     assert named_sources("As the 2025 BMJ meta-analysis shows", "I read the 2025 BMJ meta-analysis") == []
+
+
+def test_readability_issues_flag_long_or_technical_answers_for_readers_only():
+    from backend.engine import readability_issues
+
+    technical = (
+        "BOTTOM LINE: **No.**\n\n## Is it healthier? Not really.\n"
+        "A systematic review (Smith et al.) found a risk difference of 0.37 (95% CI 0.1 to 0.6).\n\n"
+        "## Evidence\n- A 2012 review of 237 studies; 95% CI 0.1 to 0.6."
+    )
+    (issue,) = readability_issues(technical)
+    assert "Evidence section" in issue and "95% CI" in issue and "et al." in issue
+    long = "BOTTOM LINE: **No.**\n\n## Why\n" + "Short plain sentence here. " * 90 + "\n\n## Evidence\n- x"
+    assert any("words" in i for i in readability_issues(long))
+    fine = "BOTTOM LINE: **No.**\n\n## Why\nIt is fine.\n\n## Evidence\n- 95% CI is fine down here."
+    assert readability_issues(fine) == []
+    assert readability_issues("BOTTOM LINE: x\n\n## Key points\n- 95% CI") == []  # a review's format isn't judged
+
+
+def test_answers_are_written_for_readers_and_reviews_keep_the_report_format():
+    reader = prompts.answer_format(sourced=True)
+    assert "## What to do" in reader and "## Evidence" in reader and "Where they differed" not in reader
+    assert "answered in the heading itself" in reader and "about 7 in 100" in reader
+    review = prompts.answer_format(sourced=True, review=True)
+    assert "## Key points" in review and "Where they differed" in review

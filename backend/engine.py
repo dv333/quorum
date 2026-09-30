@@ -779,14 +779,46 @@ def process_traces(text: str, limit: int = 8) -> List[str]:
     return out[:limit]
 
 
-def keeps_structure(original: str, revised: str) -> bool:
+def keeps_structure(original: str, revised: str, min_share: float = 0.6) -> bool:
     """A rewrite keeps the answer whole: its bottom line, every section, and most of its length."""
     sections = lambda text: set(re.findall(r"^##\s+(.+?)\s*$", text, re.M))  # noqa: E731
     return bool(
         re.search(r"BOTTOM\s*LINE", revised, re.I)
         and sections(original) <= sections(revised)
-        and len(revised) >= 0.6 * len(original)
+        and len(revised) >= min_share * len(original)
     )
+
+
+READ_WORDS = 300  # what's above "## Evidence" should take about a minute to read
+_FOLDED = re.compile(r"(?ims)^##\s*(Evidence|Plan|Key studies|Diagram|Where they differed)\b.*?(?=^##\s|\Z)")
+_JARGON = re.compile(
+    r"\b(95\s?% CI|confidence interval|p\s?[<=]\s?0?\.\d+|odds ratio|hazard ratio|risk difference|relative risk"
+    r"|\d+ CFR|meta-analys[ie]s|systematic review)\b|\bet al\.",
+    re.I,
+)
+
+
+def readability_issues(text: str) -> List[str]:
+    """What makes the part above the evidence hard to read: too long, long sentences, or technical detail that belongs
+    in the Evidence section. Readability scores only roughly track understanding, so these are guardrails, not
+    goals. Only for answers written for readers (with an Evidence section), not code reviews."""
+    if not re.search(r"(?im)^##\s*Evidence\b", text or ""):
+        return []
+    visible = _FOLDED.sub("", re.sub(r"```.*?```", "", text, flags=re.S))
+    words = len(re.findall(r"[A-Za-z0-9$%']+", visible))
+    sentences = [s for s in re.split(r"(?<=[.!?])\s+|\n+", visible) if len(s.split()) > 3]
+    issues = []
+    if words > READ_WORDS:
+        issues.append(
+            f"Everything above the Evidence section is {words} words; cut it to about 250 by removing repetition and "
+            "moving detail into Evidence."
+        )
+    if sentences and sum(len(s.split()) for s in sentences) / len(sentences) > 24:
+        issues.append("Sentences are long; keep them under about 20 words.")
+    jargon = sorted({m.group(0) for m in _JARGON.finditer(visible)})
+    if jargon:
+        issues.append(f"Move technical detail into the Evidence section: {', '.join(jargon)}.")
+    return issues
 
 
 def check_arithmetic(text: str) -> List[Dict[str, str]]:
@@ -3144,20 +3176,22 @@ class DebateEngine:
         ][:6]
 
     async def _remove_traces(self, msg_id: int) -> None:
-        """The answer speaks to the user's question, not about how it was made. In the advice benchmark, answers said
-        "the council consensus corrected the initial protein estimate" and "is unconfirmed by the available sources"
-        in their key points; the chair rewrites those sentences once."""
+        """The answer speaks to the user's question, not about how it was made, and reads easily. In the advice
+        benchmark, answers said "the council consensus corrected the initial protein estimate" and "is unconfirmed by
+        the available sources" in their key points, and research answers ran to 1,000 words; the chair rewrites once
+        what the checks flag."""
         row = db.query_one("SELECT * FROM messages WHERE id = ?", [msg_id])
         if not row or row["status"] != "done" or not row["content"]:
             return
         passages = process_traces(row["content"])
-        if not passages:
+        issues = readability_issues(row["content"])
+        if not passages and not issues:
             return
         d = self.debate()
         chair = self._chair_label(d)
         self._set_phase(f"{chair} is polishing the answer…")
         meta = json.loads(row["meta_json"] or "{}")
-        meta["traces"] = {"passages": passages, "revised": False}
+        meta["traces"] = {"passages": passages, "readability": issues, "revised": False}
         content = row["content"]
         try:
             revised = strip_thinking(
@@ -3166,13 +3200,19 @@ class DebateEngine:
                     "polish",
                     d["chair_endpoint_id"],
                     d["chair_model"],
-                    prompts.traces_fix_messages(row["content"], passages),
+                    prompts.traces_fix_messages(row["content"], passages, issues),
                     await self._thinking_flag(d["chair_endpoint_id"], d["chair_model"], False),
                 )
             ).strip()
-            if keeps_structure(row["content"], revised):
+            # Cutting a long answer down is the point here, so it may shrink more than other fixes
+            if keeps_structure(row["content"], revised, min_share=0.4 if issues else 0.6):
                 content = shorten_bottom_line(plain_answer(revised))
-                meta["traces"].update(revised=True, left=process_traces(content), original=row["content"])
+                meta["traces"].update(
+                    revised=True,
+                    left=process_traces(content),
+                    readability_left=readability_issues(content),
+                    original=row["content"],
+                )
         except Exception as e:
             log.warning("removing traces failed: %s", e)
         self._finish_message(msg_id, content=content, meta_json=json.dumps(meta))
@@ -3532,6 +3572,7 @@ class DebateEngine:
                 search_failed=(self._search_down or "") if d["research_enabled"] else "",
                 plan=is_plan(question) and not is_code_review(question, d["pack"], d.get("repo_path")),
                 opening=self._opening(topic),
+                review=is_code_review(question, d["pack"], d.get("repo_path")),
             )
             row = self._insert_message(topic=topic, round_no=d["round"], author_kind="chair", status="streaming")
             try:

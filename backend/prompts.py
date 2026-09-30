@@ -400,8 +400,15 @@ def verdict_messages(
     search_failed: str = "",
     plan: bool = False,
     opening: Optional[str] = None,
+    review: bool = False,
 ) -> List[Dict[str, str]]:
     pos = "\n".join(f"- {p['handle']}: {p['stance']} — {p['position']}" for p in positions)
+    dissent = (
+        'Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it.'
+        if review
+        else 'Where a real disagreement would change the advice, turn it into an "It depends" line; keep open '
+        "uncertainty in the Evidence section. Don't name the agents or describe the debate."
+    )
     if opening:
         start = (
             "Write the final answer in markdown, starting from your first answer: keep everything in it the debate "
@@ -471,9 +478,9 @@ Final positions:
 {why}
 The user cares most about: {criteria_text(criteria, custom_rubric)}.{guidance_line(guidance)}
 
-{start} Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. Keep the strongest dissent and any open uncertainty in "Where they differed", even if only one agent held it. {ANSWER_RULES} Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. {MAINSTREAM} Python checks are programs the agents ran, not council members: don't name them among those who differed. Every section must agree with the bottom line: don't lean toward an option in the details or in "Where they differed" more than the evidence and the bottom line do.
+{start} Correct anything the evidence or research briefs contradicted; for time-sensitive facts, the web sources beat the agents' memory. {dissent} {ANSWER_RULES} Where the research and the agents disagree, follow the research unless an agent gave a sourced reason. Where an agent's Python check computed a value (a block after "@Python:" and what it printed), trust that output over any agent's mental arithmetic unless someone showed the program misread the question, and give that value. {MAINSTREAM} Python checks are programs the agents ran, not council members: don't name them among those who differed. Every section must agree with the bottom line: don't lean toward an option in any section more than the evidence and the bottom line do.
 
-{answer_format(sourced=bool(research or studies or claims), plan=plan)}""",
+{answer_format(sourced=bool(research or studies or claims), plan=plan, review=review)}""",
         },
     ]
 
@@ -488,6 +495,10 @@ SOURCED_POINTS = (
     "for the checked claims."
 )
 UNSOURCED_POINTS = "Nothing was looked up, so name no studies or sources and give no statistics from them."
+READER_UNSOURCED = (
+    "nothing was looked up, so name no studies or sources and give no statistics from them: give the reasoning and "
+    "the rough figures behind the answer, called estimates."
+)
 
 
 PLAN_SECTION = """## Plan
@@ -496,10 +507,50 @@ The schedule itself, since the user asked for a plan: a markdown table or number
 """
 
 
-def answer_format(sourced: bool = True, plan: bool = False, debate: bool = True) -> str:
-    """The answer's structure. Without research, it asks for no named studies: models invent them from memory. A plan
-    gets a schedule: on "how should I train?" and "what should I do in the next 90 days?" the council's answers were
-    thinner than one model's week-by-week plan."""
+PLAIN_WORDS = (
+    'Write for this one reader, as "you": short sentences, everyday words, and a few plain words to explain any '
+    'technical term. Give numbers as plain comparisons or "about 7 in 100", not percentage changes, confidence '
+    "intervals, effect sizes or regulation codes; those belong in the Evidence section."
+)
+
+READER_FORMAT = """Use exactly this structure, with no preamble. People scan: everything above "## Evidence" should take
+about a minute to read (roughly 250 words).
+
+BOTTOM LINE: <one plain sentence, under 30 words, that answers the question exactly as asked (for "is it a scam?",
+say whether it is), wrapping the key recommendation in **bold**>
+
+## <A question this reader would ask next, answered in the heading itself, like "Is it more nutritious? Not really.">
+One or two short sentences.
+
+<2 to 4 of these question sections in all, the most important first.>
+
+## What to do
+2 to 4 numbered steps, each starting with a verb, specific to this reader's situation.
+
+{plan}## It depends
+Include this section only when a condition would change the advice: at most two lines, each "If …, …". Otherwise leave
+it out entirely.
+
+## Worth knowing
+Include this section only for up to three points that are specific to this question, not obvious, and came up in the
+debate (not general advice like "consider your budget"). Otherwise leave it out entirely.
+
+## Evidence
+The detail behind the answer for readers who want it, in 3 to 6 bullets: {points} Put here the figures, comparisons
+and caveats the rules above call for, so the sections above stay short."""
+
+
+def answer_format(sourced: bool = True, plan: bool = False, debate: bool = True, review: bool = False) -> str:
+    """The answer's structure. A code review keeps the report format its checks rely on. Everything else is written
+    to be read: the direct answer first, question-style headings, what to do, and the evidence last (the app folds it
+    away), because people scan and read the first line most. Without research, it asks for no named studies: models
+    invent them from memory. A plan gets a schedule."""
+    if not review:
+        points = SOURCED_POINTS if sourced else READER_UNSOURCED
+        text = READER_FORMAT.replace("{points}", points).replace("{plan}", PLAN_SECTION if plan else "")
+        if not debate:  # the chair's first answer comes before any debate
+            text = text.replace("and came up in the\ndebate", "and that an expert\nwould flag")
+        return f"{PLAIN_WORDS}\n\n{text}"
     text = ANSWER_FORMAT.replace("{points}", SOURCED_POINTS if sourced else UNSOURCED_POINTS)
     if not debate:  # the chair's first answer comes before any debate
         text = re.sub(r"## Where they differed\n.*?\n\n", "", text, flags=re.S)
@@ -1052,8 +1103,10 @@ Reply like: {{"problems": [{{"check": "partial|trace", "text": "<exact words fro
     ]
 
 
-def traces_fix_messages(answer: str, passages: List[str]) -> List[Dict[str, str]]:
-    listed = "\n".join(f"- {p}" for p in passages)
+def traces_fix_messages(answer: str, passages: List[str], issues: Sequence[str] = ()) -> List[Dict[str, str]]:
+    listed = "\n".join(f"- {p}" for p in passages) or "(none)"
+    also = "".join(f"\n- {i}" for i in issues)
+    readable = f"\n\nAlso make it easier to read:{also}" if issues else ""
     return [
         {
             "role": "system",
@@ -1069,9 +1122,10 @@ earlier positions or corrections, program runs, whether sources confirmed someth
 {listed}
 
 Rewrite each so it speaks directly to the user about their situation: state the fact or advice itself (with "usually"
-or "may" where it's uncertain), and drop a sentence that only discusses whether something was confirmed. Keep
-everything else word for word, including every section and heading; the "Where they differed" section may name the
-agents. Output only the corrected answer.""",
+or "may" where it's uncertain), and drop a sentence that only discusses whether something was confirmed.{readable}
+
+Keep the facts, the advice and every section and heading; the "Where they differed" section may name the agents.
+Output only the corrected answer.""",
         },
     ]
 
