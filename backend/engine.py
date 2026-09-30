@@ -37,7 +37,6 @@ from .config import (
     TURN_MAX_TOKENS,
     BRIEF_TURN_TOKENS,
     SLOW_TURN_SECONDS,
-    CRITIC_MAX_TOKENS,
     REVIEW_PART_CHARS,
     RESEARCH_REQUESTS_PER_ROUND,
     RESEARCH_RESULTS_PER_QUERY,
@@ -1526,10 +1525,8 @@ class DebateEngine:
         messages: List[Dict[str, str]],
         think: Optional[bool],
         topic: Optional[int] = None,
-        max_tokens: int = ANSWER_MAX_TOKENS,
     ) -> str:
-        """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded. max_tokens caps thinking and
-        reply together."""
+        """Non-streamed model call (plans, summaries, picks, rewrites) with usage recorded."""
         parts, stats = [], {}
         ep = self._endpoint(endpoint_id)
         trace = CallTrace()
@@ -1541,8 +1538,8 @@ class DebateEngine:
                 model,
                 messages,
                 think=think,
-                num_ctx=self._num_ctx(messages, max_tokens, model),
-                num_predict=max_tokens,
+                num_ctx=self._num_ctx(messages, ANSWER_MAX_TOKENS, model),
+                num_predict=ANSWER_MAX_TOKENS,
             ):
                 if chunk.kind in ("content", "thinking"):
                     trace.token(chunk.kind == "content")
@@ -2962,19 +2959,13 @@ class DebateEngine:
         self.bus.publish({"type": "debate_updated", "debate": {"phase": f"{critic} is checking the answer…"}})
         raw: List[Any] = []
         critique = prompts.critique_messages(question, row["content"], list(self._handles().values()))
-        # The critic thinks: without it, it missed contradictions between sections and made-up figures. Its thinking
-        # is capped (on the largest model, often the slowest, uncapped thinking took 3-5 minutes); if it runs out
-        # before it replies, it tries once more without thinking
-        for wanted in (True, False):
+        # The critic doesn't think. With thinking capped at 2,048 tokens, qwen3.8 used the whole budget without replying
+        # on 6 of 8 questions (0.7-2.2 minutes lost each time), and the answer that followed without thinking found
+        # problems every time; uncapped, thinking took 3-5 minutes. The critic being the largest model is what matters
+        for attempt in range(2):  # one retry when the reply is empty
             try:
                 text = await self._complete(
-                    critic,
-                    "critique",
-                    c_ep,
-                    c_model,
-                    critique,
-                    await self._thinking_flag(c_ep, c_model, wanted),
-                    max_tokens=CRITIC_MAX_TOKENS if wanted else ANSWER_MAX_TOKENS,
+                    critic, "critique", c_ep, c_model, critique, await self._thinking_flag(c_ep, c_model, False)
                 )
             except Exception as e:
                 log.warning("answer critique failed: %s", e)
