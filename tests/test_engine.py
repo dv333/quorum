@@ -1969,3 +1969,16 @@ def test_plan_questions_are_told_apart():
     assert is_plan("We're planning 7 days in Japan in April")
     assert not is_plan("Is it worth learning Rust?")
     assert not is_plan("How should I teach my 8-year-old to handle money?")
+
+
+async def test_the_critic_thinks_within_a_cap_and_the_recheck_doesnt_think():
+    client = FakeClient(lambda h, r, m: reply("AGREE"))
+    client.verdict_reply = SAVINGS
+    client.critique_reply = FLAG
+    eng = make_debate(client, max_rounds=1)
+    await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
+    await eng.task
+    ((_, _, critique),) = critique_calls(client)
+    assert critique["think"] is True and critique["num_predict"] == engine_mod.CRITIC_MAX_TOKENS
+    recheck = [kw for _, m, kw in client.calls if "An answer was corrected" in m[1]["content"]]
+    assert len(recheck) == 1 and recheck[0]["think"] is False
