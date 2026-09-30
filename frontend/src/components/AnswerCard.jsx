@@ -65,6 +65,9 @@ function headline(verdict, finalStances, seatsCount, factChecked, chairName) {
   if (verdict.reason === 'direct') {
     text = `Answered by ${chairName} · no debate needed`
     tone = 'agree'
+  } else if (verdict.reason === 'followup') {
+    text = `Answered by ${chairName} from the council's debate`
+    tone = 'agree'
   } else if (verdict.reason === 'consensus') {
     text = `All ${seatsCount} agreed in round ${verdict.rounds}`
     tone = 'agree'
@@ -358,7 +361,7 @@ function Evidence({ claims }) {
   )
 }
 
-export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question, title, claims = [] }) {
+export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle, metrics, finalStances, factChecked, question, title, claims = [], onAsk = null }) {
   const replay = useContext(ReplayContext)
   const [level, setLevel] = useState('standard')
   // A replay carries the reading levels it was recorded with; it can't write new ones
@@ -368,7 +371,8 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
   const [diagramFailed, setDiagramFailed] = useState(false)
   const cardRef = useRef(null)
   const onDiagramFail = useCallback(() => setDiagramFailed(true), [])
-  const canTrace = !replay && !!verdict && verdict.reason !== 'direct' && msg?.status === 'done'
+  const quick = verdict && (verdict.reason === 'direct' || verdict.reason === 'followup')
+  const canTrace = !replay && !!verdict && !quick && msg?.status === 'done'
   const [sel, setSel] = useSelection(cardRef, canTrace)
   const [why, setWhy] = useState(null) // { text, x, y, loading, data, error, chair }
   const closeWhy = useCallback(() => setWhy(null), [])
@@ -454,7 +458,7 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
         {verdict && <CopyButton text={text} label="Copy answer" />}
         {!replay && verdict && msg?.status === 'done' && <ExportMenu debateId={debateId} level={versions[level] || level === 'standard' ? level : 'standard'} onPrint={print} />}
         {verdict && text && !streaming && <span className="read-time">{readTime(a)}</span>}
-        {verdict && verdict.reason !== 'direct' && (
+        {verdict && !quick && (
           <div className="seg" role="group" aria-label="Reading level">
             {LEVELS.map(([k, label]) => (
               <button key={k} className={level === k ? 'on' : ''} disabled={!!busy || (replay && k !== 'standard' && !versions[k])}
@@ -507,6 +511,12 @@ export default function AnswerCard({ debateId, msg, verdict, seats, chairHandle,
           {a.dissent && <div className="dissent"><b>Where they differed: </b><Markdown className="inline">{citeLinks(a.dissent)}</Markdown></div>}
         </div>
         </CiteContext.Provider>
+      )}
+      {onAsk && msg?.status === 'done' && msg?.meta?.suggestions?.length > 0 && (
+        <div className="ask-next" role="group" aria-label="Ask next">
+          <span>Ask next</span>
+          {msg.meta.suggestions.map((q) => <button key={q} onClick={() => onAsk(q)}>{q}</button>)}
+        </div>
       )}
       {verdict && <EvidenceSummary claims={claims} evidence={msg?.meta?.evidence} />}
       {verdict && <Evidence claims={claims} />}

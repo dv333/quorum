@@ -509,6 +509,10 @@ details.disclose pre { white-space: pre-wrap; font-family: var(--font); backgrou
 .a-evidence summary { cursor: pointer; font: 600 14px var(--font); color: var(--text); }
 .a-evidence .a-body { padding: 4px 0 0; font-size: 14.5px; }
 .read-time { font-size: 12.5px; color: var(--text-2); white-space: nowrap; }
+.ask-next { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 26px 16px; }
+.ask-next span { font: 600 13px var(--font); color: var(--text-2); margin-right: 2px; }
+.ask-next button { font-size: 13.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--hairline); background: var(--fill); color: var(--text); cursor: pointer; }
+.ask-next button:hover { background: var(--refine-bg); }
 .a-body ul { padding-left: 20px; margin: 6px 0; }
 .a-body li { margin: 5px 0; }
 .a-body li::marker { color: var(--text-3); }
