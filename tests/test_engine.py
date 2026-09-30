@@ -1895,25 +1895,29 @@ async def test_the_critic_is_the_largest_other_model_by_its_real_size():
     assert critic == ["big:latest"]  # judged by name, "big:latest" would count as 0 and lose to gpt-oss:20b
 
 
-async def test_the_critic_thinks_and_retries_without_thinking_when_it_only_thought():
-    class ThinkingCritic(FakeClient):
+async def test_the_critic_doesnt_think_and_tries_again_after_an_empty_reply():
+    class QuietCritic(FakeClient):
+        quiet = 1
+
         async def stream(self, endpoint, model, messages, **kw):
-            if messages[0]["content"].startswith("You check an AI council's final") and kw.get("think"):
+            first_look = messages[0]["content"].startswith("You check an AI council's final") and (
+                "An answer was corrected" not in messages[1]["content"]
+            )
+            if first_look and self.quiet:
+                self.quiet -= 1
                 self.calls.append((model, messages, kw))
-                yield Chunk("thinking", "hmm " * 20)
                 yield Chunk("done", stats={})
                 return
             async for c in super().stream(endpoint, model, messages, **kw):
                 yield c
 
-    client = ThinkingCritic(lambda h, r, m: reply("AGREE"))
+    client = QuietCritic(lambda h, r, m: reply("AGREE"))
     client.verdict_reply = SAVINGS
     client.critique_reply = FLAG
     eng = make_debate(client, max_rounds=1)
     await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
     await eng.task
-    thinks = [kw["think"] for _, _, kw in critique_calls(client)]
-    assert thinks == [True, False]
+    assert [kw["think"] for _, _, kw in critique_calls(client)] == [False, False]
     chair = db.query_one("SELECT * FROM messages WHERE author_kind = 'chair'")
     assert json.loads(chair["meta_json"])["critique"]["revised"]  # the second try's flag was acted on
 
@@ -1971,14 +1975,12 @@ def test_plan_questions_are_told_apart():
     assert not is_plan("How should I teach my 8-year-old to handle money?")
 
 
-async def test_the_critic_thinks_within_a_cap_and_the_recheck_doesnt_think():
+async def test_the_recheck_doesnt_think():
     client = FakeClient(lambda h, r, m: reply("AGREE"))
     client.verdict_reply = SAVINGS
     client.critique_reply = FLAG
     eng = make_debate(client, max_rounds=1)
     await eng.post_user_message("I have $12,000 of card debt at 24% and $8,000 saved. Pay it off?")
     await eng.task
-    ((_, _, critique),) = critique_calls(client)
-    assert critique["think"] is True and critique["num_predict"] == engine_mod.CRITIC_MAX_TOKENS
     recheck = [kw for _, m, kw in client.calls if "An answer was corrected" in m[1]["content"]]
     assert len(recheck) == 1 and recheck[0]["think"] is False
