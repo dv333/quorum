@@ -213,6 +213,31 @@ async def search(query: str, limit: int, focus: str = "") -> List[Dict[str, str]
         return await _search(query, limit, focus)
 
 
+async def scrape(url: str) -> str:
+    """One page as markdown, for a link in the question."""
+    s = settings()
+    if s["mode"] == "cloud" and not s["api_key"]:
+        raise SearchError("No Firecrawl API key set")
+    payload = {
+        "url": url,
+        "formats": ["markdown"],
+        "onlyMainContent": True,
+        "timeout": int(RESEARCH_TIMEOUT * 1000 * 0.8),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=RESEARCH_TIMEOUT) as client:
+            r = await client.post(f"{s['url']}/v2/scrape", json=payload, headers=_headers(s))
+        data = r.json()
+    except (httpx.HTTPError, ValueError) as e:
+        raise SearchError(f"Firecrawl couldn't read the page: {e}")
+    page = data.get("data") or {}
+    text = (page.get("markdown") or "").strip()
+    if r.status_code >= 400 or not data.get("success", False) or not text:
+        raise SearchError(f"Firecrawl couldn't read the page (HTTP {r.status_code})")
+    title = (page.get("metadata") or {}).get("title")
+    return f"Page: {url}\n" + (f"Title: {title}\n" if title else "") + text
+
+
 async def _search(query: str, limit: int, focus: str = "") -> List[Dict[str, str]]:
     s = settings()
     if s["mode"] == "cloud" and not s["api_key"]:

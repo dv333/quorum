@@ -74,6 +74,18 @@ def save(name: str, data: bytes) -> Dict[str, Any]:
     return public(get(att_id))
 
 
+def add_link(url: str) -> Dict[str, Any]:
+    """A link from the question: read when the debate starts (see links.py). The path holds the address."""
+    from .links import display
+
+    att_id = uuid.uuid4().hex[:12]
+    db.execute(
+        "INSERT INTO attachments (id, name, kind, path, size, created_at) VALUES (?, ?, 'link', ?, 0, ?)",
+        [att_id, display(url), url, db.now()],
+    )
+    return public(get(att_id))
+
+
 def get(att_id: str) -> Optional[Dict[str, Any]]:
     return db.query_one("SELECT * FROM attachments WHERE id = ?", [att_id])
 
@@ -184,7 +196,9 @@ def block(rows: List[Dict[str, Any]], limit: int) -> str:
             cut = text[:share].rsplit("\n", 1)[0] or text[:share]
             note = f" (the first {round(100 * len(cut) / len(text))}% of the file)"
             text = cut
-        label = "an image, described by a model that can see it" if r["kind"] == "image" else r["kind"]
+        label = {"image": "an image, described by a model that can see it", "link": "the page at this link"}.get(
+            r["kind"], r["kind"]
+        )
         parts.append(f"[ATTACHED FILE: {r['name']}, {label}{note}]\n{text}\n[END OF FILE]")
     return "\n\n" + "\n\n".join(parts)
 
@@ -195,5 +209,5 @@ def strip_block(text: str) -> str:
 
 def remove(debate_id: str) -> None:
     """A deleted debate's files go too."""
-    for r in db.query("SELECT path FROM attachments WHERE debate_id = ?", [debate_id]):
+    for r in db.query("SELECT path FROM attachments WHERE debate_id = ? AND kind != 'link'", [debate_id]):
         shutil.rmtree(os.path.dirname(r["path"]), ignore_errors=True)

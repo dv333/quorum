@@ -1748,6 +1748,14 @@ def test_advice_questions_are_told_apart_from_simple_ones():
     assert is_advice("Is it worth learning Rust?")
     assert not is_advice("What is the capital of France?")
     assert not is_advice("Hi there!")
+    # A growth question went to a 7-model council of 3-8B models and came back with guesses
+    assert is_advice(
+        "Can you do a deep research into https://github.com/dv333/quorum and come up with marketing/product "
+        "improvements strategies to make it 100K git stars."
+    )
+    assert is_advice("How can we grow our newsletter?")
+    assert is_advice("Give me ideas for a 10th birthday party")
+    assert not is_advice("What does the growth rate of bacteria depend on?")
 
 
 # ---------------------------------------------------------------- tracing
